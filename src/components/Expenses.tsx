@@ -113,22 +113,24 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex bg-slate-100 p-1 rounded-lg mr-2">
-            <button
+            <button 
               onClick={() => setView('list')}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${view === 'list' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'
-                }`}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                view === 'list' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'
+              }`}
             >
               <List size={14} /> Lista
             </button>
-            <button
+            <button 
               onClick={() => setView('report')}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${view === 'report' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'
-                }`}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                view === 'report' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'
+              }`}
             >
               <PieChart size={14} /> Reporte
             </button>
           </div>
-          <button
+          <button 
             onClick={() => setShowForm(!showForm)}
             className="btn-primary"
           >
@@ -144,21 +146,21 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
               <label className="label">Fecha</label>
               <div className="relative">
                 <Calendar className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                <input
-                  type="date"
+                <input 
+                  type="date" 
                   required
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="input-field pl-10"
+                  onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  className="input-field pl-10" 
                 />
               </div>
             </div>
 
             <div className="space-y-1">
               <label className="label">Categoría</label>
-              <select
+              <select 
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                onChange={(e) => setFormData({...formData, category: e.target.value})}
                 className="input-field"
               >
                 {CATEGORIES.map(c => (
@@ -171,27 +173,27 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
               <label className="label">Monto USD</label>
               <div className="relative">
                 <TrendingDown className="absolute left-3 top-2.5 text-rose-400" size={18} />
-                <input
-                  type="number"
+                <input 
+                  type="number" 
                   step="0.01"
                   required
                   placeholder="0.00"
                   value={formData.amountUsd}
                   onChange={(e) => handleUsdChange(e.target.value)}
-                  className="input-field pl-10"
+                  className="input-field pl-10" 
                 />
               </div>
             </div>
 
             <div className="space-y-1">
               <label className="label">Monto BS (Equivalente)</label>
-              <input
-                type="number"
+              <input 
+                type="number" 
                 step="0.01"
                 placeholder="0.00"
                 value={formData.amountBs}
                 onChange={(e) => handleBsChange(e.target.value)}
-                className="input-field"
+                className="input-field" 
               />
               {exchangeRate && <p className="text-[9px] text-slate-400 text-right">Tasa: {exchangeRate} BS/$</p>}
             </div>
@@ -200,12 +202,12 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
               <label className="label">Nota (Opcional)</label>
               <div className="relative">
                 <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                <input
-                  type="text"
+                <input 
+                  type="text" 
                   placeholder="Ej: Pago de luz"
                   value={formData.note}
-                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                  className="input-field pl-10"
+                  onChange={(e) => setFormData({...formData, note: e.target.value})}
+                  className="input-field pl-10" 
                 />
               </div>
             </div>
@@ -224,8 +226,8 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
           <Filter size={18} className="text-slate-400" />
           <span className="text-sm font-semibold text-slate-600">Filtrar Mes:</span>
         </div>
-        <input
-          type="month"
+        <input 
+          type="month" 
           value={filterMonth}
           onChange={(e) => setFilterMonth(e.target.value)}
           className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
@@ -283,15 +285,15 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
                   <BarChart data={categoryData} layout="vertical" margin={{ left: 40, right: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} stroke="#f1f5f9" />
                     <XAxis type="number" hide />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      axisLine={false}
-                      tickLine={false}
+                    <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      axisLine={false} 
+                      tickLine={false} 
                       width={100}
                       tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
                     />
-                    <Tooltip
+                    <Tooltip 
                       cursor={{ fill: 'transparent' }}
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
@@ -299,7 +301,7 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
                             <div className="bg-white p-3 border border-slate-200 shadow-xl rounded-lg">
                               <p className="text-xs font-bold text-slate-500 uppercase">{payload[0].payload.name}</p>
                               <p className="text-lg font-black text-rose-600">{formatCurrency(payload[0].value as number)}</p>
-                              <p className="text-[10px] text-slate-400 italic">{((payload[0].value as number / totalMonthlyExpense) * 100).toFixed(1)}% del total</p>
+                              <p className="text-[10px] text-slate-400 italic">{( (payload[0].value as number / totalMonthlyExpense) * 100).toFixed(1)}% del total</p>
                             </div>
                           );
                         }
@@ -333,12 +335,12 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
                   <div className="flex-1">
                     <p className="text-sm font-bold text-slate-700">{item.name}</p>
                     <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1 overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-1000"
-                        style={{
+                      <div 
+                        className="h-full rounded-full transition-all duration-1000" 
+                        style={{ 
                           width: `${(item.value / totalMonthlyExpense) * 100}%`,
                           backgroundColor: item.color
-                        }}
+                        }} 
                       />
                     </div>
                   </div>
@@ -354,7 +356,7 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
                 <div className="py-20 text-center text-slate-400 italic">No hay gastos registrados este mes</div>
               )}
             </div>
-
+            
             {categoryData.length > 0 && (
               <div className="mt-8 pt-6 border-t border-slate-100">
                 <div className="flex items-center justify-between text-slate-800">

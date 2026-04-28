@@ -56,7 +56,7 @@ export default function Dashboard() {
     .reduce((sum, t) => sum + t.amountUsd, 0);
 
   const monthlyWithdrawals = transactions
-    .filter(t => t.type === TransactionType.WITHDRAWAL && isWithinInterval(new Date(t.date), currentMonthInterval))
+    .filter(t => t.type === 'withdrawal' && isWithinInterval(new Date(t.date), currentMonthInterval))
     .reduce((sum, t) => sum + t.amountUsd, 0);
 
   const monthlyExpenses = expenses
@@ -79,7 +79,7 @@ export default function Dashboard() {
         .reduce((sum, t) => sum + t.amountUsd, 0);
         
       const withdrawal = transactions
-        .filter(t => t.type === TransactionType.WITHDRAWAL && isWithinInterval(new Date(t.date), interval))
+        .filter(t => t.type === 'withdrawal' && isWithinInterval(new Date(t.date), interval))
         .reduce((sum, t) => sum + t.amountUsd, 0);
 
       const expense = expenses

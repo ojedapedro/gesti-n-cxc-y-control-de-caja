@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 import { type CXCAccount, type CXCPayment } from '../types';
-import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag } from 'lucide-react';
+import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -10,6 +10,7 @@ export default function CXCAccounts() {
   const [accounts, setAccounts] = useState<CXCAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<CXCAccount | null>(null);
   const [payments, setPayments] = useState<CXCPayment[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentData, setPaymentData] = useState({
     amountUsd: '',
@@ -20,6 +21,41 @@ export default function CXCAccounts() {
   useEffect(() => {
     return dbService.subscribeToCXCAccounts(setAccounts);
   }, []);
+
+  const getUrgencyStyles = (balance: number) => {
+    if (balance === 0) return { 
+      bg: 'bg-emerald-50 text-emerald-700', 
+      border: 'border-emerald-100', 
+      dot: 'bg-emerald-500',
+      icon: <CheckCircle size={14} className="text-emerald-500" />,
+      label: 'Al día'
+    };
+    if (balance < 50) return { 
+      bg: 'bg-amber-50 text-amber-700', 
+      border: 'border-amber-100', 
+      dot: 'bg-amber-500',
+      icon: <CircleDollarSign size={14} className="text-amber-500" />,
+      label: 'Bajo'
+    };
+    if (balance < 200) return { 
+      bg: 'bg-orange-50 text-orange-700', 
+      border: 'border-orange-100', 
+      dot: 'bg-orange-500',
+      icon: <AlertTriangle size={14} className="text-orange-500" />,
+      label: 'Moderado'
+    };
+    return { 
+      bg: 'bg-rose-50 text-rose-700', 
+      border: 'border-rose-100', 
+      dot: 'bg-rose-500',
+      icon: <AlertTriangle size={14} className="text-rose-500" />,
+      label: 'Alto Riesgo'
+    };
+  };
+
+  const filteredAccounts = accounts.filter(acc => 
+    acc.clientName.toLowerCase().includes(searchQuery.toLowerCase())
+  ).sort((a, b) => b.totalBalance - a.totalBalance);
 
   useEffect(() => {
     if (selectedAccount?.id) {
@@ -52,38 +88,84 @@ export default function CXCAccounts() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Accounts List */}
-      <div className="lg:col-span-1 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-800">Clientes CXC</h2>
+      <div className="lg:col-span-1 flex flex-col h-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-slate-800">Clientes CXC</h2>
+            <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-black uppercase">
+              {filteredAccounts.length} Total
+            </span>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+            <input 
+              type="text" 
+              placeholder="Buscar cliente..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            />
+          </div>
         </div>
-        <div className="card max-h-[calc(100vh-200px)] overflow-y-auto">
-          {accounts.map((acc) => (
-            <button
-              key={acc.id}
-              onClick={() => setSelectedAccount(acc)}
-              className={`w-full text-left p-4 border-b border-slate-100 transition-colors flex items-center justify-between hover:bg-slate-50 ${
-                selectedAccount?.id === acc.id ? 'bg-blue-50/50 border-r-4 border-r-blue-600' : ''
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold uppercase transition-transform hover:scale-110">
-                  {acc.clientName.charAt(0)}
+
+        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 custom-scrollbar">
+          {filteredAccounts.map((acc) => {
+            const urgency = getUrgencyStyles(acc.totalBalance);
+            const isSelected = selectedAccount?.id === acc.id;
+            
+            return (
+              <button
+                key={acc.id}
+                onClick={() => setSelectedAccount(acc)}
+                className={`w-full text-left p-4 transition-all group relative overflow-hidden ${
+                  isSelected ? 'bg-blue-50/30' : 'hover:bg-slate-50'
+                }`}
+              >
+                {isSelected && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-full" />
+                )}
+                
+                <div className="flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black uppercase transition-all shadow-sm ${
+                    isSelected ? 'bg-blue-600 text-white rotate-3' : 'bg-slate-100 text-slate-400 group-hover:bg-white group-hover:shadow group-hover:-rotate-3'
+                  }`}>
+                    {acc.clientName.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-bold truncate text-sm tracking-tight ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
+                      {acc.clientName}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1 ${urgency.bg}`}>
+                        {urgency.icon}
+                        {urgency.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right pl-2">
+                    <p className={`text-sm font-black tracking-tighter ${
+                      acc.totalBalance > 200 ? 'text-rose-600' : 
+                      acc.totalBalance > 50 ? 'text-orange-600' : 
+                      acc.totalBalance > 0 ? 'text-amber-600' : 
+                      'text-emerald-600'
+                    }`}>
+                      {formatCurrency(acc.totalBalance)}
+                    </p>
+                    <ChevronRight size={14} className={`ml-auto mt-1 transition-transform ${
+                      isSelected ? 'text-blue-400 translate-x-1' : 'text-slate-300'
+                    }`} />
+                  </div>
                 </div>
-                <div>
-                  <p className="font-bold text-slate-900">{acc.clientName}</p>
-                  <p className="text-xs text-slate-500">Saldo pendiente</p>
-                </div>
+              </button>
+            );
+          })}
+          {filteredAccounts.length === 0 && (
+            <div className="p-12 text-center">
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Search className="text-slate-300" size={24} />
               </div>
-              <div className="text-right">
-                <p className={`font-bold ${acc.totalBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  {formatCurrency(acc.totalBalance)}
-                </p>
-                <ChevronRight size={16} className="text-slate-300 ml-auto" />
-              </div>
-            </button>
-          ))}
-          {accounts.length === 0 && (
-            <div className="p-8 text-center text-slate-500 italic">No hay cuentas CXC activas.</div>
+              <p className="text-slate-400 text-sm italic">No se encontraron clientes.</p>
+            </div>
           )}
         </div>
       </div>
@@ -92,18 +174,46 @@ export default function CXCAccounts() {
       <div className="lg:col-span-2 space-y-6">
         {selectedAccount ? (
           <>
-            <div className="card p-6 bg-white flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div>
-                <h3 className="text-2xl font-bold text-slate-900">{selectedAccount.clientName}</h3>
-                <p className="text-slate-500 flex items-center gap-2 mt-1">
-                  <User size={14} /> ID Cliente: {selectedAccount.id}
-                </p>
-              </div>
-              <div className="bg-slate-50 px-6 py-4 rounded-xl border border-slate-100 text-center md:text-right">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Saldo de la Cuenta</p>
-                <p className={`text-3xl font-extrabold ${selectedAccount.totalBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  {formatCurrency(selectedAccount.totalBalance)}
-                </p>
+            <div className="card p-0 overflow-hidden bg-white border-slate-200 shadow-xl">
+              <div className="bg-slate-900 p-8 text-white relative isolate">
+                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                  <CircleDollarSign size={160} />
+                </div>
+                
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative">
+                  <div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-2xl font-black shadow-lg shadow-blue-500/20">
+                        {selectedAccount.clientName.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="text-3xl font-black tracking-tighter">{selectedAccount.clientName}</h3>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mt-1">
+                          <User size={12} className="text-blue-400" /> ID: {selectedAccount.id}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-left md:text-right bg-white/5 backdrop-blur px-6 py-4 rounded-2xl border border-white/10">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Balance Pendiente</p>
+                    <div className="flex items-center gap-3 justify-end">
+                      {selectedAccount.totalBalance > 200 && (
+                        <div className="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1 animate-pulse">
+                          <AlertTriangle size={12} /> Urgente
+                        </div>
+                      )}
+                      <p className={`text-4xl font-black tracking-tighter ${
+                        selectedAccount.totalBalance > 200 ? 'text-rose-400' : 
+                        selectedAccount.totalBalance > 50 ? 'text-orange-400' : 
+                        selectedAccount.totalBalance > 0 ? 'text-amber-400' : 
+                        'text-emerald-400'
+                      }`}>
+                        {formatCurrency(selectedAccount.totalBalance)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

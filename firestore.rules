@@ -79,8 +79,8 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow create: if isSignedIn() && isValidTransaction(incoming()) && isValidId(transactionId);
       allow update: if isSignedIn() && isValidTransaction(incoming()) && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['concept', 'clientName', 'amountBs', 'exchangeRate', 'amountUsd', 'paymentMethod', 'type', 'isCXC', 'cxcBalance', 'amountUsdCash', 'amountZelle', 'amountCXC', 'totalDailySale']);
-      allow delete: if isSignedIn();
+                    incoming().diff(existing()).affectedKeys().hasOnly(['concept', 'clientName', 'amountBs', 'exchangeRate', 'amountUsd', 'paymentMethod', 'type', 'isCXC', 'cxcBalance']);
+      allow delete: if isSignedIn(); // In a business app, admins might delete.
     }
 
     match /expenses/{expenseId} {
