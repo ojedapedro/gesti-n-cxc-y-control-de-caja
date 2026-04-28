@@ -242,7 +242,15 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                     <tr key={t.id} className="hover:bg-slate-50 border-b border-slate-200 text-xs font-medium">
                       <td className="p-3 text-slate-400 border-r border-slate-100">{transactions.length - i}</td>
                       <td className="p-3 font-bold uppercase border-r border-slate-100">{getDayName(t.date)}</td>
-                      <td className="p-3 border-r border-slate-100">{format(new Date(t.date + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                      <td className="p-3 border-r border-slate-100">
+                        {(() => {
+                          try {
+                            return format(new Date(t.date + 'T12:00:00'), 'dd/MM/yyyy');
+                          } catch {
+                            return t.date;
+                          }
+                        })()}
+                      </td>
                       <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30">{new Intl.NumberFormat('es-VE').format(t.amountBs || 0)}</td>
                       <td className="p-3 text-right border-r border-slate-100 font-mono text-blue-600">{t.exchangeRate}</td>
                       <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30">{formatCurrency(conv)}</td>

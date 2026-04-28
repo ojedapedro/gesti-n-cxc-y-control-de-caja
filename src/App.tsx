@@ -10,7 +10,6 @@ import {
   Menu,
   X
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { dbService } from './services/db';
 import Dashboard from './components/Dashboard';
 import Incomes from './components/Incomes';
@@ -115,56 +114,48 @@ export default function App() {
       </div>
 
       {/* Mobile Menu Overlay */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <div key="mobile-nav-container">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.5 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSidebarOpen(false)}
-              className="fixed inset-0 bg-black z-40 md:hidden"
-            />
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed left-0 top-0 bottom-0 w-3/4 max-w-xs bg-slate-900 z-50 p-6 md:hidden flex flex-col"
-            >
-              <div className="mb-10">
-                <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <TrendingDown className="text-blue-400" />
-                  GESTIÓN CXC
-                </h1>
-              </div>
-              <nav className="flex-1 space-y-4 overflow-y-auto">
-                {menuItems.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setActiveView(item.id as View);
-                        setSidebarOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-4 text-lg ${
-                        activeView === item.id ? 'text-blue-400' : 'text-slate-400'
-                      }`}
-                    >
-                      <Icon size={24} />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </nav>
-              <div className="mt-8 border-t border-slate-800 pt-4">
-                <UserMenu user={user} />
-              </div>
-            </motion.div>
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div 
+            onClick={() => setSidebarOpen(false)}
+            className="absolute inset-0 bg-black/50 transition-opacity"
+          />
+          <div className="absolute left-0 top-0 bottom-0 w-3/4 max-w-xs bg-slate-900 p-6 flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
+            <div className="mb-10 flex items-center justify-between">
+              <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <TrendingDown className="text-blue-400" />
+                GESTIÓN CXC
+              </h1>
+              <button onClick={() => setSidebarOpen(false)} className="text-slate-400">
+                <X size={24} />
+              </button>
+            </div>
+            <nav className="flex-1 space-y-4 overflow-y-auto">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveView(item.id as View);
+                      setSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-4 text-lg ${
+                      activeView === item.id ? 'text-blue-400' : 'text-slate-400'
+                    }`}
+                  >
+                    <Icon size={24} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="mt-8 border-t border-slate-800 pt-4">
+              <UserMenu user={user} />
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 bg-slate-50 min-h-screen">
