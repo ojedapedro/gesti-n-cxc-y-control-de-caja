@@ -105,7 +105,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
           onClick={() => setShowForm(!showForm)}
           className="btn-primary"
         >
-          {showForm ? 'Cerrar Formulario' : 'Nuevo Cuadre Diario'}
+          {showForm ? <span>Cerrar Formulario</span> : <span><Plus size={16} className="inline mr-2 -mt-0.5" />Nuevo Cuadre Diario</span>}
         </button>
       </div>
 
