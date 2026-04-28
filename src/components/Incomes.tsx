@@ -3,7 +3,7 @@ import { dbService } from '../services/db';
 import { TransactionType, PaymentMethod, type Transaction } from '../types';
 import { Plus, Search, Calendar, User, DollarSign, Tag, Clock } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
@@ -30,8 +30,19 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     return dbService.subscribeToTransactions(setTransactions);
   }, []);
 
+  useEffect(() => {
+    if (exchangeRate && !formData.amountBs) {
+      setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+    }
+  }, [exchangeRate]);
+
+  // Handle form field changes helper
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
   // Calculated Fields
-  const amountUsdConv = parseFloat(formData.amountBs) / (parseFloat(formData.exchangeRate) || 1) || 0;
+  const amountUsdConv = (parseFloat(formData.amountBs) || 0) / (parseFloat(formData.exchangeRate) || 1);
   const amountUsdCash = parseFloat(formData.amountUsdCash) || 0;
   const amountZelle = parseFloat(formData.amountZelle) || 0;
   const amountCXC = parseFloat(formData.amountCXC) || 0;
@@ -73,8 +84,11 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   };
 
   const getDayName = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T12:00:00');
+    if (!isValid(date)) return '';
     try {
-      return format(new Date(dateStr + 'T12:00:00'), 'EEEE', { locale: es });
+      return format(date, 'EEEE', { locale: es });
     } catch {
       return '';
     }
@@ -91,14 +105,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
           onClick={() => setShowForm(!showForm)}
           className="btn-primary"
         >
-          {showForm ? (
-            <span>Cerrar Formulario</span>
-          ) : (
-            <>
-              <Plus size={20} />
-              <span>Nuevo Cuadre Diario</span>
-            </>
-          )}
+          {showForm ? 'Cerrar Formulario' : 'Nuevo Cuadre Diario'}
         </button>
       </div>
 
@@ -251,8 +258,10 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                       <td className="p-3 font-bold uppercase border-r border-slate-100">{getDayName(t.date)}</td>
                       <td className="p-3 border-r border-slate-100">
                         {(() => {
+                          const d = new Date(t.date + 'T12:00:00');
+                          if (!isValid(d)) return t.date;
                           try {
-                            return format(new Date(t.date + 'T12:00:00'), 'dd/MM/yyyy');
+                            return format(d, 'dd/MM/yyyy');
                           } catch {
                             return t.date;
                           }

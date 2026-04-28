@@ -159,14 +159,12 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 bg-slate-50 min-h-screen">
-        <div className="fade-in duration-300">
-          {activeView === 'dashboard' && <Dashboard />}
-          {activeView === 'incomes' && <Incomes exchangeRate={globalSettings?.exchangeRate} />}
-          {activeView === 'cxc' && <CXCAccounts />}
-          {activeView === 'expenses' && <Expenses exchangeRate={globalSettings?.exchangeRate} />}
-          {activeView === 'receipts' && <Receipts />}
-          {activeView === 'settings' && <Settings />}
-        </div>
+        {activeView === 'dashboard' && <div key="dashboard"><Dashboard /></div>}
+        {activeView === 'incomes' && <div key="incomes"><Incomes exchangeRate={globalSettings?.exchangeRate} /></div>}
+        {activeView === 'cxc' && <div key="cxc"><CXCAccounts /></div>}
+        {activeView === 'expenses' && <div key="expenses"><Expenses exchangeRate={globalSettings?.exchangeRate} /></div>}
+        {activeView === 'receipts' && <div key="receipts"><Receipts /></div>}
+        {activeView === 'settings' && <div key="settings"><Settings /></div>}
       </main>
     </div>
   );
