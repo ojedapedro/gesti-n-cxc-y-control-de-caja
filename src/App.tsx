@@ -168,22 +168,14 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 bg-slate-50 min-h-screen">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeView}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            {activeView === 'dashboard' && <Dashboard />}
-            {activeView === 'incomes' && <Incomes exchangeRate={globalSettings?.exchangeRate} />}
-            {activeView === 'cxc' && <CXCAccounts />}
-            {activeView === 'expenses' && <Expenses exchangeRate={globalSettings?.exchangeRate} />}
-            {activeView === 'receipts' && <Receipts />}
-            {activeView === 'settings' && <Settings />}
-          </motion.div>
-        </AnimatePresence>
+        <div key={activeView} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {activeView === 'dashboard' && <Dashboard />}
+          {activeView === 'incomes' && <Incomes exchangeRate={globalSettings?.exchangeRate} />}
+          {activeView === 'cxc' && <CXCAccounts />}
+          {activeView === 'expenses' && <Expenses exchangeRate={globalSettings?.exchangeRate} />}
+          {activeView === 'receipts' && <Receipts />}
+          {activeView === 'settings' && <Settings />}
+        </div>
       </main>
     </div>
   );
