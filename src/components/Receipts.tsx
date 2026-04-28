@@ -35,15 +35,18 @@ export default function Receipts() {
       date: formData.date,
     };
 
-    await dbService.addReceipt(newReceipt);
+    const docRef = await dbService.addReceipt(newReceipt);
     
     // Refresh
     const res = await dbService.getReceipts();
     setReceipts(res || []);
     setShowForm(false);
     
-    // Auto Select for Preview
-    setSelectedReceipt(newReceipt as Receipt);
+    // Auto Select for Preview with the actual document data (including ID)
+    if (docRef) {
+      const fullReceipt = { ...newReceipt, id: docRef.id } as Receipt;
+      setSelectedReceipt(fullReceipt);
+    }
   };
 
   const handlePrint = () => {
