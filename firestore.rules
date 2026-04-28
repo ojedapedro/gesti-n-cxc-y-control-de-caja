@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // HELPER FUNCTIONS
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validations
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['date', 'amountUsd', 'type', 'createdAt']) &&
+             data.date is string &&
+             data.amountUsd is number &&
+             data.amountUsd >= 0 &&
+             data.type in ['income', 'sale', 'withdrawal'] &&
+             data.createdAt == request.time;
+    }
+
+    function isValidExpense(data) {
+      return data.keys().hasAll(['date', 'category', 'amountUsd', 'createdAt']) &&
+             data.date is string &&
+             data.category is string &&
+             data.category.size() <= 100 &&
+             data.amountUsd is number &&
+             data.amountUsd >= 0 &&
+             data.createdAt == request.time;
+    }
+
+    function isValidCXCAccount(data) {
+      return data.keys().hasAll(['clientName', 'totalBalance', 'lastUpdated']) &&
+             data.clientName is string &&
+             data.clientName.size() <= 200 &&
+             data.totalBalance is number &&
+             data.lastUpdated == request.time;
+    }
+
+    function isValidCXCPayment(data) {
+      return data.keys().hasAll(['clientId', 'amountUsd', 'date', 'createdAt']) &&
+             data.clientId is string &&
+             data.amountUsd is number &&
+             data.amountUsd >= 0 &&
+             data.date is string &&
+             data.createdAt == request.time;
+    }
+
+    function isValidReceipt(data) {
+      return data.keys().hasAll(['receiptNumber', 'amountUsd', 'recipient', 'date', 'createdAt']) &&
+             data.receiptNumber is string &&
+             data.amountUsd is number &&
+             data.recipient is string &&
+             data.date is string &&
+             data.createdAt == request.time;
+    }
+
+    // MATCH BLOCKS
+    match /transactions/{transactionId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidTransaction(incoming()) && isValidId(transactionId);
+      allow update: if isSignedIn() && isValidTransaction(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['concept', 'clientName', 'amountBs', 'exchangeRate', 'amountUsd', 'paymentMethod', 'type', 'isCXC', 'cxcBalance']);
+      allow delete: if isSignedIn(); // In a business app, admins might delete.
+    }
+
+    match /expenses/{expenseId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidExpense(incoming()) && isValidId(expenseId);
+      allow update: if isSignedIn() && isValidExpense(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['category', 'note', 'amountBs', 'amountUsd', 'date']);
+      allow delete: if isSignedIn();
+    }
+
+    match /cxc_accounts/{clientId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidCXCAccount(incoming()) && isValidId(clientId);
+      allow update: if isSignedIn() && isValidCXCAccount(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['totalBalance', 'lastUpdated', 'clientName']);
+      allow delete: if isSignedIn();
+
+      match /payments/{paymentId} {
+        allow list: if isSignedIn();
+        allow get: if isSignedIn();
+        allow create: if isSignedIn() && isValidCXCPayment(incoming()) && isValidId(paymentId);
+        allow update: if isSignedIn() && isValidCXCPayment(incoming()) &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'date', 'concept']);
+        allow delete: if isSignedIn();
+      }
+    }
+
+    match /receipts/{receiptId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidReceipt(incoming()) && isValidId(receiptId);
+      allow update: if isSignedIn() && isValidReceipt(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'recipient', 'concept', 'date']);
+      allow delete: if isSignedIn();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn(); 
+    }
+  }
+}

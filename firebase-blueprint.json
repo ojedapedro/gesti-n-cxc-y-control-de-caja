@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Daily box income or recorded sale.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date-time" },
+        "clientName": { "type": "string" },
+        "concept": { "type": "string" },
+        "amountBs": { "type": "number" },
+        "exchangeRate": { "type": "number" },
+        "amountUsd": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["Bolivares", "Dolares Efectivo", "Zelle", "CXC"] },
+        "type": { "type": "string", "enum": ["income", "sale", "withdrawal"] },
+        "isCXC": { "type": "boolean" },
+        "cxcBalance": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["date", "amountUsd", "type"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Business expenses.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" },
+        "note": { "type": "string" },
+        "amountBs": { "type": "number" },
+        "amountUsd": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["date", "category", "amountUsd"]
+    },
+    "CXCAccount": {
+      "title": "CXC Account",
+      "description": "Outstanding balance per client.",
+      "type": "object",
+      "properties": {
+        "clientName": { "type": "string" },
+        "totalBalance": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientName", "totalBalance"]
+    },
+    "CXCPayment": {
+      "title": "CXC Payment",
+      "description": "Payments made towards an outstanding CXC balance.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "amountUsd": { "type": "number" },
+        "concept": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "date", "amountUsd"]
+    },
+    "Receipt": {
+      "title": "Receipt",
+      "description": "Support for cash withdrawals.",
+      "type": "object",
+      "properties": {
+        "receiptNumber": { "type": "string" },
+        "amountUsd": { "type": "number" },
+        "recipient": { "type": "string" },
+        "concept": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["receiptNumber", "amountUsd", "recipient", "date"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application settings like exchange rates.",
+      "type": "object",
+      "properties": {
+        "exchangeRate": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["exchangeRate"]
+    }
+  },
+  "firestore": {
+    "/transactions": {
+      "schema": "Transaction",
+      "description": "Main ledger for daily incomes and sales."
+    },
+    "/expenses": {
+      "schema": "Expense",
+      "description": "Business expenses tracking."
+    },
+    "/cxc_accounts": {
+      "schema": "CXCAccount",
+      "description": "Summary of outstanding balances by client."
+    },
+    "/cxc_accounts/{clientId}/payments": {
+      "schema": "CXCPayment",
+      "description": "History of payments for a specific client."
+    },
+    "/receipts": {
+      "schema": "Receipt",
+      "description": "Withdrawal receipts."
+    },
+    "/settings": {
+      "schema": "Settings",
+      "description": "Global configuration."
+    }
+  }
+}
