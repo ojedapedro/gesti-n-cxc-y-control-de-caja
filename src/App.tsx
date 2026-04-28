@@ -115,10 +115,11 @@ export default function App() {
       </div>
 
       {/* Mobile Menu Overlay */}
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {sidebarOpen && (
-          <>
+          <div key="mobile-nav-wrapper">
             <motion.div
+              key="overlay"
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.5 }}
               exit={{ opacity: 0 }}
@@ -126,6 +127,7 @@ export default function App() {
               className="fixed inset-0 bg-black z-40 md:hidden"
             />
             <motion.div
+              key="sidebar"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
@@ -162,25 +164,28 @@ export default function App() {
                 <UserMenu user={user} />
               </div>
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
 
       {/* Main Content */}
       <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 bg-slate-50 min-h-screen">
-        <motion.div
-          key={activeView}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {activeView === 'dashboard' && <Dashboard />}
-          {activeView === 'incomes' && <Incomes exchangeRate={globalSettings?.exchangeRate} />}
-          {activeView === 'cxc' && <CXCAccounts />}
-          {activeView === 'expenses' && <Expenses exchangeRate={globalSettings?.exchangeRate} />}
-          {activeView === 'receipts' && <Receipts />}
-          {activeView === 'settings' && <Settings />}
-        </motion.div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeView}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {activeView === 'dashboard' && <Dashboard />}
+            {activeView === 'incomes' && <Incomes exchangeRate={globalSettings?.exchangeRate} />}
+            {activeView === 'cxc' && <CXCAccounts />}
+            {activeView === 'expenses' && <Expenses exchangeRate={globalSettings?.exchangeRate} />}
+            {activeView === 'receipts' && <Receipts />}
+            {activeView === 'settings' && <Settings />}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );

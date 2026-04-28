@@ -48,20 +48,12 @@ export default function Receipts() {
 
   const handlePrint = () => {
     if (!selectedReceipt) return;
-    const printContent = printRef.current?.innerHTML;
-    const originalContent = document.body.innerHTML;
-    
-    if (printContent) {
-      document.body.innerHTML = printContent;
-      window.print();
-      document.body.innerHTML = originalContent;
-      window.location.reload(); // To restore React state
-    }
+    window.print();
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Recibos de Retiro</h2>
           <p className="text-slate-500">Vales de salida de efectivo que afectan CXC.</p>
@@ -75,7 +67,7 @@ export default function Receipts() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="space-y-6">
+        <div className="space-y-6 no-print">
           {showForm && (
             <div className="card p-6 border-blue-100 bg-blue-50/10">
               <h3 className="font-bold text-slate-800 mb-4">Nuevo Recibo</h3>
@@ -194,7 +186,7 @@ export default function Receipts() {
           </div>
           
           {selectedReceipt ? (
-            <div ref={printRef} className="bg-white p-8 rounded-xl border border-slate-300 shadow-xl max-w-lg mx-auto print:shadow-none print:border-none print:m-0">
+            <div ref={printRef} className="print-container bg-white p-8 rounded-xl border border-slate-300 shadow-xl max-w-lg mx-auto print:shadow-none print:border-none print:m-0">
               <div className="border-2 border-slate-900 p-6 space-y-6">
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
