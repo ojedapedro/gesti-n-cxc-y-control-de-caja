@@ -159,7 +159,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 bg-slate-50 min-h-screen">
-        <div key={activeView} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="fade-in duration-300">
           {activeView === 'dashboard' && <Dashboard />}
           {activeView === 'incomes' && <Incomes exchangeRate={globalSettings?.exchangeRate} />}
           {activeView === 'cxc' && <CXCAccounts />}

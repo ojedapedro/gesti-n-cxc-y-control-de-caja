@@ -91,12 +91,19 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
           onClick={() => setShowForm(!showForm)}
           className="btn-primary"
         >
-          {showForm ? 'Cerrar Formulario' : <><Plus size={20} /> Nuevo Cuadre Diarío</>}
+          {showForm ? (
+            <span>Cerrar Formulario</span>
+          ) : (
+            <>
+              <Plus size={20} />
+              <span>Nuevo Cuadre Diario</span>
+            </>
+          )}
         </button>
       </div>
 
       {showForm && (
-        <div className="card p-6 border-blue-100 bg-blue-50/10">
+        <div key="incomes-form-container" className="card p-6 border-blue-100 bg-blue-50/10">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <div className="space-y-1">
