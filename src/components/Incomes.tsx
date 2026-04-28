@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 import { TransactionType, PaymentMethod, type Transaction } from '../types';
-import { Plus, Search, Calendar, User, DollarSign, Tag, Clock } from 'lucide-react';
+import { Plus, Calendar } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -9,6 +9,8 @@ import { es } from 'date-fns/locale';
 export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     amountBs: '',
@@ -39,35 +41,49 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    await dbService.addTransaction({
-      date: formData.date,
-      clientName: 'CUADRE DIARIO',
-      concept: formData.concept,
-      amountBs: parseFloat(formData.amountBs) || 0,
-      exchangeRate: parseFloat(formData.exchangeRate) || 1,
-      amountUsd: totalDailySale, // Total sale for the day
-      paymentMethod: PaymentMethod.BS, // Or mixed? Let's use BS as base for this summary type
-      type: TransactionType.SALE,
-      isCXC: amountCXC > 0,
-      amountUsdCash: amountUsdCash,
-      amountZelle: amountZelle,
-      amountCXC: amountCXC,
-      totalDailySale: totalDailySale,
-    });
+    if (submitting) return;
 
-    // If there's a CXC component, maybe we should ask for a client or record it generally?
-    // The user image shows CXC as a column. In a real app, you'd want to know WHICH client.
-    // For now, I'll record it as a general sales summary.
+    // A-07: Validate amounts
+    const bsVal = parseFloat(formData.amountBs);
+    const rateVal = parseFloat(formData.exchangeRate);
+    if (isNaN(rateVal) || rateVal <= 0) {
+      setError('La tasa de cambio debe ser mayor a cero.');
+      return;
+    }
 
-    setShowForm(false);
-    setFormData({
-      ...formData,
-      amountBs: '',
-      amountUsdCash: '',
-      amountZelle: '',
-      amountCXC: '',
-    });
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await dbService.addTransaction({
+        date: formData.date,
+        clientName: 'CUADRE DIARIO',
+        concept: formData.concept,
+        amountBs: bsVal || 0,
+        exchangeRate: rateVal,
+        amountUsd: totalDailySale,
+        paymentMethod: PaymentMethod.BS,
+        type: TransactionType.SALE,
+        isCXC: amountCXC > 0,
+        amountUsdCash: amountUsdCash,
+        amountZelle: amountZelle,
+        amountCXC: amountCXC,
+        totalDailySale: totalDailySale,
+      });
+
+      setShowForm(false);
+      setFormData({
+        ...formData,
+        amountBs: '',
+        amountUsdCash: '',
+        amountZelle: '',
+        amountCXC: '',
+      });
+    } catch (err) {
+      setError('Error al guardar el cuadre de caja. Intente de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const getDayName = (dateStr: string) => {
@@ -95,6 +111,11 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
       {showForm && (
         <div className="card p-6 border-blue-100 bg-blue-50/10">
+          {error && (
+            <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 font-medium">
+              {error}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <div className="space-y-1">
@@ -206,8 +227,8 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
             </div>
 
             <div className="flex justify-end pt-4 border-t border-slate-100">
-              <button type="submit" className="btn-primary px-10 h-12 shadow-xl shadow-blue-200">
-                Guardar Cuadre de Caja
+              <button type="submit" disabled={submitting} className="btn-primary px-10 h-12 shadow-xl shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                {submitting ? 'Guardando...' : 'Guardar Cuadre de Caja'}
               </button>
             </div>
           </form>
@@ -232,13 +253,13 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
               </tr>
             </thead>
             <tbody>
-              {transactions
-                .filter(t => t.type === TransactionType.SALE)
-                .map((t, i) => {
+              {(() => {
+                const salesOnly = transactions.filter(t => t.type === TransactionType.SALE);
+                return salesOnly.map((t, i) => {
                   const conv = (t.amountBs || 0) / (t.exchangeRate || 1);
                   return (
                     <tr key={t.id} className="hover:bg-slate-50 border-b border-slate-200 text-xs font-medium">
-                      <td className="p-3 text-slate-400 border-r border-slate-100">{transactions.length - i}</td>
+                      <td className="p-3 text-slate-400 border-r border-slate-100">{salesOnly.length - i}</td>
                       <td className="p-3 font-bold uppercase border-r border-slate-100">{getDayName(t.date)}</td>
                       <td className="p-3 border-r border-slate-100">{format(new Date(t.date + 'T12:00:00'), 'dd/MM/yyyy')}</td>
                       <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30">{new Intl.NumberFormat('es-VE').format(t.amountBs || 0)}</td>
@@ -250,7 +271,8 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                       <td className="p-3 text-right font-black text-slate-900 bg-slate-50">{formatCurrency(t.totalDailySale || t.amountUsd)}</td>
                     </tr>
                   );
-                })}
+                });
+              })()}
               {transactions.filter(t => t.type === TransactionType.SALE).length === 0 && (
                 <tr>
                   <td colSpan={10} className="p-10 text-center text-slate-400 italic">No hay cuadres de caja registrados.</td>

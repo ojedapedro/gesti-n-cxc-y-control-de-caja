@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/db';
 import { type Receipt } from '../types';
-import { Plus, Printer, FileText, User, DollarSign, Calendar, Tag } from 'lucide-react';
+import { Plus, Printer, FileText, User, DollarSign, Calendar, Tag, ChevronRight } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -10,6 +10,8 @@ export default function Receipts() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     recipient: '',
     amountUsd: '',
@@ -19,35 +21,72 @@ export default function Receipts() {
 
   const printRef = useRef<HTMLDivElement>(null);
 
+  // C-05 FIX: Use real-time listener instead of one-time fetch
   useEffect(() => {
-    dbService.getReceipts().then(res => setReceipts(res || []));
+    return dbService.subscribeToReceipts(setReceipts);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const nextNum = (receipts.length + 1).toString().padStart(5, '0');
-    
-    const newReceipt = {
-      receiptNumber: nextNum,
-      recipient: formData.recipient,
-      amountUsd: parseFloat(formData.amountUsd),
-      concept: formData.concept,
-      date: formData.date,
-    };
+    if (submitting) return; // Prevent double-click duplicates
 
-    const docRef = await dbService.addReceipt(newReceipt);
-    
-    // Refresh
-    const res = await dbService.getReceipts();
-    setReceipts(res || []);
-    setShowForm(false);
-    
-    // Auto Select for Preview with the actual document data (including ID)
-    if (docRef) {
-      const fullReceipt = { ...newReceipt, id: docRef.id } as Receipt;
-      setSelectedReceipt(fullReceipt);
+    const amount = parseFloat(formData.amountUsd);
+    if (isNaN(amount) || amount <= 0) {
+      setError('El monto debe ser mayor a cero.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      // C-02 FIX: Receipt number is now generated atomically in dbService
+      const docRef = await dbService.addReceipt({
+        recipient: formData.recipient,
+        amountUsd: amount,
+        concept: formData.concept,
+        date: formData.date,
+      });
+
+      setShowForm(false);
+      setFormData({
+        recipient: '',
+        amountUsd: '',
+        concept: 'RETIRO EN EFECTIVO',
+        date: format(new Date(), 'yyyy-MM-dd'),
+      });
+
+      // The receipt will appear via the real-time listener.
+      // Auto-select it if we got the ref back.
+      if (docRef) {
+        // We'll find the receipt in the next snapshot update and select it then.
+        // For immediate preview, create a temporary object:
+        setSelectedReceipt({
+          id: docRef.id,
+          recipient: formData.recipient,
+          amountUsd: amount,
+          concept: formData.concept,
+          date: formData.date,
+          receiptNumber: '...', // Will update from real-time listener
+          createdAt: null,
+        } as Receipt);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? 'Error al guardar el recibo. Intente de nuevo.' : String(err));
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  // When receipts update from listener, refresh the selected receipt data
+  useEffect(() => {
+    if (selectedReceipt?.id) {
+      const updated = receipts.find(r => r.id === selectedReceipt.id);
+      if (updated) {
+        setSelectedReceipt(updated);
+      }
+    }
+  }, [receipts]);
 
   const handlePrint = () => {
     if (!selectedReceipt) return;
@@ -62,7 +101,7 @@ export default function Receipts() {
           <p className="text-slate-500">Vales de salida de efectivo que afectan CXC.</p>
         </div>
         <button 
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { setShowForm(!showForm); setError(null); }}
           className="btn-primary"
         >
           {showForm ? 'Cerrar' : <><Plus size={20} /> Generar Recibo</>}
@@ -74,6 +113,13 @@ export default function Receipts() {
           {showForm && (
             <div className="card p-6 border-blue-100 bg-blue-50/10">
               <h3 className="font-bold text-slate-800 mb-4">Nuevo Recibo</h3>
+
+              {error && (
+                <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 font-medium">
+                  {error}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -132,8 +178,12 @@ export default function Receipts() {
                     </div>
                   </div>
                 </div>
-                <button type="submit" className="btn-primary w-full h-11 mt-2">
-                  Crear y Guardar (Afecta CXC)
+                <button 
+                  type="submit" 
+                  disabled={submitting}
+                  className="btn-primary w-full h-11 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Guardando...' : 'Crear y Guardar (Afecta CXC)'}
                 </button>
               </form>
             </div>
@@ -250,23 +300,5 @@ export default function Receipts() {
         </div>
       </div>
     </div>
-  );
-}
-
-function ChevronRight({ size, className }: { size: number, className: string }) {
-  return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      className={className}
-    >
-      <path d="m9 18 6-6-6-6"/>
-    </svg>
   );
 }

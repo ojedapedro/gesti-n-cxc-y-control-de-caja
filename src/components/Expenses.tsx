@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 import { type Expense } from '../types';
-import { Plus, TrendingDown, Calendar, Tag, FileText, Search, Filter } from 'lucide-react';
+import { Plus, TrendingDown, Calendar, Tag, FileText, Filter } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 
@@ -18,6 +18,8 @@ const CATEGORIES = [
 export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     category: CATEGORIES[0],
@@ -26,24 +28,24 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     amountBs: '',
   });
 
-  // Automatic conversion logic
+  // A-06 FIX: Auto-conversion only when exchange rate is available and valid
+  const safeRate = exchangeRate && exchangeRate > 0 ? exchangeRate : null;
+
   const handleBsChange = (val: string) => {
     const bs = parseFloat(val);
-    const rate = exchangeRate || 1;
     setFormData({
       ...formData,
       amountBs: val,
-      amountUsd: bs > 0 ? (bs / rate).toFixed(2) : formData.amountUsd
+      amountUsd: (safeRate && bs > 0) ? (bs / safeRate).toFixed(2) : formData.amountUsd
     });
   };
 
   const handleUsdChange = (val: string) => {
     const usd = parseFloat(val);
-    const rate = exchangeRate || 1;
     setFormData({
       ...formData,
       amountUsd: val,
-      amountBs: usd > 0 ? (usd * rate).toFixed(2) : formData.amountBs
+      amountBs: (safeRate && usd > 0) ? (usd * safeRate).toFixed(2) : formData.amountBs
     });
   };
 
@@ -55,21 +57,39 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await dbService.addExpense({
-      date: formData.date,
-      category: formData.category,
-      note: formData.note,
-      amountUsd: parseFloat(formData.amountUsd),
-      amountBs: parseFloat(formData.amountBs) || 0,
-    });
+    if (submitting) return;
 
-    setShowForm(false);
-    setFormData({
-      ...formData,
-      note: '',
-      amountUsd: '',
-      amountBs: '',
-    });
+    // A-07: Validate amount
+    const usdAmount = parseFloat(formData.amountUsd);
+    if (isNaN(usdAmount) || usdAmount <= 0) {
+      setError('El monto USD debe ser mayor a cero.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await dbService.addExpense({
+        date: formData.date,
+        category: formData.category,
+        note: formData.note,
+        amountUsd: usdAmount,
+        amountBs: parseFloat(formData.amountBs) || 0,
+      });
+
+      setShowForm(false);
+      setFormData({
+        ...formData,
+        note: '',
+        amountUsd: '',
+        amountBs: '',
+      });
+    } catch (err) {
+      setError('Error al guardar el gasto. Intente de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const filteredExpenses = expenses.filter(e => {
@@ -96,6 +116,16 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
 
       {showForm && (
         <div className="card p-6 border-rose-100 bg-rose-50/30">
+          {error && (
+            <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 font-medium">
+              {error}
+            </div>
+          )}
+          {!safeRate && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 font-medium">
+              ⚠️ No hay tasa de cambio configurada. La conversión automática BS/USD está deshabilitada. Configure la tasa en Configuración.
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-1">
               <label className="label">Fecha</label>
@@ -151,6 +181,7 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
                 className="input-field" 
               />
               {exchangeRate && <p className="text-[9px] text-slate-400 text-right">Tasa: {exchangeRate} BS/$</p>}
+              {!safeRate && <p className="text-[9px] text-amber-500 text-right">Sin tasa — ingrese ambos montos manualmente</p>}
             </div>
 
             <div className="space-y-1">
@@ -168,8 +199,8 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
             </div>
 
             <div className="md:col-span-4 flex justify-end">
-              <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white font-medium py-2 px-8 rounded-lg transition-colors">
-                Guardar Gasto
+              <button type="submit" disabled={submitting} className="bg-rose-600 hover:bg-rose-700 disabled:bg-slate-400 text-white font-medium py-2 px-8 rounded-lg transition-colors disabled:cursor-not-allowed">
+                {submitting ? 'Guardando...' : 'Guardar Gasto'}
               </button>
             </div>
           </form>
