@@ -77,11 +77,9 @@ export default function App() {
     <div className="min-h-screen flex text-slate-900">
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex w-64 flex-col bg-[#0a0a0a] text-white p-5 fixed h-full border-r border-[#262626]">
-        <div className="mb-10 px-2 mt-4">
-          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <TrendingDown className="text-emerald-500" />
-            <span className="text-white">GESTIÓN CXC</span>
-          </h1>
+        <div className="mb-10 px-2 mt-4 text-center">
+          <img src="https://i.ibb.co/NgSYhpq5/logo-Azul-Iinvepinca.jpg" alt="Logo Invepinca" className="w-24 h-auto mx-auto rounded-xl shadow-lg border border-slate-700 mb-4" />
+          <h1 className="text-xl font-bold tracking-tight text-white">GESTIÓN CXC</h1>
           <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-[0.2em] font-medium">Invepinca CA</p>
         </div>
 
@@ -112,7 +110,10 @@ export default function App() {
 
       {/* Mobile Nav */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-        <h1 className="font-bold text-slate-800 tracking-tighter">INVEPINCA CA</h1>
+        <div className="flex items-center gap-2">
+           <img src="https://i.ibb.co/NgSYhpq5/logo-Azul-Iinvepinca.jpg" alt="Logo Invepinca" className="w-8 h-8 rounded-lg" />
+           <h1 className="font-bold text-slate-800 tracking-tighter">INVEPINCA CA</h1>
+        </div>
         <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 text-slate-600">
           {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -126,11 +127,11 @@ export default function App() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
           />
           <div className="absolute left-0 top-0 bottom-0 w-3/4 max-w-xs bg-[#0a0a0a] p-6 flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
-            <div className="mb-10 flex items-center justify-between">
-              <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                <TrendingDown className="text-emerald-500" />
-                GESTIÓN CXC
-              </h1>
+            <div className="mb-10 flex items-start justify-between">
+              <div>
+                <img src="https://i.ibb.co/NgSYhpq5/logo-Azul-Iinvepinca.jpg" alt="Logo Invepinca" className="w-16 h-auto rounded-xl shadow-md border border-slate-700 mb-3" />
+                <h1 className="text-xl font-bold text-white tracking-tight">GESTIÓN CXC</h1>
+              </div>
               <button onClick={() => setSidebarOpen(false)} className="text-slate-400">
                 <X size={24} />
               </button>

@@ -2,11 +2,34 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(), 
+      tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        manifest: {
+          name: 'Gestión CXC y Control de Caja',
+          short_name: 'CXC App',
+          description: 'Gestión de Cuentas por Cobrar y Control de Caja Invepinca',
+          theme_color: '#0a0a0a',
+          background_color: '#ffffff',
+          display: 'standalone',
+          icons: [
+            {
+              src: 'https://i.ibb.co/NgSYhpq5/logo-Azul-Iinvepinca.jpg',
+              sizes: '512x512',
+              type: 'image/jpeg',
+              purpose: 'any maskable'
+            }
+          ]
+        }
+      })
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
