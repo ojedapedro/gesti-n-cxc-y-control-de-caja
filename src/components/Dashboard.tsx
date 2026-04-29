@@ -5,7 +5,8 @@ import {
   Users, 
   DollarSign,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Calendar
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -31,6 +32,11 @@ export default function Dashboard() {
   const [cxcAccounts, setCXCAccounts] = useState<CXCAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const defaultStartDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+  const defaultEndDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState(defaultEndDate);
+
   useEffect(() => {
     const unsubT = dbService.subscribeToTransactions(setTransactions);
     const unsubE = dbService.subscribeToExpenses(setExpenses);
@@ -46,26 +52,27 @@ export default function Dashboard() {
     };
   }, []);
 
-  const currentMonthInterval = {
-    start: startOfMonth(new Date()),
-    end: endOfMonth(new Date()),
+  const filterByDate = (dateStr: string) => {
+    if (startDate && dateStr < startDate) return false;
+    if (endDate && dateStr > endDate) return false;
+    return true;
   };
 
-  const monthlyIncomes = transactions
-    .filter(t => (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) && isWithinInterval(new Date(t.date), currentMonthInterval))
+  const periodIncomes = transactions
+    .filter(t => (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) && filterByDate(t.date))
     .reduce((sum, t) => sum + t.amountUsd, 0);
 
-  const monthlyWithdrawals = transactions
-    .filter(t => t.type === 'withdrawal' && isWithinInterval(new Date(t.date), currentMonthInterval))
+  const periodWithdrawals = transactions
+    .filter(t => t.type === 'withdrawal' && filterByDate(t.date))
     .reduce((sum, t) => sum + t.amountUsd, 0);
 
-  const monthlyExpenses = expenses
-    .filter(e => isWithinInterval(new Date(e.date), currentMonthInterval))
+  const periodExpenses = expenses
+    .filter(e => filterByDate(e.date))
     .reduce((sum, e) => sum + e.amountUsd, 0);
 
   const totalPendingCXC = cxcAccounts.reduce((sum, acc) => sum + acc.totalBalance, 0);
 
-  const cashBalance = monthlyIncomes - monthlyWithdrawals - monthlyExpenses;
+  const cashBalance = periodIncomes - periodWithdrawals - periodExpenses;
 
   // Chart data Preparation
   const getLast6MonthsData = () => {
@@ -98,8 +105,8 @@ export default function Dashboard() {
   const chartData = getLast6MonthsData();
 
   const stats = [
-    { label: 'Ingresos del Mes', value: monthlyIncomes, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Egresos + Retiros', value: monthlyExpenses + monthlyWithdrawals, icon: TrendingDown, color: 'text-rose-600', bg: 'bg-rose-50' },
+    { label: 'Ingresos del Periodo', value: periodIncomes, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Egresos + Retiros', value: periodExpenses + periodWithdrawals, icon: TrendingDown, color: 'text-rose-600', bg: 'bg-rose-50' },
     { label: 'Saldos Pendientes CXC', value: totalPendingCXC, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Balance de Caja', value: cashBalance, icon: DollarSign, color: cashBalance >= 0 ? 'text-emerald-600' : 'text-rose-600', bg: cashBalance >= 0 ? 'bg-emerald-50' : 'bg-rose-50' },
   ];
@@ -110,9 +117,46 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Panel General</h2>
-        <p className="text-sm font-medium text-slate-500 mt-1">Resumen del estado financiero del negocio.</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Panel General</h2>
+          <p className="text-sm font-medium text-slate-500 mt-1">Resumen del estado financiero del negocio.</p>
+        </div>
+        
+        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 px-2">
+            <Calendar size={16} className="text-slate-400" />
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Desde</label>
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+              />
+            </div>
+          </div>
+          <div className="w-px h-8 bg-slate-200 mx-1"></div>
+          <div className="flex items-center gap-2 px-2">
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Hasta</label>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+              />
+            </div>
+          </div>
+          {(startDate || endDate) && (
+            <button 
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats Grid */}

@@ -60,7 +60,10 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     });
   };
 
-  const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const defaultStartDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+  const defaultEndDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState(defaultEndDate);
 
   useEffect(() => {
     return dbService.subscribeToExpenses(setExpenses);
@@ -86,8 +89,9 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
   };
 
   const filteredExpenses = expenses.filter(e => {
-    const expenseMonth = e.date.substring(0, 7);
-    return expenseMonth === filterMonth;
+    if (startDate && e.date < startDate) return false;
+    if (endDate && e.date > endDate) return false;
+    return true;
   });
 
   const totalMonthlyExpense = filteredExpenses.reduce((sum, e) => sum + e.amountUsd, 0);
@@ -221,18 +225,48 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
         </div>
       )}
 
-      <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200">
+      <div className="flex flex-col md:flex-row md:items-center gap-4 bg-white p-4 rounded-xl border border-slate-200">
         <div className="flex items-center gap-2">
           <Filter size={18} className="text-slate-400" />
-          <span className="text-sm font-semibold text-slate-600">Filtrar Mes:</span>
+          <span className="text-sm font-semibold text-slate-600">Filtrar:</span>
         </div>
-        <input 
-          type="month" 
-          value={filterMonth}
-          onChange={(e) => setFilterMonth(e.target.value)}
-          className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <div className="ml-auto flex items-center gap-4">
+        
+        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 px-2">
+            <Calendar size={16} className="text-slate-400" />
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Desde</label>
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+              />
+            </div>
+          </div>
+          <div className="w-px h-8 bg-slate-200 mx-1"></div>
+          <div className="flex items-center gap-2 px-2">
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Hasta</label>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+              />
+            </div>
+          </div>
+          {(startDate || endDate) && (
+            <button 
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+
+        <div className="md:ml-auto flex items-center gap-4">
           <p className="text-sm text-slate-500">Total del Periodo:</p>
           <p className="text-xl font-bold text-rose-600 font-mono">{formatCurrency(totalMonthlyExpense)}</p>
         </div>

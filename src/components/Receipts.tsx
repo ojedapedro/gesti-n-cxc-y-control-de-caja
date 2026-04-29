@@ -12,6 +12,10 @@ export default function Receipts() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
   const [formData, setFormData] = useState({
     recipient: '',
     amountUsd: '',
@@ -84,19 +88,63 @@ export default function Receipts() {
     }
   };
 
+  const filteredReceipts = receipts.filter(r => {
+    if (startDate && r.date < startDate) return false;
+    if (endDate && r.date > endDate) return false;
+    return true;
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 no-print">
         <div>
           <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Recibos de Retiro</h2>
           <p className="text-sm font-medium text-slate-500 mt-1">Vales de salida de efectivo que afectan CXC.</p>
         </div>
-        <button 
-          onClick={() => setShowForm(!showForm)}
-          className="btn-primary"
-        >
-          {showForm ? 'Cerrar' : <><Plus size={16} /> Generar Recibo</>}
-        </button>
+        
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 px-2">
+              <Calendar size={16} className="text-slate-400" />
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Desde</label>
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+                />
+              </div>
+            </div>
+            <div className="w-px h-8 bg-slate-200 mx-1"></div>
+            <div className="flex items-center gap-2 px-2">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Hasta</label>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+                />
+              </div>
+            </div>
+            {(startDate || endDate) && (
+              <button 
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+
+          <button 
+            onClick={() => setShowForm(!showForm)}
+            className="btn-primary"
+          >
+            {showForm ? 'Cerrar' : <><Plus size={16} /> Generar Recibo</>}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -186,7 +234,7 @@ export default function Receipts() {
                   </tr>
                 </thead>
                 <tbody>
-                  {receipts.map((r) => (
+                  {filteredReceipts.map((r) => (
                     <tr 
                       key={r.id} 
                       onClick={() => setSelectedReceipt(r)}
@@ -209,6 +257,11 @@ export default function Receipts() {
                       </td>
                     </tr>
                   ))}
+                  {filteredReceipts.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-10 text-center text-slate-400 italic">No hay registros de retiro para el periodo seleccionado.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

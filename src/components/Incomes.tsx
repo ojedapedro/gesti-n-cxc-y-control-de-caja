@@ -12,6 +12,9 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   const [showCXCModal, setShowCXCModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     amountBs: '',
@@ -153,14 +156,57 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     }
   };
 
+  const filteredTransactions = transactions.filter(t => {
+    if (t.type !== TransactionType.SALE) return false;
+    if (startDate && t.date < startDate) return false;
+    if (endDate && t.date > endDate) return false;
+    return true;
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Relación de Ingresos de Caja</h2>
           <p className="text-sm font-medium text-slate-500 mt-1">Cierre diario y cuadre de caja (Dual Conversion).</p>
         </div>
-        <div className="flex items-center gap-3">
+        
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 px-2">
+              <Calendar size={16} className="text-slate-400" />
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Desde</label>
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+                />
+              </div>
+            </div>
+            <div className="w-px h-8 bg-slate-200 mx-1"></div>
+            <div className="flex items-center gap-2 px-2">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Hasta</label>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+                />
+              </div>
+            </div>
+            {(startDate || endDate) && (
+              <button 
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+          
           <button 
             onClick={() => setShowCXCModal(!showCXCModal)}
             className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-5 rounded-xl transition-all shadow-sm text-sm"
@@ -415,13 +461,11 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
               </tr>
             </thead>
             <tbody>
-              {transactions
-                .filter(t => t.type === TransactionType.SALE)
-                .map((t, i) => {
+              {filteredTransactions.map((t, i) => {
                   const conv = (t.amountBs || 0) / (t.exchangeRate || 1);
                   return (
                     <tr key={t.id} className="hover:bg-slate-50 border-b border-slate-200 text-xs font-medium">
-                      <td className="p-3 text-slate-400 border-r border-slate-100">{transactions.length - i}</td>
+                      <td className="p-3 text-slate-400 border-r border-slate-100">{filteredTransactions.length - i}</td>
                       <td className="p-3 font-bold uppercase border-r border-slate-100">{getDayName(t.date)}</td>
                       <td className="p-3 border-r border-slate-100">
                         {(() => {
@@ -452,9 +496,9 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                     </tr>
                   );
                 })}
-              {transactions.filter(t => t.type === TransactionType.SALE).length === 0 && (
+              {filteredTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="p-10 text-center text-slate-400 italic">No hay cuadres de caja registrados.</td>
+                  <td colSpan={11} className="p-10 text-center text-slate-400 italic">No hay cuadres de caja registrados en el periodo seleccionado.</td>
                 </tr>
               )}
             </tbody>
