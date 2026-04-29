@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/db';
 import { type CXCAccount, type CXCPayment } from '../types';
-import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search } from 'lucide-react';
+import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search, Download, FileText } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function CXCAccounts() {
   const [accounts, setAccounts] = useState<CXCAccount[]>([]);
@@ -85,10 +87,71 @@ export default function CXCAccounts() {
     });
   };
 
+  const handleDownloadBook = () => {
+    const doc = new jsPDF();
+    const currentDate = format(new Date(), "dd/MM/yyyy HH:mm");
+
+    doc.setFontSize(18);
+    doc.text('Libro de CXC - Cuentas por Cobrar', 14, 22);
+    
+    doc.setFontSize(11);
+    doc.text(`Invepinca CA - Generado el: ${currentDate}`, 14, 30);
+
+    const tableColumn = ["Cliente", "Última Actualización", "Deuda Acumulada"];
+    const tableRows: any[] = [];
+
+    let totalCXC = 0;
+
+    // Accounts is already in state as `filteredAccounts` (or `accounts` to be complete)
+    const dataToExport = accounts.sort((a, b) => b.totalBalance - a.totalBalance).filter(a => a.totalBalance > 0);
+
+    dataToExport.forEach(account => {
+      const rowData = [
+        account.clientName,
+        format(new Date(), "dd/MM/yyyy"), // Replace with account.lastUpdated if appropriate
+        formatCurrency(account.totalBalance)
+      ];
+      tableRows.push(rowData);
+      totalCXC += account.totalBalance;
+    });
+
+    // Subtotal/Total row
+    tableRows.push([
+      { content: "TOTAL GENERAL", colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: formatCurrency(totalCXC), styles: { fontStyle: 'bold', textColor: [200, 50, 50] } }
+    ]);
+
+    autoTable(doc, {
+      startY: 40,
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42] }, // Slate-900 like
+      styles: { fontSize: 10 }
+    });
+
+    doc.save(`Libro_CXC_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Accounts List */}
-      <div className="lg:col-span-1 flex flex-col h-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Libro de Cuentas por Cobrar (CXC)</h1>
+          <p className="text-slate-500 text-sm">Gestiona y consulta los saldos de los clientes.</p>
+        </div>
+        <button 
+          onClick={handleDownloadBook}
+          className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium py-2 px-6 rounded-lg transition-all"
+        >
+          <FileText size={18} />
+          <span>Generar PDF del Libro</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Accounts List */}
+        <div className="lg:col-span-1 flex flex-col h-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-slate-800">Clientes CXC</h2>
@@ -315,6 +378,7 @@ export default function CXCAccounts() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

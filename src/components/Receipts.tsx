@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/db';
 import { type Receipt } from '../types';
-import { Plus, Printer, FileText, User, DollarSign, Calendar, Tag } from 'lucide-react';
+import { Plus, Printer, FileText, User, DollarSign, Calendar, Tag, Download } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function Receipts() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -52,6 +54,34 @@ export default function Receipts() {
   const handlePrint = () => {
     if (!selectedReceipt) return;
     window.print();
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!selectedReceipt || !printRef.current) return;
+    try {
+      // Capture the element using html2canvas
+      const canvas = await html2canvas(printRef.current, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      
+      // Calculate image dimensions to fit within PDF width with margin
+      const margin = 15;
+      const printWidth = pdfWidth - margin * 2;
+      const printHeight = (canvas.height * printWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', margin, margin, printWidth, printHeight);
+      pdf.save(`Recibo_INVEPINCA_${selectedReceipt.receiptNumber}.pdf`);
+    } catch (error) {
+      console.error('Error generando el PDF', error);
+      alert('Hubo un error al generar el PDF. Por favor, intenta de nuevo.');
+    }
   };
 
   return (
@@ -190,9 +220,14 @@ export default function Receipts() {
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-800">Previsualización del Recibo</h3>
             {selectedReceipt && (
-              <button onClick={handlePrint} className="flex items-center gap-2 text-blue-600 font-bold hover:underline">
-                <Printer size={18} /> Imprimir
-              </button>
+              <div className="flex items-center gap-4">
+                <button onClick={handleDownloadPDF} className="flex items-center gap-2 text-green-600 font-bold hover:underline transition-colors">
+                  <Download size={18} /> Descargar PDF
+                </button>
+                <button onClick={handlePrint} className="flex items-center gap-2 text-blue-600 font-bold hover:underline transition-colors">
+                  <Printer size={18} /> Imprimir
+                </button>
+              </div>
             )}
           </div>
           
