@@ -5,22 +5,15 @@ import {
   deleteDoc, 
   doc, 
   getDocs, 
-  getDoc, import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  getDocs, 
   getDoc, 
   setDoc,
   query, 
   where, 
   orderBy, 
   serverTimestamp,
-  type DocumentData,
   onSnapshot
 } from 'firebase/firestore';
+import type { DocumentData } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { 
   OperationType, 
@@ -345,138 +338,6 @@ export const dbService = {
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'settings'));
   }
-};
-
-  setDoc,
-  query, 
-  where, 
-  orderBy, 
-  serverTimestamp,
-  type DocumentData,
-  onSnapshot
-} from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
-import { 
-  OperationType, 
-  PaymentMethod,
-  TransactionType,
-  type Settings,
-  type Transaction, 
-  type Expense, 
-  type CXCAccount, 
-  type CXCPayment, 
-  type Receipt,
-  type FirestoreErrorInfo 
-} from '../types';
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || []
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
-
-// Collections
-const TRANSACTIONS_PATH = 'transactions';
-const EXPENSES_PATH = 'expenses';
-const CXC_ACCOUNTS_PATH = 'cxc_accounts';
-const RECEIPTS_PATH = 'receipts';
-
-export const dbService = {
-  // Transactions
-  async addTransaction(data: Omit<Transaction, 'id' | 'createdAt'>) {
-    try {
-      return await addDoc(collection(db, TRANSACTIONS_PATH), {
-        ...data,
-        createdAt: serverTimestamp(),
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, TRANSACTIONS_PATH);
-    }
-  },
-
-  async getTransactions() {
-    try {
-      const q = query(collection(db, TRANSACTIONS_PATH), orderBy('date', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, TRANSACTIONS_PATH);
-    }
-  },
-
-  // Expenses
-  async addExpense(data: Omit<Expense, 'id' | 'createdAt'>) {
-    try {
-      return await addDoc(collection(db, EXPENSES_PATH), {
-        ...data,
-        createdAt: serverTimestamp(),
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, EXPENSES_PATH);
-    }
-  },
-
-  async getExpenses() {
-    try {
-      const q = query(collection(db, EXPENSES_PATH), orderBy('date', 'desc'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, EXPENSES_PATH);
-    }
-  },
-
-  // CXC Accounts
-  async addOrUpdateCXCAccount(clientName: string, balanceDelta: number) {
-    try {
-      const q = query(collection(db, CXC_ACCOUNTS_PATH), where('clientName', '==', clientName));
-      const snapshot = await getDocs(q);
-      
-      if (snapshot.empty) {
-        return await addDoc(collection(db, CXC_ACCOUNTS_PATH), {
-          clientName,
-          totalBalance: balanceDelta,
-          lastUpdated: serverTimestamp(),
-        });
-      } else {
-        const accountDoc = snapshot.docs[0];
-        const currentBalance = accountDoc.data().totalBalance || 0;
-        return await updateDoc(doc(db, CXC_ACCOUNTS_PATH, accountDoc.id), {
-          totalBalance: currentBalance + balanceDelta,
-          lastUpdated: serverTimestamp(),
-        });
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, CXC_ACCOUNTS_PATH);
-    }
-  },
-
-  async getCXCAccounts() {
-    try {
-      const snapshot = await getDocs(collection(db, CXC_ACCOUNTS_PATH));
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CXCAccount));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, CXC_ACCOUNTS_PATH);
-    }
-  },
-
-  async addCXCPayment(clientId: string, data: Omit<CXCPayment, 'id' | 'clientId' | 'createdAt'>) {
-    const path = `${CXC_ACCOUNTS_PATH}/${clientId}/payments`;
     try {
       await addDoc(collection(db, path), {
         ...data,
