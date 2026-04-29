@@ -8,6 +8,7 @@ import {
   Settings as SettingsIcon,
   PlusCircle,
   Menu,
+  Activity,
   X
 } from 'lucide-react';
 import { dbService } from './services/db';
@@ -18,12 +19,13 @@ import Expenses from './components/Expenses';
 import Receipts from './components/Receipts';
 import Settings from './components/Settings';
 
-type View = 'dashboard' | 'incomes' | 'cxc' | 'expenses' | 'receipts' | 'settings';
+type View = 'dashboard' | 'incomes' | 'cxc' | 'expenses' | 'receipts' | 'cashflow' | 'settings';
 
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './lib/firebase';
 import { LoginScreen, UserMenu } from './components/Auth';
 import { type Settings as SettingsType } from './types';
+import CashFlow from './components/CashFlow';
 
 export default function App() {
   const [activeView, setActiveView] = useState<View>('dashboard');
@@ -67,19 +69,20 @@ export default function App() {
     { id: 'cxc', label: 'Cuentas por Cobrar', icon: Contact },
     { id: 'expenses', label: 'Gastos', icon: TrendingDown },
     { id: 'receipts', label: 'Recibos / Retiros', icon: FileText },
+    { id: 'cashflow', label: 'Flujo de Caja', icon: Activity },
     { id: 'settings', label: 'Configuración', icon: SettingsIcon },
   ];
 
   return (
     <div className="min-h-screen flex text-slate-900">
       {/* Sidebar Desktop */}
-      <aside className="hidden md:flex w-64 flex-col bg-slate-900 text-white p-4 fixed h-full">
-        <div className="mb-10 px-4">
+      <aside className="hidden md:flex w-64 flex-col bg-[#0a0a0a] text-white p-5 fixed h-full border-r border-[#262626]">
+        <div className="mb-10 px-2 mt-4">
           <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <TrendingDown className="text-blue-400" />
-            <span className="bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">GESTIÓN CXC</span>
+            <TrendingDown className="text-emerald-500" />
+            <span className="text-white">GESTIÓN CXC</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest font-semibold">Invepinca CA</p>
+          <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-[0.2em] font-medium">Invepinca CA</p>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto">
@@ -89,20 +92,22 @@ export default function App() {
               <button
                 key={item.id}
                 onClick={() => setActiveView(item.id as View)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium ${
                   activeView === item.id 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-white/10 text-white' 
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
                 }`}
               >
-                <Icon size={20} />
-                <span className="font-medium">{item.label}</span>
+                <Icon size={18} />
+                <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <UserMenu user={user} />
+        <div className="pt-4 mt-4 border-t border-[#262626]">
+          <UserMenu user={user} />
+        </div>
       </aside>
 
       {/* Mobile Nav */}
@@ -118,19 +123,19 @@ export default function App() {
         <div className="fixed inset-0 z-40 md:hidden">
           <div 
             onClick={() => setSidebarOpen(false)}
-            className="absolute inset-0 bg-black/50 transition-opacity"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
           />
-          <div className="absolute left-0 top-0 bottom-0 w-3/4 max-w-xs bg-slate-900 p-6 flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
+          <div className="absolute left-0 top-0 bottom-0 w-3/4 max-w-xs bg-[#0a0a0a] p-6 flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
             <div className="mb-10 flex items-center justify-between">
               <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                <TrendingDown className="text-blue-400" />
+                <TrendingDown className="text-emerald-500" />
                 GESTIÓN CXC
               </h1>
               <button onClick={() => setSidebarOpen(false)} className="text-slate-400">
                 <X size={24} />
               </button>
             </div>
-            <nav className="flex-1 space-y-4 overflow-y-auto">
+            <nav className="flex-1 space-y-2 overflow-y-auto">
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -140,17 +145,17 @@ export default function App() {
                       setActiveView(item.id as View);
                       setSidebarOpen(false);
                     }}
-                    className={`w-full flex items-center gap-4 text-lg ${
-                      activeView === item.id ? 'text-blue-400' : 'text-slate-400'
+                    className={`w-full flex items-center gap-4 text-sm font-medium px-4 py-3 rounded-xl ${
+                      activeView === item.id ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    <Icon size={24} />
+                    <Icon size={20} />
                     {item.label}
                   </button>
                 );
               })}
             </nav>
-            <div className="mt-8 border-t border-slate-800 pt-4">
+            <div className="mt-8 border-t border-[#262626] pt-4">
               <UserMenu user={user} />
             </div>
           </div>
@@ -164,6 +169,7 @@ export default function App() {
         {activeView === 'cxc' && <div key="cxc"><CXCAccounts /></div>}
         {activeView === 'expenses' && <div key="expenses"><Expenses exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'receipts' && <div key="receipts"><Receipts /></div>}
+        {activeView === 'cashflow' && <div key="cashflow"><CashFlow exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'settings' && <div key="settings"><Settings /></div>}
       </main>
     </div>

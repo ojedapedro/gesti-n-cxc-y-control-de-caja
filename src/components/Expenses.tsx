@@ -108,23 +108,23 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Control de Gastos</h2>
-          <p className="text-slate-500">Registro detallado de egresos por categoría.</p>
+          <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Control de Gastos</h2>
+          <p className="text-sm font-medium text-slate-500 mt-1">Registro detallado de egresos por categoría.</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-slate-100 p-1 rounded-lg mr-2">
+          <div className="flex bg-slate-100 p-1 rounded-xl mr-2">
             <button 
               onClick={() => setView('list')}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
-                view === 'list' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                view === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               <List size={14} /> Lista
             </button>
             <button 
               onClick={() => setView('report')}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
-                view === 'report' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                view === 'report' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               <PieChart size={14} /> Reporte
@@ -134,7 +134,7 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
             onClick={() => setShowForm(!showForm)}
             className="btn-primary"
           >
-            {showForm ? 'Cerrar' : <><Plus size={20} /> Registrar Egreso</>}
+            {showForm ? 'Cerrar' : <><Plus size={16} /> Registrar Egreso</>}
           </button>
         </div>
       </div>

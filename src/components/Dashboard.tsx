@@ -111,21 +111,21 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-slate-800">Panel General</h2>
-        <p className="text-slate-500">Resumen del estado financiero del negocio.</p>
+        <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Panel General</h2>
+        <p className="text-sm font-medium text-slate-500 mt-1">Resumen del estado financiero del negocio.</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {stats.map((stat, i) => (
-          <div key={i} className="card p-6">
+          <div key={i} className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">{stat.label}</p>
-                <h3 className={`text-2xl font-bold mt-1 ${stat.color}`}>{formatCurrency(stat.value)}</h3>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
+                <h3 className={`text-3xl font-black mt-2 tracking-tight ${stat.color}`}>{formatCurrency(stat.value)}</h3>
               </div>
-              <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
-                <stat.icon size={24} />
+              <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color}`}>
+                <stat.icon size={22} strokeWidth={2.5} />
               </div>
             </div>
           </div>
@@ -134,61 +134,66 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Chart */}
-        <div className="lg:col-span-2 card p-6">
-          <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+        <div className="lg:col-span-2 card p-6 border-slate-200/60">
+          <h3 className="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-4">
             Desempeño Últimos 6 Meses
           </h3>
-          <div className="h-80 w-full">
+          <div className="h-80 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis 
                   dataKey="name" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 12 }} 
+                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
                   dy={10}
                 />
                 <YAxis 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 12 }} 
+                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
                 />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  contentStyle={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                   cursor={{ fill: '#f8fafc' }}
                 />
-                <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} />
-                <Bar dataKey="egresos" name="Egresos" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={24} />
+                <Bar dataKey="ingresos" name="Ingresos" fill="#0f172a" radius={[6, 6, 0, 0]} barSize={28} />
+                <Bar dataKey="egresos" name="Egresos" fill="#94a3b8" radius={[6, 6, 0, 0]} barSize={28} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Top Debtors */}
-        <div className="card p-6">
-          <h3 className="font-bold text-slate-800 mb-6">Mayores Saldos CXC</h3>
-          <div className="space-y-4">
+        <div className="card p-6 border-slate-200/60">
+          <h3 className="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-4">
+            Mayores Saldos CXC
+          </h3>
+          <div className="space-y-3 mt-4">
             {cxcAccounts
               .filter(acc => acc.totalBalance > 0)
               .sort((a, b) => b.totalBalance - a.totalBalance)
               .slice(0, 5)
               .map((acc, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">
+                <div key={i} className="flex items-center justify-between p-3.5 rounded-[16px] bg-slate-50 border border-slate-100/50 hover:bg-slate-100 transition-colors">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-full bg-white shadow-sm border border-slate-200/60 flex items-center justify-center text-slate-800 font-bold text-sm">
                       {acc.clientName.charAt(0)}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-800">{acc.clientName}</p>
-                      <p className="text-[10px] text-slate-400 uppercase font-mono">ID: {acc.id?.slice(-6)}</p>
+                      <p className="text-[13px] font-bold text-slate-900 leading-tight">{acc.clientName}</p>
+                      <p className="text-[10px] text-slate-500 uppercase font-mono tracking-widest mt-0.5">ID: {acc.id?.slice(-6)}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-rose-600">{formatCurrency(acc.totalBalance)}</span>
+                  <span className="text-[15px] font-black tracking-tight text-slate-900">{formatCurrency(acc.totalBalance)}</span>
                 </div>
               ))}
             {cxcAccounts.length === 0 && (
-              <p className="text-sm text-slate-500 text-center py-10 italic">No hay saldos pendientes.</p>
+              <p className="text-sm text-slate-500 text-center py-10 flex flex-col items-center justify-center gap-2">
+                <Users className="text-slate-300" size={32} />
+                <span>No hay saldos pendientes.</span>
+              </p>
             )}
           </div>
         </div>

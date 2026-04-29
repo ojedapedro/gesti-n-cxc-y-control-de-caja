@@ -88,14 +88,14 @@ export default function Receipts() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Recibos de Retiro</h2>
-          <p className="text-slate-500">Vales de salida de efectivo que afectan CXC.</p>
+          <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Recibos de Retiro</h2>
+          <p className="text-sm font-medium text-slate-500 mt-1">Vales de salida de efectivo que afectan CXC.</p>
         </div>
         <button 
           onClick={() => setShowForm(!showForm)}
           className="btn-primary"
         >
-          {showForm ? 'Cerrar' : <><Plus size={20} /> Generar Recibo</>}
+          {showForm ? 'Cerrar' : <><Plus size={16} /> Generar Recibo</>}
         </button>
       </div>
 

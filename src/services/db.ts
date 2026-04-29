@@ -68,6 +68,15 @@ export const dbService = {
     }
   },
 
+  async updateTransaction(id: string, data: Partial<Omit<Transaction, 'id' | 'createdAt'>>) {
+    try {
+      const docRef = doc(db, TRANSACTIONS_PATH, id);
+      await updateDoc(docRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, TRANSACTIONS_PATH);
+    }
+  },
+
   async getTransactions() {
     try {
       const q = query(collection(db, TRANSACTIONS_PATH), orderBy('date', 'desc'));

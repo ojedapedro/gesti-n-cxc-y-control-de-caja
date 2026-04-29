@@ -133,29 +133,86 @@ export default function CXCAccounts() {
     doc.save(`Libro_CXC_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
+  const handleDownloadClientPDF = () => {
+    if (!selectedAccount) return;
+
+    const doc = new jsPDF();
+    const currentDate = format(new Date(), "dd/MM/yyyy HH:mm");
+
+    doc.setFontSize(18);
+    doc.text(`Estado de Cuenta - ${selectedAccount.clientName}`, 14, 22);
+    
+    doc.setFontSize(11);
+    doc.text(`Invepinca CA - Generado el: ${currentDate}`, 14, 30);
+    doc.text(`ID Cliente: ${selectedAccount.id}`, 14, 36);
+    doc.text(`Saldo Total Pendiente: ${formatCurrency(selectedAccount.totalBalance)}`, 14, 42);
+
+    const tableColumn = ["Fecha", "Concepto", "Item", "Cargo USD", "Abono USD"];
+    const tableRows: any[] = [];
+
+    let totalPagos = 0;
+    let totalCargos = 0;
+
+    payments.forEach(payment => {
+      const isCharge = payment.type === 'charge';
+      const rowData = [
+        payment.date,
+        payment.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago'),
+        payment.item || '-',
+        isCharge ? formatCurrency(payment.amountUsd) : '',
+        !isCharge ? formatCurrency(payment.amountUsd) : ''
+      ];
+      tableRows.push(rowData);
+      if (isCharge) totalCargos += payment.amountUsd;
+      else totalPagos += payment.amountUsd;
+    });
+
+    tableRows.push([
+      { content: "TOTALES", colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: formatCurrency(totalCargos), styles: { fontStyle: 'bold', textColor: [200, 50, 50] } },
+      { content: formatCurrency(totalPagos), styles: { fontStyle: 'bold', textColor: [50, 150, 50] } }
+    ]);
+    
+    tableRows.push([
+      { content: "SALDO DEUDOR", colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: formatCurrency(totalCargos - totalPagos), styles: { fontStyle: 'bold' } }
+    ]);
+
+    autoTable(doc, {
+      startY: 50,
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42] },
+      styles: { fontSize: 10 }
+    });
+
+    doc.save(`Estado_Cuenta_${selectedAccount.clientName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Libro de Cuentas por Cobrar (CXC)</h1>
-          <p className="text-slate-500 text-sm">Gestiona y consulta los saldos de los clientes.</p>
+          <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Libro de Cuentas por Cobrar (CXC)</h2>
+          <p className="text-sm font-medium text-slate-500 mt-1">Gestiona y consulta los saldos de los clientes.</p>
         </div>
         <button 
           onClick={handleDownloadBook}
-          className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-medium py-2 px-6 rounded-lg transition-all"
+          className="btn-primary"
         >
-          <FileText size={18} />
+          <FileText size={16} />
           <span>Generar PDF del Libro</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Accounts List */}
-        <div className="lg:col-span-1 flex flex-col h-full bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="lg:col-span-1 card flex flex-col h-full border-slate-200/60 shadow-sm">
+        <div className="p-5 border-b border-slate-100 bg-white">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-slate-800">Clientes CXC</h2>
-            <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-black uppercase">
+            <h2 className="text-[13px] font-black text-slate-900 uppercase tracking-widest">Clientes CXC</h2>
+            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest">
               {filteredAccounts.length} Total
             </span>
           </div>
@@ -166,7 +223,7 @@ export default function CXCAccounts() {
               placeholder="Buscar cliente..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition-all"
             />
           </div>
         </div>
@@ -282,14 +339,23 @@ export default function CXCAccounts() {
 
             <div className="flex items-center justify-between">
               <h4 className="font-bold flex items-center gap-2">
-                <History size={18} className="text-blue-600" /> Historial de Pagos
+                <History size={18} className="text-blue-600" /> Estado de Cuenta (Cargos y Abonos)
               </h4>
-              <button 
-                onClick={() => setShowPaymentForm(!showPaymentForm)}
-                className="btn-primary text-sm px-3 py-1.5"
-              >
-                <Plus size={16} /> Registrar Pago
-              </button>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleDownloadClientPDF}
+                  className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-1.5 px-3 rounded-lg transition-colors text-sm"
+                >
+                  <Download size={16} /> 
+                  <span className="hidden sm:inline">Descargar PDF</span>
+                </button>
+                <button 
+                  onClick={() => setShowPaymentForm(!showPaymentForm)}
+                  className="btn-primary text-sm px-3 py-1.5"
+                >
+                  <Plus size={16} /> Registrar Pago
+                </button>
+              </div>
             </div>
 
             {showPaymentForm && (
@@ -326,7 +392,7 @@ export default function CXCAccounts() {
                   <div className="space-y-1">
                     <label className="label">Concepto / Nota</label>
                     <div className="relative">
-                      <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                       <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
                       <input 
                         type="text" 
                         placeholder="Nota del pago"
@@ -344,26 +410,33 @@ export default function CXCAccounts() {
               </div>
             )}
 
-            <div className="card overflow-hidden">
+            <div className="card overflow-hidden text-sm">
               <table className="w-full">
                 <thead>
-                  <tr>
+                  <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="table-header">Fecha</th>
                     <th className="table-header">Concepto</th>
-                    <th className="table-header text-right">Monto USD</th>
+                    <th className="table-header">Item</th>
+                    <th className="table-header text-right text-rose-600">(+) Cargo</th>
+                    <th className="table-header text-right text-emerald-600">(-) Abono</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {payments.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50">
-                      <td className="table-cell">{p.date}</td>
-                      <td className="table-cell text-slate-600">{p.concept || '-'}</td>
-                      <td className="table-cell text-right font-bold text-emerald-600">-{formatCurrency(p.amountUsd)}</td>
-                    </tr>
-                  ))}
+                  {payments.map((p) => {
+                    const isCharge = p.type === 'charge';
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                        <td className="table-cell">{p.date}</td>
+                        <td className="table-cell text-slate-600">{p.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago')}</td>
+                        <td className="table-cell font-mono text-slate-400 text-xs">{p.item || '-'}</td>
+                        <td className="table-cell text-right font-bold text-rose-600">{isCharge ? formatCurrency(p.amountUsd) : ''}</td>
+                        <td className="table-cell text-right font-bold text-emerald-600">{!isCharge ? `-${formatCurrency(p.amountUsd)}` : ''}</td>
+                      </tr>
+                    );
+                  })}
                   {payments.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="table-cell text-center py-10 text-slate-400 italic">No hay pagos registrados para este cliente.</td>
+                      <td colSpan={5} className="table-cell text-center py-10 text-slate-400 italic">No hay movimientos registrados para este cliente.</td>
                     </tr>
                   )}
                 </tbody>
