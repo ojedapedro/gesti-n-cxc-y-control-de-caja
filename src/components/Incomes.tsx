@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 import { TransactionType, PaymentMethod, type Transaction } from '../types';
-import { Plus, Search, Calendar, User, DollarSign, Tag, Clock } from 'lucide-react';
+import { Plus, Search, Calendar, User, DollarSign, Tag, Clock, FileText } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -9,14 +9,24 @@ import { es } from 'date-fns/locale';
 export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [showCXCModal, setShowCXCModal] = useState(false);
+  
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     amountBs: '',
-    exchangeRate: exchangeRate?.toString() || '480', // Use prop if available
+    exchangeRate: exchangeRate?.toString() || '480',
     amountUsdCash: '',
     amountZelle: '',
     amountCXC: '',
     concept: 'CUADRE DE CAJA DIARIO',
+  });
+
+  const [cxcData, setCxcData] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    clientName: '',
+    concept: '',
+    amountUsd: '',
+    item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
   });
 
   // Sync rate when prop changes if form is not dirty or just always for new forms
@@ -83,6 +93,32 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     }
   };
 
+  const handleSubmitCXC = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cxcData.clientName || !cxcData.amountUsd) return;
+
+    try {
+      await dbService.addCXCCharge(cxcData.clientName, {
+        date: cxcData.date,
+        amountUsd: parseFloat(cxcData.amountUsd) || 0,
+        concept: cxcData.concept,
+        item: cxcData.item,
+        type: 'charge'
+      });
+
+      setShowCXCModal(false);
+      setCxcData({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        clientName: '',
+        concept: '',
+        amountUsd: '',
+        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+      });
+    } catch (error) {
+      console.error("Error saving CXC:", error);
+    }
+  };
+
   const getDayName = (dateStr: string) => {
     if (!dateStr) return '';
     const date = new Date(dateStr + 'T12:00:00');
@@ -101,13 +137,120 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
           <h2 className="text-2xl font-bold text-slate-800">Relación de Ingresos de Caja</h2>
           <p className="text-slate-500">Cierre diario y cuadre de caja (Dual Conversion).</p>
         </div>
-        <button 
-          onClick={() => setShowForm(!showForm)}
-          className="btn-primary"
-        >
-          {showForm ? <span>Cerrar Formulario</span> : <span><Plus size={16} className="inline mr-2 -mt-0.5" />Nuevo Cuadre Diario</span>}
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setShowCXCModal(!showCXCModal)}
+            className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold py-2 px-4 rounded-xl transition-all"
+          >
+            <FileText size={16} /> <span>Ingreso CXC</span>
+          </button>
+          <button 
+            onClick={() => setShowForm(!showForm)}
+            className="btn-primary"
+          >
+            {showForm ? <span>Cerrar Formulario</span> : <span><Plus size={16} className="inline mr-2 -mt-0.5" />Nuevo Cuadre Diario</span>}
+          </button>
+        </div>
       </div>
+
+      {showCXCModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 bg-blue-50/50 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <FileText className="text-blue-600" size={20} />
+                Registrar Ingreso CXC
+              </h3>
+              <button 
+                onClick={() => setShowCXCModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl leading-none"
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmitCXC} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Fecha</label>
+                  <input 
+                    type="date" 
+                    required
+                    value={cxcData.date}
+                    onChange={(e) => setCxcData({...cxcData, date: e.target.value})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Item (Autogenerado)</label>
+                  <input 
+                    type="text" 
+                    readOnly
+                    value={cxcData.item}
+                    className="input-field bg-slate-50 text-slate-500 font-mono" 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label">Cliente (Nombre y Apellido)</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    required
+                    value={cxcData.clientName}
+                    onChange={(e) => setCxcData({...cxcData, clientName: e.target.value.toUpperCase()})}
+                    className="input-field pl-10 uppercase" 
+                    placeholder="Escriba el nombre exacto del cliente"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label">Concepto</label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    required
+                    value={cxcData.concept}
+                    onChange={(e) => setCxcData({...cxcData, concept: e.target.value})}
+                    className="input-field pl-10" 
+                    placeholder="Detalle de la venta/ingreso a crédito"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label">Monto de la Deuda (USD)</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={cxcData.amountUsd}
+                    onChange={(e) => setCxcData({...cxcData, amountUsd: e.target.value})}
+                    className="input-field pl-10 font-bold" 
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              
+              <div className="pt-4 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowCXCModal(false)} className="px-5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 font-medium transition-colors">
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary">
+                  Registrar CXC
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div key="incomes-form-container" className="card p-6 border-blue-100 bg-blue-50/10">
