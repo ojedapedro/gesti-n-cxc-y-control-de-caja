@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../services/db';
 import { Transaction, Expense, Receipt } from '../types';
-import { Activity, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, isValid, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -20,6 +20,9 @@ interface DailyCashFlow {
 export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
   const [data, setData] = useState<DailyCashFlow[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     async function fetchData() {
@@ -98,8 +101,16 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
     }
   };
 
-  const totalInflow = data.reduce((acc, curr) => acc + curr.inflowUsd, 0);
-  const totalOutflow = data.reduce((acc, curr) => acc + curr.outflowUsd + curr.withdrawalsUsd, 0);
+  const filteredData = useMemo(() => {
+    return data.filter(row => {
+      if (startDate && row.date < startDate) return false;
+      if (endDate && row.date > endDate) return false;
+      return true;
+    });
+  }, [data, startDate, endDate]);
+
+  const totalInflow = filteredData.reduce((acc, curr) => acc + curr.inflowUsd, 0);
+  const totalOutflow = filteredData.reduce((acc, curr) => acc + curr.outflowUsd + curr.withdrawalsUsd, 0);
   const totalNet = totalInflow - totalOutflow;
 
   if (loading) {
@@ -112,9 +123,46 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Balance de Liquidez</h2>
-        <p className="text-sm font-medium text-slate-500 mt-1">Resumen del flujo de caja diario (Ingresos vs Egresos).</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Balance de Liquidez</h2>
+          <p className="text-sm font-medium text-slate-500 mt-1">Resumen del flujo de caja diario (Ingresos vs Egresos).</p>
+        </div>
+        
+        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 px-2">
+            <Calendar size={16} className="text-slate-400" />
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Desde</label>
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+              />
+            </div>
+          </div>
+          <div className="w-px h-8 bg-slate-200 mx-1"></div>
+          <div className="flex items-center gap-2 px-2">
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Hasta</label>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+              />
+            </div>
+          </div>
+          {(startDate || endDate) && (
+            <button 
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -168,7 +216,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
               </tr>
             </thead>
             <tbody>
-              {data.map((row, i) => (
+              {filteredData.map((row, i) => (
                 <tr key={i} className="hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors">
                   <td className="p-4 px-5">
                     <div className="font-bold text-slate-900 capitalize">{getDayName(row.date)}</div>
@@ -190,9 +238,9 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                   </td>
                 </tr>
               ))}
-              {data.length === 0 && (
+              {filteredData.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-10 text-center text-slate-400 italic">No hay registros de flujo de caja.</td>
+                  <td colSpan={5} className="p-10 text-center text-slate-400 italic">No hay registros de flujo de caja para el periodo seleccionado.</td>
                 </tr>
               )}
             </tbody>
