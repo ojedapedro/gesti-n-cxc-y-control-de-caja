@@ -422,6 +422,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                   <option value="BANCO DEL TESORO" />
                   <option value="BNC" />
                   <option value="EFECTIVO EN CAJA" />
+                  <option value="EFECTIVO" />
                   <option value="BINANCE P2P" />
                   <option value="ZELLE" />
                 </datalist>

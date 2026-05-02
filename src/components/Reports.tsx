@@ -48,7 +48,7 @@ export default function Reports({ exchangeRate = 1 }: { exchangeRate?: number })
 
   // Extract unique banks for the dropdown filter
   const uniqueBanks = useMemo(() => {
-    const banks = new Set<string>(['BANESCO', 'PROVINCIAL', 'MERCANTIL', 'VENEZUELA', 'BANCO DEL TESORO', 'BNC', 'EFECTIVO EN CAJA', 'BINANCE P2P', 'ZELLE']);
+    const banks = new Set<string>(['BANESCO', 'PROVINCIAL', 'MERCANTIL', 'VENEZUELA', 'BANCO DEL TESORO', 'BNC', 'EFECTIVO EN CAJA', 'EFECTIVO', 'BINANCE P2P', 'ZELLE']);
     transactions.forEach(t => {
       if ((t.type === TransactionType.SALE || t.type === TransactionType.INCOME) && t.destinationBank) {
         banks.add(t.destinationBank);
@@ -64,27 +64,66 @@ export default function Reports({ exchangeRate = 1 }: { exchangeRate?: number })
     let cripto = 0;
     let totalUsdEquiv = 0;
 
+    let bsEfectivo = 0;
+    let bsBancos = 0;
+    let zelle = 0;
+    let binance = 0;
+    let usdEfectivo = 0;
+    let usdBancos = 0;
+
     filteredData.forEach(t => {
       // In base on previous logic for Sales formatting
       const amtBs = t.amountBs || 0;
       const rate = t.exchangeRate || 1;
       
+      const destBank = t.destinationBank?.toUpperCase() || '';
+      const isEfectivo = destBank === 'EFECTIVO EN CAJA' || destBank === 'EFECTIVO';
+      const isZelle = destBank === 'ZELLE';
+      const isBinance = destBank === 'BINANCE P2P';
+
       if (t.currency === 'Bolívares (BS)') {
         bs += amtBs;
         totalUsdEquiv += amtBs / rate;
+
+        if (isEfectivo) {
+          bsEfectivo += amtBs;
+        } else {
+          bsBancos += amtBs;
+        }
       } else if (t.currency === 'Dólares ($)') {
-        usd += t.amountUsdCash || t.amountUsd || 0;
-        totalUsdEquiv += t.amountUsdCash || t.amountUsd || 0;
+        const usdAmt = t.amountUsdCash || t.amountUsd || 0;
+        usd += usdAmt;
+        totalUsdEquiv += usdAmt;
+
+        if (isEfectivo) {
+          usdEfectivo += usdAmt;
+        } else if (isZelle) {
+          zelle += usdAmt;
+        } else if (isBinance) {
+          binance += usdAmt;
+        } else {
+          usdBancos += usdAmt;
+        }
       } else if (t.currency === 'Binance (USDT)' || t.amountZelle) {
-        cripto += t.amountZelle || t.amountUsd || 0;
-        totalUsdEquiv += t.amountZelle || t.amountUsd || 0;
+        const criptoAmt = t.amountZelle || t.amountUsd || 0;
+        cripto += criptoAmt;
+        totalUsdEquiv += criptoAmt;
+
+        if (t.currency === 'Binance (USDT)' || isBinance) {
+          binance += criptoAmt;
+        } else if (t.amountZelle || isZelle) {
+          zelle += criptoAmt;
+        } else {
+          // If it had amountZelle but bank is empty maybe fallback to zelle
+          zelle += criptoAmt;
+        }
       } else {
         // Fallback for older transactions
         totalUsdEquiv += t.amountUsd;
       }
     });
 
-    return { bs, usd, cripto, totalUsdEquiv };
+    return { bs, usd, cripto, totalUsdEquiv, bsEfectivo, bsBancos, zelle, binance, usdEfectivo, usdBancos };
   }, [filteredData]);
 
   const exportCSV = () => {
@@ -219,7 +258,7 @@ export default function Reports({ exchangeRate = 1 }: { exchangeRate?: number })
         </div>
       </div>
 
-      {/* Tarjetas de Resumen */}
+      {/* Tarjetas de Resumen Principales */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Equiv. USD</p>
@@ -262,6 +301,34 @@ export default function Reports({ exchangeRate = 1 }: { exchangeRate?: number })
               Bs. {new Intl.NumberFormat('es-VE').format(summary.cripto * exchangeRate)}
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Desglose de Saldos */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bs Efectivo</p>
+          <p className="text-lg font-black text-slate-800">Bs. {new Intl.NumberFormat('es-VE').format(summary.bsEfectivo)}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bs en Bancos</p>
+          <p className="text-lg font-black text-slate-800">Bs. {new Intl.NumberFormat('es-VE').format(summary.bsBancos)}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">$ Efectivo</p>
+          <p className="text-lg font-black text-slate-800">{formatCurrency(summary.usdEfectivo)}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">$ en Bancos</p>
+          <p className="text-lg font-black text-slate-800">{formatCurrency(summary.usdBancos)}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Zelle</p>
+          <p className="text-lg font-black text-slate-800">{formatCurrency(summary.zelle)}</p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Binance</p>
+          <p className="text-lg font-black text-slate-800">{formatCurrency(summary.binance)}</p>
         </div>
       </div>
 
