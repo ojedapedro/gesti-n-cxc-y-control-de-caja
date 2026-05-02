@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 import { type Expense } from '../types';
-import { Plus, TrendingDown, Calendar, Tag, FileText, Search, Filter, PieChart, List, ChevronRight } from 'lucide-react';
+import { Plus, TrendingDown, Calendar, Tag, FileText, Search, Filter, PieChart, List, ChevronRight, Download } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   BarChart,
   Bar,
@@ -108,6 +110,108 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     };
   }).filter(d => d.value > 0);
 
+  const handleDownloadReport = () => {
+    const doc = new jsPDF();
+    const currentDate = format(new Date(), "dd/MM/yyyy HH:mm");
+
+    doc.setFontSize(18);
+    doc.text('Reporte de Gastos', 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generado: ${currentDate}`, 14, 28);
+    
+    let periodText = 'Periodo: Todos los registros';
+    if (startDate && endDate) {
+      periodText = `Periodo: ${format(new Date(startDate), "dd/MM/yyyy")} al ${format(new Date(endDate), "dd/MM/yyyy")}`;
+    } else if (startDate) {
+      periodText = `Periodo: Desde ${format(new Date(startDate), "dd/MM/yyyy")}`;
+    } else if (endDate) {
+      periodText = `Periodo: Hasta ${format(new Date(endDate), "dd/MM/yyyy")}`;
+    }
+    doc.text(periodText, 14, 33);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(50);
+    doc.text(`Total Gastos USD: ${formatCurrency(totalMonthlyExpense)}`, 14, 43);
+    if (exchangeRate) {
+      doc.text(`Total Equivalente Bs: Bs. ${new Intl.NumberFormat('es-VE').format(totalMonthlyExpense * exchangeRate)}`, 14, 49);
+    }
+
+    const tableColumn = ["Fecha", "Categoría", "Detalle", "Monto USD"];
+    if (exchangeRate) {
+      tableColumn.push("Monto Bs.");
+    }
+    const tableRows: any[] = [];
+
+    // Sort descending by date
+    const sortedExpenses = [...filteredExpenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    sortedExpenses.forEach(e => {
+      const rowData = [
+        format(new Date(e.date), "dd/MM/yyyy"),
+        e.category,
+        e.note || '-',
+        formatCurrency(e.amountUsd)
+      ];
+      if (exchangeRate) {
+         rowData.push(`Bs. ${new Intl.NumberFormat('es-VE').format(e.amountUsd * exchangeRate)}`);
+      }
+      tableRows.push(rowData);
+    });
+
+    autoTable(doc, {
+      startY: 55,
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      columnStyles: exchangeRate 
+          ? { 3: { halign: 'right', fontStyle: 'bold' }, 4: { halign: 'right' } }
+          : { 3: { halign: 'right', fontStyle: 'bold' } }
+    });
+
+    // Summary by category
+    const finalY = (doc as any).lastAutoTable.finalY || 55;
+    
+    // Add page if near bottom
+    let summaryY = finalY + 15;
+    if (summaryY > 250) {
+      doc.addPage();
+      summaryY = 20;
+    }
+    
+    doc.setFontSize(14);
+    doc.setTextColor(20, 20, 20);
+    doc.text('Resumen por Categoría', 14, summaryY);
+
+    const summaryColumn = ["Categoría", "Monto USD"];
+    if(exchangeRate) summaryColumn.push("Monto Bs.");
+    const summaryRows: any[] = [];
+    
+    [...categoryData].sort((a, b) => b.value - a.value).forEach(cat => {
+      const row = [cat.name, formatCurrency(cat.value)];
+      if(exchangeRate) row.push(`Bs. ${new Intl.NumberFormat('es-VE').format(cat.value * exchangeRate)}`);
+      summaryRows.push(row);
+    });
+
+    autoTable(doc, {
+      startY: summaryY + 5,
+      head: [summaryColumn],
+      body: summaryRows,
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
+      columnStyles: exchangeRate 
+          ? { 1: { halign: 'right', fontStyle: 'bold' }, 2: { halign: 'right' } }
+          : { 1: { halign: 'right', fontStyle: 'bold' } }
+    });
+
+    doc.save(`gastos_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -134,6 +238,14 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
               <PieChart size={14} /> Reporte
             </button>
           </div>
+          
+          <button 
+            onClick={handleDownloadReport}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-700 transition-colors shadow-sm"
+          >
+            <Download size={16} /> PDF
+          </button>
+          
           <button 
             onClick={() => setShowForm(!showForm)}
             className="btn-primary"
