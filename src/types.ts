@@ -23,6 +23,8 @@ export interface Transaction {
   type: TransactionType;
   isCXC: boolean;
   cxcBalance?: number;
+  currency?: string;
+  destinationBank?: string;
   // Breakdown fields for Daily Box
   amountUsdCash?: number;
   amountZelle?: number;

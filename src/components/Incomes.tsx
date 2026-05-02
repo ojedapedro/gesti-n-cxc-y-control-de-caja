@@ -17,12 +17,11 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
-    amountBs: '',
+    currency: 'Bolívares (BS)',
+    destinationBank: '',
+    amount: '',
     exchangeRate: exchangeRate?.toString() || '480',
-    amountUsdCash: '',
-    amountZelle: '',
-    amountCXC: '',
-    concept: 'CUADRE DE CAJA DIARIO',
+    concept: 'INGRESO',
   });
 
   const [cxcData, setCxcData] = useState({
@@ -45,7 +44,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   }, []);
 
   useEffect(() => {
-    if (exchangeRate && !formData.amountBs) {
+    if (exchangeRate && !formData.amount) {
       setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
     }
   }, [exchangeRate]);
@@ -56,11 +55,14 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   };
 
   // Calculated Fields
-  const amountUsdConv = (parseFloat(formData.amountBs) || 0) / (parseFloat(formData.exchangeRate) || 1);
-  const amountUsdCash = parseFloat(formData.amountUsdCash) || 0;
-  const amountZelle = parseFloat(formData.amountZelle) || 0;
-  const amountCXC = parseFloat(formData.amountCXC) || 0;
-  const totalDailySale = amountUsdConv + amountUsdCash + amountZelle + amountCXC;
+  const inputAmt = parseFloat(formData.amount) || 0;
+  const inBolivares = formData.currency === 'Bolívares (BS)';
+  const amountUsdConv = inBolivares ? inputAmt / (parseFloat(formData.exchangeRate) || 1) : 0;
+  const amountUsdCash = formData.currency === 'Dólares ($)' ? inputAmt : 0;
+  const amountZelle = formData.currency === 'Binance (USDT)' ? inputAmt : 0;
+  const amountBs = inBolivares ? inputAmt : 0;
+  
+  const totalDailySale = inBolivares ? amountUsdConv : inputAmt;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,27 +72,28 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         date: formData.date,
         clientName: 'CUADRE DIARIO',
         concept: formData.concept,
-        amountBs: parseFloat(formData.amountBs) || 0,
+        amountBs: amountBs,
         exchangeRate: parseFloat(formData.exchangeRate) || 1,
         amountUsd: totalDailySale,
-        paymentMethod: PaymentMethod.BS,
+        paymentMethod: inBolivares ? PaymentMethod.BS : PaymentMethod.USD_CASH,
         type: TransactionType.SALE,
-        isCXC: amountCXC > 0,
+        isCXC: false,
         amountUsdCash: amountUsdCash,
         amountZelle: amountZelle,
-        amountCXC: amountCXC,
+        amountCXC: 0,
         totalDailySale: totalDailySale,
+        currency: formData.currency,
+        destinationBank: formData.destinationBank
       });
 
       setShowForm(false);
       setFormData({
         date: format(new Date(), 'yyyy-MM-dd'),
+        currency: 'Bolívares (BS)',
+        destinationBank: '',
+        amount: '',
         exchangeRate: exchangeRate?.toString() || '480',
-        amountBs: '',
-        amountUsdCash: '',
-        amountZelle: '',
-        amountCXC: '',
-        concept: 'CUADRE DE CAJA DIARIO',
+        concept: 'INGRESO',
       });
     } catch (error) {
       console.error("Error saving daily closing:", error);
@@ -172,35 +175,36 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         </div>
         
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-2 px-2">
-              <Calendar size={16} className="text-slate-400" />
-              <div className="flex flex-col">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto">
+            <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
+              <Calendar size={16} className="text-slate-400 shrink-0" />
+              <div className="flex flex-col w-full">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Desde</label>
                 <input 
                   type="date" 
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-full sm:w-28 cursor-pointer"
                 />
               </div>
             </div>
-            <div className="w-px h-8 bg-slate-200 mx-1"></div>
-            <div className="flex items-center gap-2 px-2">
-              <div className="flex flex-col">
+            <div className="hidden sm:block w-px h-8 bg-slate-200 mx-1"></div>
+            <div className="w-full h-px sm:hidden bg-slate-200 my-1"></div>
+            <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
+              <div className="flex flex-col w-full">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Hasta</label>
                 <input 
                   type="date" 
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-full sm:w-28 cursor-pointer"
                 />
               </div>
             </div>
             {(startDate || endDate) && (
               <button 
                 onClick={() => { setStartDate(''); setEndDate(''); }}
-                className="ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+                className="mt-2 sm:mt-0 sm:ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors w-full sm:w-auto text-center border border-transparent sm:border-slate-200 bg-white sm:bg-transparent shadow-sm sm:shadow-none"
               >
                 Limpiar
               </button>
@@ -217,7 +221,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
             onClick={() => setShowForm(!showForm)}
             className="btn-primary"
           >
-            {showForm ? <span>Cerrar Formulario</span> : <span><Plus size={16} className="inline mr-2 -mt-0.5" />Nuevo Cuadre Diario</span>}
+            {showForm ? <span>Cerrar Formulario</span> : <span><Plus size={16} className="inline mr-2 -mt-0.5" />Nuevo Ingreso</span>}
           </button>
         </div>
       </div>
@@ -341,16 +345,39 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
               </div>
 
               <div className="space-y-1">
-                <label className="label">Bolívares (BS)</label>
-                <input 
-                  type="number" 
-                  step="0.01"
+                <label className="label">Moneda</label>
+                <select
                   required
-                  placeholder="0.00"
-                  value={formData.amountBs}
-                  onChange={(e) => setFormData({...formData, amountBs: e.target.value})}
-                  className="input-field" 
+                  value={formData.currency}
+                  onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                  className="input-field cursor-pointer"
+                >
+                  <option value="Bolívares (BS)">Bolívares (Bs)</option>
+                  <option value="Dólares ($)">Dólares ($)</option>
+                  <option value="Binance (USDT)">Binance (Cripto)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label">Banco / Destino</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Ej: Banesco, Provincial, Caja Fuerte, etc."
+                  value={formData.destinationBank}
+                  onChange={(e) => setFormData({...formData, destinationBank: e.target.value.toUpperCase()})}
+                  className="input-field uppercase" 
+                  list="bancos-list"
                 />
+                <datalist id="bancos-list">
+                  <option value="BANESCO" />
+                  <option value="PROVINCIAL" />
+                  <option value="MERCANTIL" />
+                  <option value="VENEZUELA" />
+                  <option value="EFECTIVO EN CAJA" />
+                  <option value="BINANCE P2P" />
+                  <option value="ZELLE" />
+                </datalist>
               </div>
 
               <div className="space-y-1">
@@ -362,54 +389,21 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                   placeholder="480.00"
                   value={formData.exchangeRate}
                   onChange={(e) => setFormData({...formData, exchangeRate: e.target.value})}
-                  className="input-field font-mono text-blue-600 font-bold" 
+                  className={`input-field font-mono font-bold ${formData.currency === 'Bolívares (BS)' ? 'text-blue-600' : 'text-slate-400 opacity-50 bg-slate-50'}`} 
+                  readOnly={formData.currency !== 'Bolívares (BS)'}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="label">Dólares Conv.</label>
-                <div className="input-field bg-slate-100 font-bold border-dashed flex items-center">
-                  {formatCurrency(amountUsdConv)}
-                </div>
-                <p className="text-[10px] text-slate-400">BS / Tasa</p>
-              </div>
-
-              <div className="space-y-1">
-                <label className="label">Dólares Efectivo</label>
+                <label className="label">Monto ({formData.currency.split(' ')[0]})</label>
                 <input 
                   type="number" 
                   step="0.01"
                   required
                   placeholder="0.00"
-                  value={formData.amountUsdCash}
-                  onChange={(e) => setFormData({...formData, amountUsdCash: e.target.value})}
-                  className="input-field" 
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="label">ZELLE</label>
-                <input 
-                  type="number" 
-                  step="0.01"
-                  required
-                  placeholder="0.00"
-                  value={formData.amountZelle}
-                  onChange={(e) => setFormData({...formData, amountZelle: e.target.value})}
-                  className="input-field" 
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="label">C X C</label>
-                <input 
-                  type="number" 
-                  step="0.01"
-                  required
-                  placeholder="0.00"
-                  value={formData.amountCXC}
-                  onChange={(e) => setFormData({...formData, amountCXC: e.target.value})}
-                  className="input-field" 
+                  value={formData.amount}
+                  onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                  className="input-field font-bold" 
                 />
               </div>
 
@@ -424,6 +418,16 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                 />
               </div>
 
+              {formData.currency === 'Bolívares (BS)' && (
+                <div className="space-y-1">
+                  <label className="label text-emerald-600">Dólares Conv.</label>
+                  <div className="input-field bg-emerald-50 text-emerald-700 font-bold border-dashed flex items-center">
+                    {formatCurrency(amountUsdConv)}
+                  </div>
+                  <p className="text-[10px] text-slate-400">BS / Tasa</p>
+                </div>
+              )}
+
               <div className="col-span-1 md:col-span-2 lg:col-span-2 space-y-1">
                 <label className="label text-blue-600">Venta Diaria Total (USD)</label>
                 <div className="h-10 px-4 bg-blue-600 text-white rounded-lg flex items-center justify-between shadow-lg shadow-blue-200">
@@ -435,7 +439,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
             <div className="flex justify-end pt-4 border-t border-slate-100">
               <button type="submit" className="btn-primary px-10 h-12 shadow-xl shadow-blue-200">
-                Guardar Cuadre de Caja
+                Guardar Ingreso
               </button>
             </div>
           </form>
@@ -450,11 +454,13 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                 <th className="p-3 text-left text-[10px] uppercase font-black border-r border-slate-700">Item</th>
                 <th className="p-3 text-left text-[10px] uppercase font-black border-r border-slate-700">Día</th>
                 <th className="p-3 text-left text-[10px] uppercase font-black border-r border-slate-700">Fecha</th>
+                <th className="p-3 text-left text-[10px] uppercase font-black border-r border-slate-700">Moneda</th>
+                <th className="p-3 text-left text-[10px] uppercase font-black border-r border-slate-700">Destino</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-orange-950/20">Bolívares</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700">Tasa</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-orange-950/20">Dolars Conv.</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Efectivo ($)</th>
-                <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Zelle</th>
+                <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Zelle/Binance</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-blue-950/20">C X C</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700">Venta Diaria</th>
                 <th className="p-3 text-center text-[10px] uppercase font-black">Edit</th>
@@ -478,6 +484,8 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                           }
                         })()}
                       </td>
+                      <td className="p-3 border-r border-slate-100 text-slate-600">{t.currency || '-'}</td>
+                      <td className="p-3 border-r border-slate-100 font-bold">{t.destinationBank || '-'}</td>
                       <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30">{new Intl.NumberFormat('es-VE').format(t.amountBs || 0)}</td>
                       <td className="p-3 text-right border-r border-slate-100 font-mono text-blue-600">{t.exchangeRate}</td>
                       <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30">{formatCurrency(conv)}</td>

@@ -123,35 +123,36 @@ export default function Dashboard() {
           <p className="text-sm font-medium text-slate-500 mt-1">Resumen del estado financiero del negocio.</p>
         </div>
         
-        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 px-2">
-            <Calendar size={16} className="text-slate-400" />
-            <div className="flex flex-col">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto">
+          <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
+            <Calendar size={16} className="text-slate-400 shrink-0" />
+            <div className="flex flex-col w-full">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Desde</label>
               <input 
                 type="date" 
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-full sm:w-28 cursor-pointer"
               />
             </div>
           </div>
-          <div className="w-px h-8 bg-slate-200 mx-1"></div>
-          <div className="flex items-center gap-2 px-2">
-            <div className="flex flex-col">
+          <div className="hidden sm:block w-px h-8 bg-slate-200 mx-1"></div>
+          <div className="w-full h-px sm:hidden bg-slate-200 my-1"></div>
+          <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
+            <div className="flex flex-col w-full">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Hasta</label>
               <input 
                 type="date" 
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-28"
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-full sm:w-28 cursor-pointer"
               />
             </div>
           </div>
           {(startDate || endDate) && (
             <button 
               onClick={() => { setStartDate(''); setEndDate(''); }}
-              className="ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors"
+              className="mt-2 sm:mt-0 sm:ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors w-full sm:w-auto text-center border border-transparent sm:border-slate-200 bg-white sm:bg-transparent shadow-sm sm:shadow-none"
             >
               Limpiar
             </button>
