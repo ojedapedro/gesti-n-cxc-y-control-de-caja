@@ -258,12 +258,6 @@ export const dbService = {
         createdAt: serverTimestamp(),
       });
       
-      // If it's a withdrawal for CXC, we should also track it in CXC
-      // The user said: "recibo para justificar retiros en efectivos por caja los cuales seran parte de las CXC"
-      // So every receipt creates a CXC entry? Or just if specified?
-      // For now, let's assume receipts are always CXC additions for the recipient
-      await this.addOrUpdateCXCAccount(data.recipient, data.amountUsd);
-      
       // Record as withdrawal in main ledger
       await this.addTransaction({
         date: data.date,
@@ -272,7 +266,7 @@ export const dbService = {
         amountUsd: data.amountUsd,
         paymentMethod: PaymentMethod.USD_CASH,
         type: TransactionType.WITHDRAWAL,
-        isCXC: true
+        isCXC: false
       });
 
       return res;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../services/db';
-import { Transaction, Expense, Receipt } from '../types';
+import { Transaction, Expense, Receipt, TransactionType } from '../types';
 import { Activity, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, isValid, parseISO } from 'date-fns';
@@ -52,6 +52,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         };
 
         transactions?.forEach(t => {
+          if (t.type !== TransactionType.SALE && t.type !== TransactionType.INCOME) return;
           const d = getOrCreateDate(t.date);
           d.inflowUsd += t.amountUsd || 0;
           d.cashUsd += t.amountUsdCash || 0;
