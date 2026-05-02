@@ -16,6 +16,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentData, setPaymentData] = useState({
     amountUsd: '',
+    amountBs: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     concept: '',
   });
@@ -82,6 +83,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     setShowPaymentForm(false);
     setPaymentData({
       amountUsd: '',
+      amountBs: '',
       date: format(new Date(), 'yyyy-MM-dd'),
       concept: '',
     });
@@ -147,7 +149,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     doc.text(`ID Cliente: ${selectedAccount.id}`, 14, 36);
     doc.text(`Saldo Total Pendiente: ${formatCurrency(selectedAccount.totalBalance)}`, 14, 42);
 
-    const tableColumn = ["Fecha", "Concepto", "Item", "Cargo USD", "Abono USD"];
+    const tableColumn = ["Fecha", "Concepto", "Item", "Factura N°", "Cargo USD", "Abono USD"];
     const tableRows: any[] = [];
 
     let totalPagos = 0;
@@ -159,6 +161,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         payment.date,
         payment.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago'),
         payment.item || '-',
+        payment.invoiceNumber || '-',
         isCharge ? formatCurrency(payment.amountUsd) : '',
         !isCharge ? formatCurrency(payment.amountUsd) : ''
       ];
@@ -379,8 +382,31 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         required
                         placeholder="0.00"
                         value={paymentData.amountUsd}
-                        onChange={(e) => setPaymentData({...paymentData, amountUsd: e.target.value})}
+                        onChange={(e) => {
+                          const usd = parseFloat(e.target.value) || 0;
+                          const bs = usd * (exchangeRate || 1);
+                          setPaymentData({...paymentData, amountUsd: e.target.value, amountBs: e.target.value ? bs.toFixed(2) : ''});
+                        }}
                         className="input-field pl-10" 
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="label text-blue-600 truncate">Eq. (Bs) - Tasa: {exchangeRate}</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-blue-400 font-bold text-sm">Bs</span>
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        required
+                        placeholder="0.00"
+                        value={paymentData.amountBs}
+                        onChange={(e) => {
+                          const bs = parseFloat(e.target.value) || 0;
+                          const usd = bs / (exchangeRate || 1);
+                          setPaymentData({...paymentData, amountBs: e.target.value, amountUsd: e.target.value ? usd.toFixed(4) : ''});
+                        }}
+                        className="input-field pl-10 font-bold text-blue-700 bg-blue-50 border-blue-200" 
                       />
                     </div>
                   </div>
@@ -425,6 +451,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     <th className="table-header">Fecha</th>
                     <th className="table-header">Concepto</th>
                     <th className="table-header">Item</th>
+                    <th className="table-header whitespace-nowrap">Factura N°</th>
                     <th className="table-header text-right text-rose-600">(+) Cargo</th>
                     <th className="table-header text-right text-emerald-600">(-) Abono</th>
                   </tr>
@@ -437,6 +464,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         <td className="table-cell">{p.date}</td>
                         <td className="table-cell text-slate-600">{p.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago')}</td>
                         <td className="table-cell font-mono text-slate-400 text-xs">{p.item || '-'}</td>
+                        <td className="table-cell font-bold text-slate-700">{p.invoiceNumber || '-'}</td>
                         <td className="table-cell text-right font-bold text-rose-600">
                           {isCharge ? (
                             <>

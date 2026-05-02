@@ -29,6 +29,8 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     clientName: '',
     concept: '',
     amountUsd: '',
+    amountBs: '',
+    invoiceNumber: '',
     item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
   });
 
@@ -110,6 +112,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         amountUsd: parseFloat(cxcData.amountUsd) || 0,
         concept: cxcData.concept,
         item: cxcData.item,
+        invoiceNumber: cxcData.invoiceNumber,
         type: 'charge'
       });
 
@@ -119,6 +122,8 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         clientName: '',
         concept: '',
         amountUsd: '',
+        amountBs: '',
+        invoiceNumber: '',
         item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
       });
     } catch (error) {
@@ -296,19 +301,59 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
               </div>
 
               <div className="space-y-1">
-                <label className="label">Monto de la Deuda (USD)</label>
+                <label className="label">Número de Factura</label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
                   <input 
-                    type="number" 
-                    step="0.01"
-                    min="0.01"
-                    required
-                    value={cxcData.amountUsd}
-                    onChange={(e) => setCxcData({...cxcData, amountUsd: e.target.value})}
-                    className="input-field pl-10 font-bold" 
-                    placeholder="0.00"
+                    type="text" 
+                    value={cxcData.invoiceNumber}
+                    onChange={(e) => setCxcData({...cxcData, invoiceNumber: e.target.value})}
+                    className="input-field pl-10" 
+                    placeholder="Opcional. Ej: FAC-00123"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Monto (USD)</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      min="0.01"
+                      required
+                      value={cxcData.amountUsd}
+                      onChange={(e) => {
+                        const usd = parseFloat(e.target.value) || 0;
+                        const bs = usd * (exchangeRate || 1);
+                        setCxcData({...cxcData, amountUsd: e.target.value, amountBs: e.target.value ? bs.toFixed(2) : ''});
+                      }}
+                      className="input-field pl-10 font-bold" 
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="label text-blue-600 truncate">Eq. (Bs) - Tasa: {exchangeRate}</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-blue-400 font-bold text-sm">Bs</span>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      min="0.01"
+                      required
+                      value={cxcData.amountBs}
+                      onChange={(e) => {
+                        const bs = parseFloat(e.target.value) || 0;
+                        const usd = bs / (exchangeRate || 1);
+                        setCxcData({...cxcData, amountBs: e.target.value, amountUsd: e.target.value ? usd.toFixed(4) : ''});
+                      }}
+                      className="input-field pl-10 font-bold text-blue-700 bg-blue-50 border-blue-200" 
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
               </div>
               

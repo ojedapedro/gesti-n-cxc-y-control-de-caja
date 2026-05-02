@@ -58,6 +58,7 @@ export interface CXCPayment {
   concept?: string;
   type?: 'payment' | 'charge';
   item?: string; // Correlative item
+  invoiceNumber?: string;
   createdAt: any;
 }
 
