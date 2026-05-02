@@ -8,7 +8,7 @@ import { es } from 'date-fns/locale';
 
 export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true);
   const [showCXCModal, setShowCXCModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
@@ -374,6 +374,8 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                   <option value="PROVINCIAL" />
                   <option value="MERCANTIL" />
                   <option value="VENEZUELA" />
+                  <option value="BANCO DEL TESORO" />
+                  <option value="BNC" />
                   <option value="EFECTIVO EN CAJA" />
                   <option value="BINANCE P2P" />
                   <option value="ZELLE" />

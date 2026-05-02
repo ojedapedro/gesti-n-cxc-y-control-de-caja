@@ -48,7 +48,7 @@ export default function Reports() {
 
   // Extract unique banks for the dropdown filter
   const uniqueBanks = useMemo(() => {
-    const banks = new Set<string>();
+    const banks = new Set<string>(['BANESCO', 'PROVINCIAL', 'MERCANTIL', 'VENEZUELA', 'BANCO DEL TESORO', 'BNC', 'EFECTIVO EN CAJA', 'BINANCE P2P', 'ZELLE']);
     transactions.forEach(t => {
       if ((t.type === TransactionType.SALE || t.type === TransactionType.INCOME) && t.destinationBank) {
         banks.add(t.destinationBank);
