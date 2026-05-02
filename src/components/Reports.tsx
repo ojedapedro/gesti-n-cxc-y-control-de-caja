@@ -46,6 +46,15 @@ export default function Reports({ exchangeRate = 1 }: { exchangeRate?: number })
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, startDate, endDate, currencyFilter, bankFilter]);
 
+  const filteredWithdrawals = useMemo(() => {
+    return transactions.filter(t => {
+      if (t.type !== TransactionType.WITHDRAWAL) return false;
+      if (startDate && t.date < startDate) return false;
+      if (endDate && t.date > endDate) return false;
+      return true;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, startDate, endDate]);
+
   // Extract unique banks for the dropdown filter
   const uniqueBanks = useMemo(() => {
     const banks = new Set<string>(['BANESCO', 'PROVINCIAL', 'MERCANTIL', 'VENEZUELA', 'BANCO DEL TESORO', 'BNC', 'EFECTIVO EN CAJA', 'EFECTIVO', 'BINANCE P2P', 'ZELLE']);
@@ -401,6 +410,65 @@ export default function Reports({ exchangeRate = 1 }: { exchangeRate?: number })
               {filteredData.length === 0 && (
                 <tr>
                   <td colSpan={7} className="p-10 text-center text-slate-400 italic">No se encontraron registros para los filtros seleccionados.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Detalle de Retiros de Efectivo */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <FileText size={18} className="text-slate-400" />
+            Detalle de Retiros de Efectivo
+          </h3>
+          <span className="text-xs font-bold text-slate-500 bg-slate-200 px-3 py-1 rounded-full">{filteredWithdrawals.length} registros</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-800 text-white">
+                <th className="p-3 text-[10px] uppercase font-black tracking-wider">Fecha</th>
+                <th className="p-3 text-[10px] uppercase font-black tracking-wider">Destinatario</th>
+                <th className="p-3 text-[10px] uppercase font-black tracking-wider">Concepto</th>
+                <th className="p-3 text-[10px] uppercase font-black tracking-wider text-right">Monto USD</th>
+                <th className="p-3 text-[10px] uppercase font-black tracking-wider text-right">Equiv. Bs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredWithdrawals.map((t) => {
+                let dateStr = t.date;
+                const d = new Date(t.date + 'T12:00:00');
+                if (isValid(d)) dateStr = format(d, 'dd/MM/yyyy');
+                const amountUsd = t.amountUsd || 0;
+                const rate = t.exchangeRate || exchangeRate || 1;
+                const amountBs = amountUsd * rate;
+                
+                return (
+                  <tr key={t.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td className="p-3 border-r border-slate-100 text-slate-600 font-medium">
+                      {dateStr}
+                    </td>
+                    <td className="p-3 border-r border-slate-100 font-bold text-slate-700">
+                      {t.clientName || '-'}
+                    </td>
+                    <td className="p-3 border-r border-slate-100 text-slate-600">
+                      {t.concept || '-'}
+                    </td>
+                    <td className="p-3 text-right font-black text-rose-600 bg-rose-50/30 border-r border-slate-100">
+                      {formatCurrency(amountUsd)}
+                    </td>
+                    <td className="p-3 text-right font-black text-slate-800 bg-slate-50">
+                      Bs. {new Intl.NumberFormat('es-VE').format(amountBs)}
+                    </td>
+                  </tr>
+                );
+              })}
+              {filteredWithdrawals.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-10 text-center text-slate-400 italic">No se encontraron retiros para los filtros seleccionados.</td>
                 </tr>
               )}
             </tbody>
