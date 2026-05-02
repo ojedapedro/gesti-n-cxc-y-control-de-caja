@@ -6,7 +6,7 @@ import { format, isValid, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, Filter, Download, FileText, ArrowUpRight, DollarSign } from 'lucide-react';
 
-export default function Reports() {
+export default function Reports({ exchangeRate = 1 }: { exchangeRate?: number }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -223,30 +223,44 @@ export default function Reports() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Equiv. USD</p>
-          <div className="flex items-center gap-2">
-            <DollarSign size={20} className="text-emerald-500" />
-            <p className="text-3xl font-black text-slate-800">{formatCurrency(summary.totalUsdEquiv)}</p>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1">
+              <DollarSign size={20} className="text-emerald-500" />
+              <p className="text-3xl font-black text-slate-800">{formatCurrency(summary.totalUsdEquiv)}</p>
+            </div>
+            <p className="text-xs font-bold text-emerald-600 px-1 mt-1">
+              Bs. {new Intl.NumberFormat('es-VE').format(summary.totalUsdEquiv * exchangeRate)}
+            </p>
           </div>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center relative overflow-hidden group">
           <div className="absolute -right-4 -top-4 w-16 h-16 bg-blue-50 rounded-full transition-transform group-hover:scale-150 duration-500 ease-out z-0"></div>
-          <div className="relative z-10">
+          <div className="relative z-10 flex flex-col">
             <p className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-1">Total Bolívares</p>
             <p className="text-2xl font-black text-slate-800">Bs. {new Intl.NumberFormat('es-VE').format(summary.bs)}</p>
+            <p className="text-xs font-bold text-blue-600 mt-1 opacity-70">
+              {formatCurrency(summary.bs / exchangeRate)}
+            </p>
           </div>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center relative overflow-hidden group">
           <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-50 rounded-full transition-transform group-hover:scale-150 duration-500 ease-out z-0"></div>
-          <div className="relative z-10">
+          <div className="relative z-10 flex flex-col">
             <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Total Dólares</p>
             <p className="text-2xl font-black text-slate-800">{formatCurrency(summary.usd)}</p>
+            <p className="text-xs font-bold text-emerald-700 mt-1 opacity-70">
+              Bs. {new Intl.NumberFormat('es-VE').format(summary.usd * exchangeRate)}
+            </p>
           </div>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center relative overflow-hidden group">
           <div className="absolute -right-4 -top-4 w-16 h-16 bg-orange-50 rounded-full transition-transform group-hover:scale-150 duration-500 ease-out z-0"></div>
-          <div className="relative z-10">
+          <div className="relative z-10 flex flex-col">
             <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">Total Cripto/Zelle</p>
             <p className="text-2xl font-black text-slate-800">{formatCurrency(summary.cripto)}</p>
+            <p className="text-xs font-bold text-orange-700 mt-1 opacity-70">
+              Bs. {new Intl.NumberFormat('es-VE').format(summary.cripto * exchangeRate)}
+            </p>
           </div>
         </div>
       </div>
@@ -310,6 +324,9 @@ export default function Reports() {
                     </td>
                     <td className="p-3 text-right font-black text-slate-800 bg-slate-50/50">
                       {formatCurrency(conv || 0)}
+                      <span className="block text-[9px] text-slate-400 font-bold mt-0.5">
+                        Bs. {new Intl.NumberFormat('es-VE').format((conv || 0) * exchangeRate)}
+                      </span>
                     </td>
                   </tr>
                 );

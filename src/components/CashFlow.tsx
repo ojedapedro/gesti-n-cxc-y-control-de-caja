@@ -173,6 +173,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
               <div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Ingresos Totales</p>
                 <h3 className="text-3xl font-black mt-2 tracking-tight text-slate-900">{formatCurrency(totalInflow)}</h3>
+                <p className="text-xs font-bold text-emerald-600/70 mt-1">Bs. {new Intl.NumberFormat('es-VE').format(totalInflow * (exchangeRate || 1))}</p>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-50 text-emerald-600">
                 <TrendingUp size={22} strokeWidth={2.5} />
@@ -184,6 +185,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
               <div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Egresos Totales</p>
                 <h3 className="text-3xl font-black mt-2 tracking-tight text-slate-900">{formatCurrency(totalOutflow)}</h3>
+                <p className="text-xs font-bold text-rose-600/70 mt-1">Bs. {new Intl.NumberFormat('es-VE').format(totalOutflow * (exchangeRate || 1))}</p>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-50 text-rose-600">
                 <TrendingDown size={22} strokeWidth={2.5} />
@@ -197,6 +199,9 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                 <h3 className={`text-3xl font-black mt-2 tracking-tight ${totalNet >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                   {formatCurrency(totalNet)}
                 </h3>
+                <p className={`text-xs font-bold mt-1 ${totalNet >= 0 ? 'text-emerald-600/70' : 'text-rose-600/70'}`}>
+                  Bs. {new Intl.NumberFormat('es-VE').format(totalNet * (exchangeRate || 1))}
+                </p>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-50 text-slate-900">
                 <Activity size={22} strokeWidth={2.5} />
@@ -236,6 +241,9 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                   <td className="p-4 px-5 text-right bg-slate-50 border-l border-slate-200">
                     <div className={`font-black ${row.netFlow >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
                       {formatCurrency(row.netFlow)}
+                    </div>
+                    <div className="text-[10px] font-bold text-slate-400 mt-0.5">
+                      Bs. {new Intl.NumberFormat('es-VE').format(row.netFlow * (exchangeRate || 1))}
                     </div>
                   </td>
                 </tr>

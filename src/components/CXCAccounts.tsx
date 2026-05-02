@@ -8,7 +8,7 @@ import { es } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export default function CXCAccounts() {
+export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: number }) {
   const [accounts, setAccounts] = useState<CXCAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<CXCAccount | null>(null);
   const [payments, setPayments] = useState<CXCPayment[]>([]);
@@ -271,6 +271,9 @@ export default function CXCAccounts() {
                     }`}>
                       {formatCurrency(acc.totalBalance)}
                     </p>
+                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                      Bs. {new Intl.NumberFormat('es-VE').format(acc.totalBalance * exchangeRate)}
+                    </p>
                     <ChevronRight size={14} className={`ml-auto mt-1 transition-transform ${
                       isSelected ? 'text-blue-400 translate-x-1' : 'text-slate-300'
                     }`} />
@@ -317,19 +320,24 @@ export default function CXCAccounts() {
                   
                   <div className="text-left md:text-right bg-white/5 backdrop-blur px-6 py-4 rounded-2xl border border-white/10">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Balance Pendiente</p>
-                    <div className="flex items-center gap-3 justify-end">
-                      {selectedAccount.totalBalance > 200 && (
-                        <div className="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1 animate-pulse">
-                          <AlertTriangle size={12} /> Urgente
-                        </div>
-                      )}
-                      <p className={`text-4xl font-black tracking-tighter ${
-                        selectedAccount.totalBalance > 200 ? 'text-rose-400' : 
-                        selectedAccount.totalBalance > 50 ? 'text-orange-400' : 
-                        selectedAccount.totalBalance > 0 ? 'text-amber-400' : 
-                        'text-emerald-400'
-                      }`}>
-                        {formatCurrency(selectedAccount.totalBalance)}
+                    <div className="flex flex-col md:items-end justify-end">
+                      <div className="flex items-center gap-3">
+                        {selectedAccount.totalBalance > 200 && (
+                          <div className="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1 animate-pulse">
+                            <AlertTriangle size={12} /> Urgente
+                          </div>
+                        )}
+                        <p className={`text-4xl font-black tracking-tighter ${
+                          selectedAccount.totalBalance > 200 ? 'text-rose-400' : 
+                          selectedAccount.totalBalance > 50 ? 'text-orange-400' : 
+                          selectedAccount.totalBalance > 0 ? 'text-amber-400' : 
+                          'text-emerald-400'
+                        }`}>
+                          {formatCurrency(selectedAccount.totalBalance)}
+                        </p>
+                      </div>
+                      <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-wider">
+                        Bs. {new Intl.NumberFormat('es-VE').format(selectedAccount.totalBalance * exchangeRate)}
                       </p>
                     </div>
                   </div>
@@ -429,8 +437,22 @@ export default function CXCAccounts() {
                         <td className="table-cell">{p.date}</td>
                         <td className="table-cell text-slate-600">{p.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago')}</td>
                         <td className="table-cell font-mono text-slate-400 text-xs">{p.item || '-'}</td>
-                        <td className="table-cell text-right font-bold text-rose-600">{isCharge ? formatCurrency(p.amountUsd) : ''}</td>
-                        <td className="table-cell text-right font-bold text-emerald-600">{!isCharge ? `-${formatCurrency(p.amountUsd)}` : ''}</td>
+                        <td className="table-cell text-right font-bold text-rose-600">
+                          {isCharge ? (
+                            <>
+                              {formatCurrency(p.amountUsd)}
+                              <span className="block text-[9px] text-rose-400 font-normal">Bs. {new Intl.NumberFormat('es-VE').format(p.amountUsd * exchangeRate)}</span>
+                            </>
+                          ) : ''}
+                        </td>
+                        <td className="table-cell text-right font-bold text-emerald-600">
+                          {!isCharge ? (
+                            <>
+                              -{formatCurrency(p.amountUsd)}
+                              <span className="block text-[9px] text-emerald-400 font-normal">-Bs. {new Intl.NumberFormat('es-VE').format(p.amountUsd * exchangeRate)}</span>
+                            </>
+                          ) : ''}
+                        </td>
                       </tr>
                     );
                   })}

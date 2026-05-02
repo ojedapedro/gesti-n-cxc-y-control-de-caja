@@ -26,7 +26,7 @@ import { formatCurrency } from '../lib/utils';
 import { startOfMonth, endOfMonth, format, subMonths, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-export default function Dashboard() {
+export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [cxcAccounts, setCXCAccounts] = useState<CXCAccount[]>([]);
@@ -168,6 +168,7 @@ export default function Dashboard() {
               <div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
                 <h3 className={`text-3xl font-black mt-2 tracking-tight ${stat.color}`}>{formatCurrency(stat.value)}</h3>
+                <p className={`text-xs mt-1 font-bold ${stat.color} opacity-70`}>Bs. {new Intl.NumberFormat('es-VE').format(stat.value * exchangeRate)}</p>
               </div>
               <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color}`}>
                 <stat.icon size={22} strokeWidth={2.5} />
@@ -231,7 +232,10 @@ export default function Dashboard() {
                       <p className="text-[10px] text-slate-500 uppercase font-mono tracking-widest mt-0.5">ID: {acc.id?.slice(-6)}</p>
                     </div>
                   </div>
-                  <span className="text-[15px] font-black tracking-tight text-slate-900">{formatCurrency(acc.totalBalance)}</span>
+                  <div className="text-right">
+                    <span className="text-[15px] block font-black tracking-tight text-slate-900">{formatCurrency(acc.totalBalance)}</span>
+                    <span className="text-[11px] block font-bold text-slate-500">Bs. {new Intl.NumberFormat('es-VE').format(acc.totalBalance * exchangeRate)}</span>
+                  </div>
                 </div>
               ))}
             {cxcAccounts.length === 0 && (

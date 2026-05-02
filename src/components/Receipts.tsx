@@ -8,7 +8,7 @@ import { es } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export default function Receipts() {
+export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }) {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
@@ -252,7 +252,10 @@ export default function Receipts() {
                         })()}
                       </td>
                       <td className="table-cell font-medium">{r.recipient}</td>
-                      <td className="table-cell text-right font-bold">{formatCurrency(r.amountUsd)}</td>
+                      <td className="table-cell text-right font-bold">
+                        {formatCurrency(r.amountUsd)}
+                        <span className="block text-[10px] text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(r.amountUsd * exchangeRate)}</span>
+                      </td>
                       <td className="table-cell text-right">
                         <ChevronRight size={16} className="text-slate-300 ml-auto" />
                       </td>
@@ -307,6 +310,9 @@ export default function Receipts() {
                   <div className="p-3 bg-slate-50">
                     <p className="text-[10px] font-bold uppercase text-slate-400">Por la cantidad de</p>
                     <p className="text-xl font-black">{formatCurrency(selectedReceipt.amountUsd)}</p>
+                    <p className="text-[11px] font-bold text-slate-500 uppercase">
+                      Bs. {new Intl.NumberFormat('es-VE').format(selectedReceipt.amountUsd * exchangeRate)}
+                    </p>
                   </div>
                 </div>
 

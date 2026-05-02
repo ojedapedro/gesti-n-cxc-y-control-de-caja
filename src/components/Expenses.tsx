@@ -267,9 +267,12 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
           )}
         </div>
 
-        <div className="md:ml-auto flex items-center justify-between md:justify-end gap-3 w-full md:w-auto bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-lg">
-          <p className="text-sm font-semibold text-slate-500">Total <span className="hidden sm:inline">del Periodo</span>:</p>
-          <p className="text-xl font-bold text-rose-600 font-mono">{formatCurrency(totalMonthlyExpense)}</p>
+        <div className="md:ml-auto flex flex-col items-end gap-1 w-full md:w-auto bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-lg">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-semibold text-slate-500">Total <span className="hidden sm:inline">del Periodo</span>:</p>
+            <p className="text-xl font-bold text-rose-600 font-mono">{formatCurrency(totalMonthlyExpense)}</p>
+          </div>
+          <p className="text-xs font-bold text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(totalMonthlyExpense * (exchangeRate || 1))}</p>
         </div>
       </div>
 
@@ -295,7 +298,10 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
                       </span>
                     </td>
                     <td className="table-cell text-slate-600">{e.note || '-'}</td>
-                    <td className="table-cell text-right font-bold text-rose-600">-{formatCurrency(e.amountUsd)}</td>
+                    <td className="table-cell text-right font-bold text-rose-600">
+                      -{formatCurrency(e.amountUsd)}
+                      <span className="block text-[10px] text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(e.amountUsd * (exchangeRate || 1))}</span>
+                    </td>
                   </tr>
                 ))}
                 {filteredExpenses.length === 0 && (
@@ -381,7 +387,8 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
                   </div>
                   <div className="text-right ml-4">
                     <p className="text-sm font-bold text-slate-900">{formatCurrency(item.value)}</p>
-                    <p className="text-[10px] font-bold text-slate-400 italic tracking-tighter">
+                    <p className="text-[10px] font-bold text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(item.value * (exchangeRate || 1))}</p>
+                    <p className="text-[10px] font-bold text-slate-400 italic tracking-tighter mt-1">
                       {((item.value / totalMonthlyExpense) * 100).toFixed(1)}%
                     </p>
                   </div>
@@ -396,7 +403,10 @@ export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
               <div className="mt-8 pt-6 border-t border-slate-100">
                 <div className="flex items-center justify-between text-slate-800">
                   <span className="text-sm font-black uppercase tracking-widest text-slate-400">Total Acumulado</span>
-                  <span className="text-2xl font-black text-rose-600">{formatCurrency(totalMonthlyExpense)}</span>
+                  <div className="text-right">
+                    <span className="block text-2xl font-black text-rose-600">{formatCurrency(totalMonthlyExpense)}</span>
+                    <span className="block text-xs font-bold text-slate-400 mt-1">Bs. {new Intl.NumberFormat('es-VE').format(totalMonthlyExpense * (exchangeRate || 1))}</span>
+                  </div>
                 </div>
               </div>
             )}

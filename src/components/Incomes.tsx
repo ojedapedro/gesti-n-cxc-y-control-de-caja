@@ -432,9 +432,12 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
               <div className="col-span-1 md:col-span-2 lg:col-span-2 space-y-1">
                 <label className="label text-blue-600">Venta Diaria Total (USD)</label>
-                <div className="h-10 px-4 bg-blue-600 text-white rounded-lg flex items-center justify-between shadow-lg shadow-blue-200">
-                  <span className="text-xs font-bold uppercase">Resultado:</span>
-                  <span className="text-xl font-black">{formatCurrency(totalDailySale)}</span>
+                <div className="h-14 px-4 bg-blue-600 text-white rounded-lg flex flex-col justify-center shadow-lg shadow-blue-200 text-right">
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-bold uppercase">Resultado:</span>
+                    <span className="text-xl font-black">{formatCurrency(totalDailySale)}</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-blue-200 mt-0.5">Bs. {new Intl.NumberFormat('es-VE').format(totalDailySale * (parseFloat(formData.exchangeRate) || 1))}</span>
                 </div>
               </div>
             </div>
@@ -494,7 +497,12 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                       <td className="p-3 text-right border-r border-slate-100 bg-emerald-50/30">{formatCurrency(t.amountUsdCash || 0)}</td>
                       <td className="p-3 text-right border-r border-slate-100 bg-emerald-50/30">{formatCurrency(t.amountZelle || 0)}</td>
                       <td className="p-3 text-right border-r border-slate-100 bg-blue-50/30">{formatCurrency(t.amountCXC || 0)}</td>
-                      <td className="p-3 text-right font-black text-slate-900 bg-slate-50 border-r border-slate-100">{formatCurrency(t.totalDailySale || t.amountUsd)}</td>
+                      <td className="p-3 text-right font-black text-slate-900 bg-slate-50 border-r border-slate-100">
+                        {formatCurrency(t.totalDailySale || t.amountUsd)}
+                        <span className="block text-[9px] text-slate-400 font-bold mt-0.5 whitespace-nowrap">
+                          Bs. {new Intl.NumberFormat('es-VE').format((t.totalDailySale || t.amountUsd) * (exchangeRate || 1))}
+                        </span>
+                      </td>
                       <td className="p-3 text-center">
                         <button 
                           onClick={() => setEditingTransaction(t)}
