@@ -30,7 +30,7 @@ import CashFlow from './components/CashFlow';
 import Reports from './components/Reports';
 
 export default function App() {
-  const [activeView, setActiveView] = useState<View>('dashboard');
+  const [activeView, setActiveView] = useState<View>('settings');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
