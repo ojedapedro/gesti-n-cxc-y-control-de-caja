@@ -11,6 +11,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   const [showForm, setShowForm] = useState(true);
   const [showCXCModal, setShowCXCModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [pendingIngresos, setPendingIngresos] = useState<any[]>([]);
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -66,11 +67,11 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   
   const totalDailySale = inBolivares ? amountUsdConv : inputAmt;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAddPending = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    try {
-      await dbService.addTransaction({
+    if (inputAmt <= 0) return;
+
+    setPendingIngresos(prev => [...prev, {
         date: formData.date,
         clientName: 'CUADRE DIARIO',
         concept: formData.concept,
@@ -86,19 +87,28 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         totalDailySale: totalDailySale,
         currency: formData.currency,
         destinationBank: formData.destinationBank
-      });
+    }]);
 
+    setFormData({
+      ...formData,
+      amount: '',
+      destinationBank: '',
+      concept: 'INGRESO',
+      currency: 'Bolívares (BS)',
+    });
+  };
+
+  const handleSaveAll = async () => {
+    if (pendingIngresos.length === 0) return;
+    
+    try {
+      for (const t of pendingIngresos) {
+        await dbService.addTransaction(t);
+      }
+      setPendingIngresos([]);
       setShowForm(false);
-      setFormData({
-        date: format(new Date(), 'yyyy-MM-dd'),
-        currency: 'Bolívares (BS)',
-        destinationBank: '',
-        amount: '',
-        exchangeRate: exchangeRate?.toString() || '480',
-        concept: 'INGRESO',
-      });
     } catch (error) {
-      console.error("Error saving daily closing:", error);
+      console.error("Error saving multiple transactions:", error);
     }
   };
 
@@ -372,7 +382,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
       {showForm && (
         <div key="incomes-form-container" className="card p-6 border-blue-100 bg-blue-50/10">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleAddPending} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <div className="space-y-1">
                 <label className="label">Fecha</label>
@@ -489,11 +499,50 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
             </div>
 
             <div className="flex justify-end pt-4 border-t border-slate-100">
-              <button type="submit" className="btn-primary px-10 h-12 shadow-xl shadow-blue-200">
-                Guardar Ingreso
+              <button type="submit" className="bg-white border border-slate-200 shadow-sm text-slate-700 hover:bg-slate-50 font-bold rounded-xl px-6 h-12 flex items-center justify-center transition-colors">
+                <Plus size={18} className="inline mr-2 -mt-0.5" />
+                Agregar a la Lista
               </button>
             </div>
           </form>
+
+          {pendingIngresos.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center justify-between">
+                <span>Ingresos por Registrar ({pendingIngresos.length})</span>
+                <span className="text-blue-600">
+                  Total: {formatCurrency(pendingIngresos.reduce((sum, p) => sum + p.totalDailySale, 0))}
+                </span>
+              </h3>
+              <div className="space-y-3 mb-6">
+                {pendingIngresos.map((p, i) => (
+                  <div key={i} className="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm text-sm">
+                    <div>
+                      <span className="font-bold text-slate-700 block">{p.destinationBank || 'Sin Banco'} - {p.currency}</span>
+                      <span className="text-slate-500 text-xs">{p.concept}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <span className="block font-black text-slate-800">{formatCurrency(p.totalDailySale)}</span>
+                        {p.amountBs > 0 && <span className="block text-[10px] text-slate-500 font-bold">Bs. {new Intl.NumberFormat('es-VE').format(p.amountBs)}</span>}
+                      </div>
+                      <button onClick={() => setPendingIngresos(prev => prev.filter((_, idx) => idx !== i))} className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-md transition-colors">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <button 
+                  onClick={handleSaveAll}
+                  className="btn-primary px-10 h-12 shadow-xl shadow-blue-200"
+                >
+                  Guardar Todos ({pendingIngresos.length})
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

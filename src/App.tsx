@@ -20,7 +20,7 @@ import Expenses from './components/Expenses';
 import Receipts from './components/Receipts';
 import Settings from './components/Settings';
 
-type View = 'dashboard' | 'incomes' | 'cxc' | 'expenses' | 'receipts' | 'cashflow' | 'reports' | 'settings';
+type View = 'dashboard' | 'incomes' | 'cxc' | 'expenses' | 'cashflow' | 'reports' | 'settings';
 
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './lib/firebase';
@@ -69,8 +69,7 @@ export default function App() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'incomes', label: 'Ingresos Caja', icon: Wallet },
     { id: 'cxc', label: 'Cuentas por Cobrar', icon: Contact },
-    { id: 'expenses', label: 'Gastos', icon: TrendingDown },
-    { id: 'receipts', label: 'Recibos / Retiros', icon: FileText },
+    { id: 'expenses', label: 'Egresos y Retiros', icon: TrendingDown },
     { id: 'cashflow', label: 'Flujo de Caja', icon: Activity },
     { id: 'reports', label: 'Reportes', icon: BarChart2 },
     { id: 'settings', label: 'Configuración', icon: SettingsIcon },
@@ -172,7 +171,6 @@ export default function App() {
         {activeView === 'incomes' && <div key="incomes"><Incomes exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'cxc' && <div key="cxc"><CXCAccounts exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'expenses' && <div key="expenses"><Expenses exchangeRate={globalSettings?.exchangeRate} /></div>}
-        {activeView === 'receipts' && <div key="receipts"><Receipts exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'cashflow' && <div key="cashflow"><CashFlow exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'reports' && <div key="reports"><Reports exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'settings' && <div key="settings"><Settings /></div>}
