@@ -29,7 +29,41 @@ const CATEGORIES = [
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
 
-export default function Expenses({ exchangeRate }: { exchangeRate?: number }) {
+import Receipts from './Receipts';
+
+export default function ExpensesModule({ exchangeRate }: { exchangeRate?: number }) {
+  const [activeTab, setActiveTab] = useState<'gastos' | 'retiros'>('gastos');
+
+  return (
+    <div className="space-y-6">
+      <div className="flex border-b border-slate-200 gap-8 mb-2">
+        <button 
+          onClick={() => setActiveTab('gastos')}
+          className={`pb-3 font-bold text-[15px] flex items-center gap-2 transition-colors ${activeTab === 'gastos' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+        >
+          <TrendingDown size={18} />
+          Gastos Operativos
+        </button>
+        <button 
+          onClick={() => setActiveTab('retiros')}
+          className={`pb-3 font-bold text-[15px] flex items-center gap-2 transition-colors ${activeTab === 'retiros' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+        >
+          <FileText size={18} />
+          Vales y Retiros
+        </button>
+      </div>
+
+      <div className={activeTab === 'gastos' ? 'block' : 'hidden'}>
+        <Expenses exchangeRate={exchangeRate} />
+      </div>
+      <div className={activeTab === 'retiros' ? 'block' : 'hidden'}>
+        <Receipts exchangeRate={exchangeRate} />
+      </div>
+    </div>
+  );
+}
+
+function Expenses({ exchangeRate }: { exchangeRate?: number }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [view, setView] = useState<'list' | 'report'>('list');
   const [showForm, setShowForm] = useState(false);

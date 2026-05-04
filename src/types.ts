@@ -59,6 +59,9 @@ export interface CXCPayment {
   type?: 'payment' | 'charge';
   item?: string; // Correlative item
   invoiceNumber?: string;
+  sellerName?: string;
+  paymentMethod?: PaymentMethod;
+  destinationBank?: string;
   createdAt: any;
 }
 

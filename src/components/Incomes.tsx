@@ -32,6 +32,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     amountUsd: '',
     amountBs: '',
     invoiceNumber: '',
+    sellerName: '',
     item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
   });
 
@@ -123,6 +124,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         concept: cxcData.concept,
         item: cxcData.item,
         invoiceNumber: cxcData.invoiceNumber,
+        sellerName: cxcData.sellerName,
         type: 'charge'
       });
 
@@ -134,6 +136,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         amountUsd: '',
         amountBs: '',
         invoiceNumber: '',
+        sellerName: '',
         item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
       });
     } catch (error) {
@@ -310,17 +313,33 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="label">Número de Factura</label>
-                <div className="relative">
-                  <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                  <input 
-                    type="text" 
-                    value={cxcData.invoiceNumber}
-                    onChange={(e) => setCxcData({...cxcData, invoiceNumber: e.target.value})}
-                    className="input-field pl-10" 
-                    placeholder="Opcional. Ej: FAC-00123"
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Número de Factura</label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      value={cxcData.invoiceNumber}
+                      onChange={(e) => setCxcData({...cxcData, invoiceNumber: e.target.value})}
+                      className="input-field pl-10" 
+                      placeholder="Opcional. Ej: FAC-00123"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label">Vendedor</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      value={cxcData.sellerName}
+                      onChange={(e) => setCxcData({...cxcData, sellerName: e.target.value.toUpperCase()})}
+                      className="input-field pl-10 uppercase" 
+                      placeholder="Nombre del vendedor"
+                    />
+                  </div>
                 </div>
               </div>
 

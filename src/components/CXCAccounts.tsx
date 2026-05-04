@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/db';
-import { type CXCAccount, type CXCPayment } from '../types';
-import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search, Download, FileText } from 'lucide-react';
+import { type CXCAccount, type CXCPayment, PaymentMethod } from '../types';
+import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search, Download, FileText, CreditCard, Landmark } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -19,6 +19,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     amountBs: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     concept: '',
+    paymentMethod: PaymentMethod.BS,
+    destinationBank: '',
   });
 
   useEffect(() => {
@@ -74,6 +76,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       amountUsd: parseFloat(paymentData.amountUsd),
       date: paymentData.date,
       concept: paymentData.concept,
+      paymentMethod: paymentData.paymentMethod,
+      destinationBank: paymentData.destinationBank,
     });
 
     // Refresh payments list
@@ -86,6 +90,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       amountBs: '',
       date: format(new Date(), 'yyyy-MM-dd'),
       concept: '',
+      paymentMethod: PaymentMethod.BS,
+      destinationBank: '',
     });
   };
 
@@ -149,7 +155,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     doc.text(`ID Cliente: ${selectedAccount.id}`, 14, 36);
     doc.text(`Saldo Total Pendiente: ${formatCurrency(selectedAccount.totalBalance)}`, 14, 42);
 
-    const tableColumn = ["Fecha", "Concepto", "Item", "Factura N°", "Cargo USD", "Abono USD"];
+    const tableColumn = ["Fecha", "Concepto", "Forma Pago", "Vendedor", "Item", "Factura", "Cargo", "Abono"];
     const tableRows: any[] = [];
 
     let totalPagos = 0;
@@ -157,9 +163,13 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
     payments.forEach(payment => {
       const isCharge = payment.type === 'charge';
+      const fp = isCharge ? '-' : `${payment.paymentMethod || '-'}${payment.destinationBank ? ' (' + payment.destinationBank + ')' : ''}`;
+      
       const rowData = [
         payment.date,
         payment.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago'),
+        fp,
+        payment.sellerName || '-',
         payment.item || '-',
         payment.invoiceNumber || '-',
         isCharge ? formatCurrency(payment.amountUsd) : '',
@@ -171,13 +181,13 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     });
 
     tableRows.push([
-      { content: "TOTALES", colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: "TOTALES", colSpan: 6, styles: { halign: 'right', fontStyle: 'bold' } },
       { content: formatCurrency(totalCargos), styles: { fontStyle: 'bold', textColor: [200, 50, 50] } },
       { content: formatCurrency(totalPagos), styles: { fontStyle: 'bold', textColor: [50, 150, 50] } }
     ]);
     
     tableRows.push([
-      { content: "SALDO DEUDOR", colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: "SALDO DEUDOR", colSpan: 7, styles: { halign: 'right', fontStyle: 'bold' } },
       { content: formatCurrency(totalCargos - totalPagos), styles: { fontStyle: 'bold' } }
     ]);
 
@@ -424,6 +434,47 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     </div>
                   </div>
                   <div className="space-y-1">
+                    <label className="label">Forma de Pago</label>
+                    <div className="relative">
+                      <CreditCard className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                      <select 
+                        value={paymentData.paymentMethod}
+                        onChange={(e) => setPaymentData({...paymentData, paymentMethod: e.target.value as PaymentMethod})}
+                        className="input-field pl-10"
+                      >
+                        {Object.values(PaymentMethod).map(method => (
+                          <option key={method} value={method}>{method}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {(paymentData.paymentMethod === PaymentMethod.BS || paymentData.paymentMethod === PaymentMethod.ZELLE) && (
+                    <div className="space-y-1">
+                      <label className="label">Banco / Destino</label>
+                      <div className="relative">
+                        <Landmark className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                        <input 
+                          type="text" 
+                          placeholder="Ej: Banesco, Zelle, etc."
+                          value={paymentData.destinationBank}
+                          onChange={(e) => setPaymentData({...paymentData, destinationBank: e.target.value.toUpperCase()})}
+                          className="input-field pl-10 uppercase" 
+                          list="bancos-list-cxc"
+                        />
+                        <datalist id="bancos-list-cxc">
+                          <option value="BANESCO" />
+                          <option value="PROVINCIAL" />
+                          <option value="MERCANTIL" />
+                          <option value="VENEZUELA" />
+                          <option value="BANCO DEL TESORO" />
+                          <option value="BNC" />
+                          <option value="ZELLE" />
+                          <option value="BINANCE P2P" />
+                        </datalist>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1">
                     <label className="label">Concepto / Nota</label>
                     <div className="relative">
                        <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
@@ -450,6 +501,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="table-header">Fecha</th>
                     <th className="table-header">Concepto</th>
+                    <th className="table-header">Forma de Pago</th>
+                    <th className="table-header">Vendedor</th>
                     <th className="table-header">Item</th>
                     <th className="table-header whitespace-nowrap">Factura N°</th>
                     <th className="table-header text-right text-rose-600">(+) Cargo</th>
@@ -463,6 +516,16 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       <tr key={p.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
                         <td className="table-cell">{p.date}</td>
                         <td className="table-cell text-slate-600">{p.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago')}</td>
+                        <td className="table-cell text-slate-600">
+                           {!isCharge && (
+                             <span className="inline-flex flex-col">
+                               <span className="font-bold text-[10px] uppercase text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded w-fit">{p.paymentMethod || '-'}</span>
+                               {p.destinationBank && <span className="text-[10px] text-slate-500 mt-0.5">{p.destinationBank}</span>}
+                             </span>
+                           )}
+                           {isCharge && <span className="text-slate-400">-</span>}
+                        </td>
+                        <td className="table-cell font-bold text-slate-700">{p.sellerName || '-'}</td>
                         <td className="table-cell font-mono text-slate-400 text-xs">{p.item || '-'}</td>
                         <td className="table-cell font-bold text-slate-700">{p.invoiceNumber || '-'}</td>
                         <td className="table-cell text-right font-bold text-rose-600">
