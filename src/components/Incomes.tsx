@@ -50,6 +50,16 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   useEffect(() => {
     if (exchangeRate && !formData.amount) {
       setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+    } else if (exchangeRate && formData.amount) {
+      setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+    }
+  }, [exchangeRate]);
+
+  useEffect(() => {
+    if (exchangeRate && cxcData.amountUsd) {
+      const usd = parseFloat(cxcData.amountUsd) || 0;
+      const bs = usd * exchangeRate;
+      setCxcData(prev => ({ ...prev, amountBs: bs.toFixed(2) }));
     }
   }, [exchangeRate]);
 

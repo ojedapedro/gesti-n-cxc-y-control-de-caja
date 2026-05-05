@@ -75,6 +75,14 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     amountBs: '',
   });
 
+  useEffect(() => {
+    if (exchangeRate && formData.amountUsd) {
+       const usd = parseFloat(formData.amountUsd) || 0;
+       const bs = usd * exchangeRate;
+       setFormData(prev => ({ ...prev, amountBs: bs.toFixed(2) }));
+    }
+  }, [exchangeRate]);
+
   // Automatic conversion logic
   const handleBsChange = (val: string) => {
     const bs = parseFloat(val);

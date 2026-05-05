@@ -24,6 +24,18 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   });
 
   useEffect(() => {
+    if (exchangeRate && paymentData.amountUsd && !paymentData.amountBs) {
+       const usd = parseFloat(paymentData.amountUsd);
+       const bs = usd * exchangeRate;
+       setPaymentData(prev => ({ ...prev, amountBs: bs.toFixed(2) }));
+    } else if (exchangeRate && paymentData.amountUsd && paymentData.amountBs) {
+       const usd = parseFloat(paymentData.amountUsd);
+       const bs = usd * exchangeRate;
+       setPaymentData(prev => ({ ...prev, amountBs: bs.toFixed(2) }));
+    }
+  }, [exchangeRate]);
+
+  useEffect(() => {
     return dbService.subscribeToCXCAccounts(setAccounts);
   }, []);
 

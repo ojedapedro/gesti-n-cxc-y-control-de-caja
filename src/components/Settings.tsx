@@ -46,7 +46,33 @@ export default function Settings() {
 
         <form onSubmit={handleSave} className="space-y-6">
           <div className="space-y-2">
-            <label className="label">Tasa Oficial (Venta)</label>
+            <div className="flex justify-between items-end mb-2">
+              <label className="label mb-0">Tasa Oficial (Venta)</label>
+              <button 
+                type="button" 
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+                    const data = await res.json();
+                    if (data && data.promedio) {
+                      setRate(data.promedio.toString());
+                      await dbService.updateExchangeRate(data.promedio);
+                    }
+                  } catch (error) {
+                    console.error("Error fetching official rate", error);
+                    alert("No se pudo obtener la tasa oficial. Por favor intente manualmente.");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+                className="text-xs bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                <RefreshCcw size={14} className={saving ? "animate-spin" : ""} />
+                Obtener Oficial (BCV)
+              </button>
+            </div>
             <div className="relative">
               <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
               <input 
