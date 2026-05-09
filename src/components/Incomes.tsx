@@ -36,9 +36,9 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
   });
 
-  // Sync rate when prop changes if form is not dirty or just always for new forms
+  // Sync rate when prop changes or when form is opened
   useEffect(() => {
-    if (exchangeRate && !showForm) {
+    if (exchangeRate) {
       setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
     }
   }, [exchangeRate, showForm]);
@@ -46,14 +46,6 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   useEffect(() => {
     return dbService.subscribeToTransactions(setTransactions);
   }, []);
-
-  useEffect(() => {
-    if (exchangeRate && !formData.amount) {
-      setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
-    } else if (exchangeRate && formData.amount) {
-      setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
-    }
-  }, [exchangeRate]);
 
   useEffect(() => {
     if (exchangeRate && cxcData.amountUsd) {
@@ -106,6 +98,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
       destinationBank: '',
       concept: 'INGRESO',
       currency: 'Bolívares (BS)',
+      exchangeRate: exchangeRate?.toString() || '480',
     });
   };
 
