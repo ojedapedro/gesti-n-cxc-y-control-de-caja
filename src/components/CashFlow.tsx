@@ -18,117 +18,142 @@ interface DailyCashFlow {
 }
 
 export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [data, setData] = useState<DailyCashFlow[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [transactions, expenses, receipts] = await Promise.all([
-          dbService.getTransactions(),
-          dbService.getExpenses(),
-          dbService.getReceipts()
-        ]);
+    let tLoaded = false;
+    let eLoaded = false;
+    let rLoaded = false;
 
-        const flowMap = new Map<string, DailyCashFlow>();
-
-        const getOrCreateDate = (dateStr: string) => {
-          if (!flowMap.has(dateStr)) {
-            flowMap.set(dateStr, {
-              date: dateStr,
-              inflowUsd: 0,
-              cashUsd: 0,
-              zelleUsd: 0,
-              bsUsd: 0,
-              outflowUsd: 0,
-              withdrawalsUsd: 0,
-              netFlow: 0
-            });
-          }
-          return flowMap.get(dateStr)!;
-        };
-
-        transactions?.forEach(t => {
-          if (t.type !== TransactionType.SALE && t.type !== TransactionType.INCOME) return;
-          const d = getOrCreateDate(t.date);
-          
-          let cashAmount = 0;
-          let bsEquivalentUsd = 0;
-          // All sales/incomes count towards total inflow
-          const totalUsd = t.amountUsd || 0;
-
-          const dest = (t.destinationBank || '').toUpperCase();
-          const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
-          const isCash = isCashByName || t.paymentMethod === PaymentMethod.USD_CASH || (t.amountUsdCash !== undefined && t.amountUsdCash > 0) || dest === '';
-
-          if (isCash) {
-            // Handle BS
-            if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
-              // Si el banco fue especificado y no es efectivo, no lo sumamos a caja BS
-              if (dest === '' || isCashByName) {
-                 bsEquivalentUsd = t.amountBs / t.exchangeRate;
-              }
-            } else if (t.paymentMethod === PaymentMethod.BS && (dest === '' || isCashByName)) {
-               // Only apply if we haven't already calculated a precise bs equivalent.
-               if (bsEquivalentUsd === 0) {
-                 bsEquivalentUsd = totalUsd;
-               }
-            }
-
-            // Handle USD
-            if (t.amountUsdCash && t.amountUsdCash > 0) {
-               cashAmount = t.amountUsdCash;
-            } else if (isCashByName || t.paymentMethod === PaymentMethod.USD_CASH) {
-               // Only assume it's cash if it's explicitly USD_CASH or the bank name implies cash
-               const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (t.amountBs / t.exchangeRate)) : totalUsd;
-               if (rawUsdAmount > 0.001) {
-                  cashAmount = rawUsdAmount;
-               }
-            } else if (dest === '' && t.paymentMethod !== PaymentMethod.ZELLE) {
-                if (t.paymentMethod === PaymentMethod.USD_CASH) {
-                   const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (t.amountBs / t.exchangeRate)) : totalUsd;
-                   if (rawUsdAmount > 0.001) {
-                      cashAmount = rawUsdAmount;
-                   }
-                }
-            }
-          }
-          
-          d.inflowUsd += totalUsd;
-          d.cashUsd += cashAmount;
-          d.bsUsd += bsEquivalentUsd;
-        });
-
-        expenses?.forEach(e => {
-          const d = getOrCreateDate(e.date);
-          d.outflowUsd += e.amountUsd || 0;
-        });
-
-        receipts?.forEach(r => {
-          const d = getOrCreateDate(r.date);
-          d.withdrawalsUsd += r.amountUsd || 0;
-        });
-
-        const aggregated = Array.from(flowMap.values()).map(d => ({
-          ...d,
-          netFlow: d.inflowUsd - d.outflowUsd - d.withdrawalsUsd
-        }));
-
-        // Sort descending
-        aggregated.sort((a, b) => b.date.localeCompare(a.date));
-        setData(aggregated);
-      } catch (error) {
-        console.error("Error fetching cash flow data:", error);
-      } finally {
-        setLoading(false);
-      }
+    const checkReady = () => {
+      if (tLoaded && eLoaded && rLoaded) setLoading(false);
     }
 
-    fetchData();
+    const unsubT = dbService.subscribeToTransactions((data) => {
+      setTransactions(data);
+      tLoaded = true;
+      checkReady();
+    });
+    const unsubE = dbService.subscribeToExpenses((data) => {
+      setExpenses(data);
+      eLoaded = true;
+      checkReady();
+    });
+    const unsubR = dbService.subscribeToReceipts((data) => {
+      setReceipts(data);
+      rLoaded = true;
+      checkReady();
+    });
+
+    return () => {
+      unsubT();
+      unsubE();
+      unsubR();
+    };
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+
+    try {
+      const flowMap = new Map<string, DailyCashFlow>();
+
+      const getOrCreateDate = (dateStr: string) => {
+        if (!flowMap.has(dateStr)) {
+          flowMap.set(dateStr, {
+            date: dateStr,
+            inflowUsd: 0,
+            cashUsd: 0,
+            zelleUsd: 0,
+            bsUsd: 0,
+            outflowUsd: 0,
+            withdrawalsUsd: 0,
+            netFlow: 0
+          });
+        }
+        return flowMap.get(dateStr)!;
+      };
+
+      transactions?.forEach(t => {
+        if (t.type !== TransactionType.SALE && t.type !== TransactionType.INCOME) return;
+        const d = getOrCreateDate(t.date);
+        
+        let cashAmount = 0;
+        let bsEquivalentUsd = 0;
+        // All sales/incomes count towards total inflow
+        const totalUsd = Number(t.amountUsd) || 0;
+
+        const dest = (t.destinationBank || '').toUpperCase();
+        const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
+        const isCash = isCashByName || t.paymentMethod === 'USD_CASH' || (t.amountUsdCash !== undefined && t.amountUsdCash > 0) || dest === '';
+
+        if (isCash) {
+          // Handle BS
+          if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
+            // Si el banco fue especificado y no es efectivo, no lo sumamos a caja BS
+            if (dest === '' || isCashByName) {
+               bsEquivalentUsd = Number(t.amountBs) / Number(t.exchangeRate);
+            }
+          } else if (t.paymentMethod === 'BS' && (dest === '' || isCashByName)) {
+             // Only apply if we haven't already calculated a precise bs equivalent.
+             if (bsEquivalentUsd === 0) {
+               bsEquivalentUsd = totalUsd;
+             }
+          }
+
+          // Handle USD
+          if (t.amountUsdCash && t.amountUsdCash > 0) {
+             cashAmount = Number(t.amountUsdCash);
+          } else if (isCashByName || t.paymentMethod === 'USD_CASH') {
+             // Only assume it's cash if it's explicitly USD_CASH or the bank name implies cash
+             const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (Number(t.amountBs) / Number(t.exchangeRate))) : totalUsd;
+             if (rawUsdAmount > 0.001) {
+                cashAmount = rawUsdAmount;
+             }
+          } else if (dest === '' && t.paymentMethod !== 'ZELLE') {
+              if (t.paymentMethod === 'USD_CASH') {
+                 const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (Number(t.amountBs) / Number(t.exchangeRate))) : totalUsd;
+                 if (rawUsdAmount > 0.001) {
+                    cashAmount = rawUsdAmount;
+                 }
+              }
+          }
+        }
+        
+        d.inflowUsd += totalUsd;
+        d.cashUsd += cashAmount;
+        d.bsUsd += bsEquivalentUsd;
+      });
+
+      expenses?.forEach(e => {
+        const d = getOrCreateDate(e.date);
+        d.outflowUsd += Number(e.amountUsd) || 0;
+      });
+
+      receipts?.forEach(r => {
+        const d = getOrCreateDate(r.date);
+        d.withdrawalsUsd += Number(r.amountUsd) || 0;
+      });
+
+      const aggregated = Array.from(flowMap.values()).map(d => ({
+        ...d,
+        netFlow: d.inflowUsd - d.outflowUsd - d.withdrawalsUsd
+      }));
+
+      // Sort descending
+      aggregated.sort((a, b) => b.date.localeCompare(a.date));
+      setData(aggregated);
+    } catch (error) {
+      console.error("Error calculating cash flow data:", error);
+    }
+  }, [transactions, expenses, receipts, loading]);
 
   const getDayName = (dateStr: string) => {
     if (!dateStr) return '';
