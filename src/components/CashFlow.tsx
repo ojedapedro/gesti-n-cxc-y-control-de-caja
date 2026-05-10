@@ -57,6 +57,8 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
           
           let cashAmount = 0;
           let bsEquivalentUsd = 0;
+          // All sales/incomes count towards total inflow
+          const totalUsd = t.amountUsd || 0;
 
           const dest = (t.destinationBank || '').toUpperCase();
           const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
@@ -70,7 +72,10 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                  bsEquivalentUsd = t.amountBs / t.exchangeRate;
               }
             } else if (t.paymentMethod === PaymentMethod.BS && (dest === '' || isCashByName)) {
-              bsEquivalentUsd = t.amountUsd || 0;
+               // Only apply if we haven't already calculated a precise bs equivalent.
+               if (bsEquivalentUsd === 0) {
+                 bsEquivalentUsd = totalUsd;
+               }
             }
 
             // Handle USD
@@ -78,25 +83,21 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                cashAmount = t.amountUsdCash;
             } else if (isCashByName || t.paymentMethod === PaymentMethod.USD_CASH) {
                // Only assume it's cash if it's explicitly USD_CASH or the bank name implies cash
-               const usdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd;
-               if (usdAmount > 0.001) {
-                  cashAmount = usdAmount;
+               const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (t.amountBs / t.exchangeRate)) : totalUsd;
+               if (rawUsdAmount > 0.001) {
+                  cashAmount = rawUsdAmount;
                }
             } else if (dest === '' && t.paymentMethod !== PaymentMethod.ZELLE) {
-                // If it's old (dest === '') and wasn't Zelle, we can try to guess if it's cash.
-                // But honestly, Incomes previously set amountUsdCash if it was USD cash.
-                // So if amountUsdCash was 0, it probably wasn't USD cash unless it was mixed.
-                // Let's just rely on amountUsdCash or paymentMethod for old records!
                 if (t.paymentMethod === PaymentMethod.USD_CASH) {
-                   const usdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd;
-                   if (usdAmount > 0.001) {
-                      cashAmount = usdAmount;
+                   const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (t.amountBs / t.exchangeRate)) : totalUsd;
+                   if (rawUsdAmount > 0.001) {
+                      cashAmount = rawUsdAmount;
                    }
                 }
             }
           }
           
-          d.inflowUsd += cashAmount + bsEquivalentUsd;
+          d.inflowUsd += totalUsd;
           d.cashUsd += cashAmount;
           d.bsUsd += bsEquivalentUsd;
         });
