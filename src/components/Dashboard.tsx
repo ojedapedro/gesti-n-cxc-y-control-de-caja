@@ -70,20 +70,24 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .filter(t => (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) && filterByDate(t.date))
     .forEach(t => {
        const dest = (t.destinationBank || '').toUpperCase();
-       const isCash = dest.includes('EFECTIVO') || dest.includes('CAJA');
+       const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
        
        // Handle BS exactly via amountBs
        if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
           const eqUsd = t.amountBs / t.exchangeRate;
-          if (isCash) totalBsCashEq += eqUsd;
+          const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bolivares Efectivo';
+          if (isBsCash || dest === '') totalBsCashEq += eqUsd;
           else totalBsNoCashEq += eqUsd;
-       } 
+       } else if ((t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo') && (dest === '' || isCashByName || t.paymentMethod === 'Bs Efectivo')) {
+          totalBsCashEq += t.amountUsd; 
+       }
        
        // Handle USD
        const usdAmount = t.amountBs && t.exchangeRate ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd;
 
        if (usdAmount > 0.001) {
-          if (isCash) totalUsdCash += usdAmount;
+          const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === 'Dolares Efectivo' || (dest === '' && t.paymentMethod !== 'Zelle' && t.paymentMethod !== 'Binance');
+          if (isUsdCash) totalUsdCash += usdAmount;
           else totalUsdNoCash += usdAmount;
        }
        
@@ -102,7 +106,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .filter(e => filterByDate(e.date))
     .reduce((sum, e) => sum + e.amountUsd, 0);
 
-  const cashBalance = totalVendNetUsd - periodWithdrawals - periodExpenses;
+  const cashBalance = (totalUsdCash + totalBsCashEq) - periodWithdrawals - periodExpenses;
 
   // Chart data Preparation
   const getLast6MonthsData = () => {

@@ -467,7 +467,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       </select>
                     </div>
                   </div>
-                  {(paymentData.paymentMethod === PaymentMethod.BS || paymentData.paymentMethod === PaymentMethod.ZELLE) && (
+                  {(paymentData.paymentMethod === PaymentMethod.BS || paymentData.paymentMethod === PaymentMethod.ZELLE || paymentData.paymentMethod === PaymentMethod.BINANCE) && (
                     <div className="space-y-1">
                       <label className="label">Banco / Destino</label>
                       <div className="relative">

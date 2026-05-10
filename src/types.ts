@@ -5,10 +5,12 @@ export enum TransactionType {
 }
 
 export enum PaymentMethod {
-  BS = 'Bolivares',
-  USD_CASH = 'Dolares Efectivo',
+  BS = 'Transferencia Bs / Pago Móvil',
+  BS_CASH = 'Bs Efectivo',
+  USD_CASH = '$ Efectivo',
   ZELLE = 'Zelle',
-  CXC = 'CXC',
+  BINANCE = 'Binance',
+  CXC = 'CXC (Por Cobrar)',
 }
 
 export interface Transaction {

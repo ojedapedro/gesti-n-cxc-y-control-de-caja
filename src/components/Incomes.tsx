@@ -18,7 +18,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
-    currency: 'Bolívares (BS)',
+    paymentMethod: PaymentMethod.BS,
     destinationBank: '',
     amount: '',
     exchangeRate: exchangeRate?.toString() || '480',
@@ -84,10 +84,10 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
   // Calculated Fields
   const inputAmt = parseFloat(formData.amount) || 0;
-  const inBolivares = formData.currency === 'Bolívares (BS)';
+  const inBolivares = formData.paymentMethod === PaymentMethod.BS || formData.paymentMethod === PaymentMethod.BS_CASH;
   const amountUsdConv = inBolivares ? inputAmt / (parseFloat(formData.exchangeRate) || 1) : 0;
-  const amountUsdCash = formData.currency === 'Dólares ($)' ? inputAmt : 0;
-  const amountZelle = formData.currency === 'Binance (USDT)' ? inputAmt : 0;
+  const amountUsdCash = formData.paymentMethod === PaymentMethod.USD_CASH ? inputAmt : 0;
+  const amountZelle = formData.paymentMethod === PaymentMethod.ZELLE || formData.paymentMethod === PaymentMethod.BINANCE ? inputAmt : 0;
   const amountBs = inBolivares ? inputAmt : 0;
   
   const totalDailySale = inBolivares ? amountUsdConv : inputAmt;
@@ -103,14 +103,14 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         amountBs: amountBs,
         exchangeRate: parseFloat(formData.exchangeRate) || 1,
         amountUsd: totalDailySale,
-        paymentMethod: inBolivares ? PaymentMethod.BS : PaymentMethod.USD_CASH,
+        paymentMethod: formData.paymentMethod,
         type: TransactionType.SALE,
         isCXC: false,
         amountUsdCash: amountUsdCash,
         amountZelle: amountZelle,
         amountCXC: 0,
         totalDailySale: totalDailySale,
-        currency: formData.currency,
+        currency: inBolivares ? 'Bolívares (BS)' : 'Dólares ($)',
         destinationBank: formData.destinationBank
     }]);
 
@@ -119,7 +119,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
       amount: '',
       destinationBank: '',
       concept: 'INGRESO',
-      currency: 'Bolívares (BS)',
+      paymentMethod: PaymentMethod.BS,
       exchangeRate: exchangeRate?.toString() || '480',
     });
   };
@@ -447,16 +447,19 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
               </div>
 
               <div className="space-y-1">
-                <label className="label">Moneda</label>
+                <label className="label">Forma de Pago</label>
                 <select
                   required
-                  value={formData.currency}
-                  onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                  value={formData.paymentMethod}
+                  onChange={(e) => setFormData({...formData, paymentMethod: e.target.value as PaymentMethod})}
                   className="input-field cursor-pointer"
                 >
-                  <option value="Bolívares (BS)">Bolívares (Bs)</option>
-                  <option value="Dólares ($)">Dólares ($)</option>
-                  <option value="Binance (USDT)">Binance (Cripto)</option>
+                  <option value={PaymentMethod.BS}>{PaymentMethod.BS}</option>
+                  <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
+                  <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
+                  <option value={PaymentMethod.ZELLE}>{PaymentMethod.ZELLE}</option>
+                  <option value={PaymentMethod.BINANCE}>{PaymentMethod.BINANCE}</option>
+                  <option value={PaymentMethod.CXC}>{PaymentMethod.CXC}</option>
                 </select>
               </div>
 
@@ -494,15 +497,15 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                   placeholder="480.00"
                   value={formData.exchangeRate}
                   onChange={(e) => setFormData({...formData, exchangeRate: e.target.value})}
-                  className={`input-field font-mono font-bold ${formData.currency === 'Bolívares (BS)' ? 'text-blue-600' : 'text-slate-400 opacity-50 bg-slate-50'}`} 
-                  readOnly={formData.currency !== 'Bolívares (BS)'}
+                  className={`input-field font-mono font-bold ${inBolivares ? 'text-blue-600' : 'text-slate-400 opacity-50 bg-slate-50'}`} 
+                  readOnly={!inBolivares}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="label">Monto ({formData.currency.split(' ')[0]})</label>
+                <label className="label">Monto ({inBolivares ? 'Bs' : 'USD'})</label>
                 <input 
-                  type="number" 
+                  type="number"  
                   step="0.01"
                   required
                   placeholder="0.00"
@@ -523,7 +526,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                 />
               </div>
 
-              {formData.currency === 'Bolívares (BS)' && (
+              {inBolivares && (
                 <div className="space-y-1">
                   <label className="label text-emerald-600">Dólares Conv.</label>
                   <div className="input-field bg-emerald-50 text-emerald-700 font-bold border-dashed flex items-center">
