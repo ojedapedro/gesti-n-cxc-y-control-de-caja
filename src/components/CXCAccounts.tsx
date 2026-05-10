@@ -126,9 +126,16 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     const dataToExport = accounts.sort((a, b) => b.totalBalance - a.totalBalance).filter(a => a.totalBalance > 0);
 
     dataToExport.forEach(account => {
+      let dateObj = new Date();
+      if (account.lastUpdated?.toDate) {
+        dateObj = account.lastUpdated.toDate();
+      } else if (typeof account.lastUpdated === 'string' || typeof account.lastUpdated === 'number') {
+        dateObj = new Date(account.lastUpdated);
+      }
+
       const rowData = [
         account.clientName,
-        format(new Date(), "dd/MM/yyyy"), // Replace with account.lastUpdated if appropriate
+        format(dateObj, "dd/MM/yyyy"), 
         formatCurrency(account.totalBalance)
       ];
       tableRows.push(rowData);

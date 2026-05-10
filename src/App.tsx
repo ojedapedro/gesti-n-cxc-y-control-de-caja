@@ -42,13 +42,17 @@ export default function App() {
       setLoadingAuth(false);
     });
 
-    const unsubSettings = dbService.subscribeToSettings(setGlobalSettings);
-
     return () => {
       unsubAuth();
-      unsubSettings();
     };
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      const unsubSettings = dbService.subscribeToSettings(setGlobalSettings);
+      return () => unsubSettings();
+    }
+  }, [user]);
 
   if (loadingAuth) {
     return (

@@ -33,6 +33,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     amountBs: '',
     invoiceNumber: '',
     sellerName: '',
+    exchangeRate: exchangeRate?.toString() || '1',
     item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
   });
 
@@ -48,12 +49,33 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   }, []);
 
   useEffect(() => {
-    if (exchangeRate && cxcData.amountUsd) {
+    const rateToUse = exchangeRate ? exchangeRate.toString() : '1';
+    
+    // Attempt to find a transaction for the currently selected date to pick its exchange rate
+    const dateTx = transactions.find(t => t.date === cxcData.date && t.exchangeRate && t.exchangeRate > 0);
+    const finalRate = dateTx?.exchangeRate ? dateTx.exchangeRate.toString() : rateToUse;
+
+    setCxcData(prev => {
+      if (prev.exchangeRate !== finalRate) {
+        const usd = parseFloat(prev.amountUsd) || 0;
+        const bs = usd * parseFloat(finalRate);
+        return {
+          ...prev,
+          exchangeRate: finalRate,
+          amountBs: usd > 0 ? bs.toFixed(2) : prev.amountBs
+        };
+      }
+      return prev;
+    });
+  }, [cxcData.date, transactions, exchangeRate]);
+
+  useEffect(() => {
+    if (cxcData.exchangeRate && cxcData.amountUsd) {
       const usd = parseFloat(cxcData.amountUsd) || 0;
-      const bs = usd * exchangeRate;
+      const bs = usd * parseFloat(cxcData.exchangeRate);
       setCxcData(prev => ({ ...prev, amountBs: bs.toFixed(2) }));
     }
-  }, [exchangeRate]);
+  }, [cxcData.exchangeRate]);
 
   // Handle form field changes helper
   const handleInputChange = (field: string, value: string) => {
@@ -124,6 +146,8 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
       await dbService.addCXCCharge(cxcData.clientName, {
         date: cxcData.date,
         amountUsd: parseFloat(cxcData.amountUsd) || 0,
+        amountBs: parseFloat(cxcData.amountBs) || 0,
+        exchangeRate: parseFloat(cxcData.exchangeRate) || parseFloat(exchangeRate?.toString() || '1'),
         concept: cxcData.concept,
         item: cxcData.item,
         invoiceNumber: cxcData.invoiceNumber,
@@ -140,6 +164,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         amountBs: '',
         invoiceNumber: '',
         sellerName: '',
+        exchangeRate: exchangeRate?.toString() || '1',
         item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
       });
     } catch (error) {
@@ -359,7 +384,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                       value={cxcData.amountUsd}
                       onChange={(e) => {
                         const usd = parseFloat(e.target.value) || 0;
-                        const bs = usd * (exchangeRate || 1);
+                        const bs = usd * (parseFloat(cxcData.exchangeRate) || 1);
                         setCxcData({...cxcData, amountUsd: e.target.value, amountBs: e.target.value ? bs.toFixed(2) : ''});
                       }}
                       className="input-field pl-10 font-bold" 
@@ -368,7 +393,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="label text-blue-600 truncate">Eq. (Bs) - Tasa: {exchangeRate}</label>
+                  <label className="label text-blue-600 truncate">Eq. (Bs) - Tasa: {cxcData.exchangeRate}</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2.5 text-blue-400 font-bold text-sm">Bs</span>
                     <input 
@@ -379,7 +404,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                       value={cxcData.amountBs}
                       onChange={(e) => {
                         const bs = parseFloat(e.target.value) || 0;
-                        const usd = bs / (exchangeRate || 1);
+                        const usd = bs / (parseFloat(cxcData.exchangeRate) || 1);
                         setCxcData({...cxcData, amountBs: e.target.value, amountUsd: e.target.value ? usd.toFixed(4) : ''});
                       }}
                       className="input-field pl-10 font-bold text-blue-700 bg-blue-50 border-blue-200" 

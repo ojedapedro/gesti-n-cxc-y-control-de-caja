@@ -55,6 +55,8 @@ export interface CXCPayment {
   clientId: string;
   date: string;
   amountUsd: number;
+  amountBs?: number;
+  exchangeRate?: number;
   concept?: string;
   type?: 'payment' | 'charge';
   item?: string; // Correlative item

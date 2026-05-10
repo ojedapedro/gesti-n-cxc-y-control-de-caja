@@ -178,6 +178,8 @@ export const dbService = {
         clientName: clientName,
         concept: `VENTA A CRÉDITO CXC (Item: ${data.item || 'N/A'}): ${data.concept || ''}`,
         amountUsd: data.amountUsd,
+        amountBs: data.amountBs,
+        exchangeRate: data.exchangeRate,
         paymentMethod: PaymentMethod.CXC,
         type: TransactionType.SALE,
         isCXC: true,

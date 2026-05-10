@@ -157,7 +157,7 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     const currentDate = format(new Date(), "dd/MM/yyyy HH:mm");
 
     doc.setFontSize(18);
-    doc.text('Reporte de Gastos', 14, 22);
+    doc.text('Reporte de Egresos', 14, 22);
     
     doc.setFontSize(10);
     doc.setTextColor(100);
@@ -175,12 +175,12 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     
     doc.setFontSize(12);
     doc.setTextColor(50);
-    doc.text(`Total Gastos USD: ${formatCurrency(totalMonthlyExpense)}`, 14, 43);
+    doc.text(`Total Egresos USD: ${formatCurrency(totalMonthlyExpense)}`, 14, 43);
     if (exchangeRate) {
       doc.text(`Total Equivalente Bs: Bs. ${new Intl.NumberFormat('es-VE').format(totalMonthlyExpense * exchangeRate)}`, 14, 49);
     }
 
-    const tableColumn = ["Fecha", "Categoría", "Detalle", "Monto USD"];
+    const tableColumn = ["Fecha", "Detalle", "Monto USD"];
     if (exchangeRate) {
       tableColumn.push("Monto Bs.");
     }
@@ -192,8 +192,7 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     sortedExpenses.forEach(e => {
       const rowData = [
         format(new Date(e.date), "dd/MM/yyyy"),
-        e.category,
-        e.note || '-',
+        e.note || e.category || '-',
         formatCurrency(e.amountUsd)
       ];
       if (exchangeRate) {
@@ -211,8 +210,8 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
       headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [250, 250, 250] },
       columnStyles: exchangeRate 
-          ? { 3: { halign: 'right', fontStyle: 'bold' }, 4: { halign: 'right' } }
-          : { 3: { halign: 'right', fontStyle: 'bold' } }
+          ? { 2: { halign: 'right', fontStyle: 'bold' }, 3: { halign: 'right' } }
+          : { 2: { halign: 'right', fontStyle: 'bold' } }
     });
 
     // Summary by category
