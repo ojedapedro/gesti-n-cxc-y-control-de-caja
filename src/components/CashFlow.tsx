@@ -58,18 +58,42 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
           let cashAmount = 0;
           let bsEquivalentUsd = 0;
 
-          // USD Cash
-          if (t.amountUsdCash !== undefined && t.amountUsdCash > 0) {
-            cashAmount = t.amountUsdCash;
-          } else if (t.paymentMethod === PaymentMethod.USD_CASH) {
-            cashAmount = t.amountUsd || 0;
-          }
+          const dest = (t.destinationBank || '').toUpperCase();
+          const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
+          const isCash = isCashByName || t.paymentMethod === PaymentMethod.USD_CASH || (t.amountUsdCash !== undefined && t.amountUsdCash > 0) || dest === '';
 
-          // BS Cash
-          if (t.amountBs && t.exchangeRate) {
-            bsEquivalentUsd = t.amountBs / t.exchangeRate;
-          } else if (t.paymentMethod === PaymentMethod.BS) {
-            bsEquivalentUsd = t.amountUsd || 0;
+          if (isCash) {
+            // Handle BS
+            if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
+              // Si el banco fue especificado y no es efectivo, no lo sumamos a caja BS
+              if (dest === '' || isCashByName) {
+                 bsEquivalentUsd = t.amountBs / t.exchangeRate;
+              }
+            } else if (t.paymentMethod === PaymentMethod.BS && (dest === '' || isCashByName)) {
+              bsEquivalentUsd = t.amountUsd || 0;
+            }
+
+            // Handle USD
+            if (t.amountUsdCash && t.amountUsdCash > 0) {
+               cashAmount = t.amountUsdCash;
+            } else if (isCashByName || t.paymentMethod === PaymentMethod.USD_CASH) {
+               // Only assume it's cash if it's explicitly USD_CASH or the bank name implies cash
+               const usdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd;
+               if (usdAmount > 0.001) {
+                  cashAmount = usdAmount;
+               }
+            } else if (dest === '' && t.paymentMethod !== PaymentMethod.ZELLE) {
+                // If it's old (dest === '') and wasn't Zelle, we can try to guess if it's cash.
+                // But honestly, Incomes previously set amountUsdCash if it was USD cash.
+                // So if amountUsdCash was 0, it probably wasn't USD cash unless it was mixed.
+                // Let's just rely on amountUsdCash or paymentMethod for old records!
+                if (t.paymentMethod === PaymentMethod.USD_CASH) {
+                   const usdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd;
+                   if (usdAmount > 0.001) {
+                      cashAmount = usdAmount;
+                   }
+                }
+            }
           }
           
           d.inflowUsd += cashAmount + bsEquivalentUsd;
