@@ -18,16 +18,10 @@ import {
 } from 'recharts';
 
 const CATEGORIES = [
-  'Servicios',
-  'Suministros',
-  'Muestras',
-  'Mantenimiento',
-  'Sueldos / Vales',
-  'Transporte',
-  'Otros'
+  'GENERAL'
 ];
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
+const COLORS = ['#ef4444'];
 
 import Receipts from './Receipts';
 
@@ -69,7 +63,6 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
-    category: CATEGORIES[0],
     note: '',
     amountUsd: '',
     amountBs: '',
@@ -117,7 +110,7 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     e.preventDefault();
     await dbService.addExpense({
       date: formData.date,
-      category: formData.category,
+      category: 'GENERAL',
       note: formData.note,
       amountUsd: parseFloat(formData.amountUsd),
       amountBs: parseFloat(formData.amountBs) || 0,
@@ -206,48 +199,12 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
       head: [tableColumn],
       body: tableRows,
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 3 },
+      styles: { fontSize: 8, cellPadding: 4 },
       headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [250, 250, 250] },
       columnStyles: exchangeRate 
           ? { 2: { halign: 'right', fontStyle: 'bold' }, 3: { halign: 'right' } }
           : { 2: { halign: 'right', fontStyle: 'bold' } }
-    });
-
-    // Summary by category
-    const finalY = (doc as any).lastAutoTable.finalY || 55;
-    
-    // Add page if near bottom
-    let summaryY = finalY + 15;
-    if (summaryY > 250) {
-      doc.addPage();
-      summaryY = 20;
-    }
-    
-    doc.setFontSize(14);
-    doc.setTextColor(20, 20, 20);
-    doc.text('Resumen por Categoría', 14, summaryY);
-
-    const summaryColumn = ["Categoría", "Monto USD"];
-    if(exchangeRate) summaryColumn.push("Monto Bs.");
-    const summaryRows: any[] = [];
-    
-    [...categoryData].sort((a, b) => b.value - a.value).forEach(cat => {
-      const row = [cat.name, formatCurrency(cat.value)];
-      if(exchangeRate) row.push(`Bs. ${new Intl.NumberFormat('es-VE').format(cat.value * exchangeRate)}`);
-      summaryRows.push(row);
-    });
-
-    autoTable(doc, {
-      startY: summaryY + 5,
-      head: [summaryColumn],
-      body: summaryRows,
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
-      columnStyles: exchangeRate 
-          ? { 1: { halign: 'right', fontStyle: 'bold' }, 2: { halign: 'right' } }
-          : { 1: { halign: 'right', fontStyle: 'bold' } }
     });
 
     doc.save(`gastos_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
@@ -257,29 +214,10 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Control de Gastos</h2>
-          <p className="text-sm font-medium text-slate-500 mt-1">Registro detallado de egresos por categoría.</p>
+          <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Control de Egresos</h2>
+          <p className="text-sm font-medium text-slate-500 mt-1">Registro detallado de egresos.</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-slate-100 p-1 rounded-xl mr-2">
-            <button 
-              onClick={() => setView('list')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                view === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <List size={14} /> Lista
-            </button>
-            <button 
-              onClick={() => setView('report')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                view === 'report' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <PieChart size={14} /> Reporte
-            </button>
-          </div>
-          
           <button 
             onClick={handleDownloadReport}
             className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-700 transition-colors shadow-sm"
@@ -313,17 +251,19 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="label">Categoría</label>
-              <select 
-                value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
-                className="input-field"
-              >
-                {CATEGORIES.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+            <div className="space-y-1 md:col-span-1 lg:col-span-1">
+              <label className="label">Detalle</label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Ej: Pago de luz"
+                  value={formData.note}
+                  onChange={(e) => setFormData({...formData, note: e.target.value})}
+                  className="input-field pl-10" 
+                />
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -355,23 +295,9 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
               {exchangeRate && <p className="text-[9px] text-slate-400 text-right">Tasa: {exchangeRate} BS/$</p>}
             </div>
 
-            <div className="space-y-1">
-              <label className="label">Nota (Opcional)</label>
-              <div className="relative">
-                <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="Ej: Pago de luz"
-                  value={formData.note}
-                  onChange={(e) => setFormData({...formData, note: e.target.value})}
-                  className="input-field pl-10" 
-                />
-              </div>
-            </div>
-
             <div className="md:col-span-4 flex justify-end">
               <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white font-medium py-2 px-8 rounded-lg transition-colors">
-                Guardar Gasto
+                Guardar Egreso
               </button>
             </div>
           </form>
@@ -429,143 +355,36 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
         </div>
       </div>
 
-      {view === 'list' ? (
-        <div className="card">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr>
-                  <th className="table-header">Fecha</th>
-                  <th className="table-header">Categoría</th>
-                  <th className="table-header">Nota</th>
-                  <th className="table-header text-right">Monto USD</th>
+      <div className="card">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="table-header">Fecha</th>
+                <th className="table-header">Detalle</th>
+                <th className="table-header text-right">Monto USD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredExpenses.map((e) => (
+                <tr key={e.id} className="hover:bg-slate-50 border-b border-slate-100">
+                  <td className="table-cell">{e.date}</td>
+                  <td className="table-cell text-slate-600">{e.note || e.category || '-'}</td>
+                  <td className="table-cell text-right font-bold text-rose-600">
+                    -{formatCurrency(e.amountUsd)}
+                    <span className="block text-[10px] text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(e.amountUsd * (exchangeRate || 1))}</span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredExpenses.map((e) => (
-                  <tr key={e.id} className="hover:bg-slate-50 border-b border-slate-100">
-                    <td className="table-cell">{e.date}</td>
-                    <td className="table-cell">
-                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-transform hover:scale-105 inline-block">
-                        {e.category}
-                      </span>
-                    </td>
-                    <td className="table-cell text-slate-600">{e.note || '-'}</td>
-                    <td className="table-cell text-right font-bold text-rose-600">
-                      -{formatCurrency(e.amountUsd)}
-                      <span className="block text-[10px] text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(e.amountUsd * (exchangeRate || 1))}</span>
-                    </td>
-                  </tr>
-                ))}
-                {filteredExpenses.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="table-cell text-center py-10 text-slate-500 italic">No hay gastos en este periodo.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="card p-6 min-h-[400px]">
-            <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-              <TrendingDown className="text-rose-600" size={18} />
-              Distribución por Categoría
-            </h3>
-            {categoryData.length > 0 ? (
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryData} layout="vertical" margin={{ left: 40, right: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} stroke="#f1f5f9" />
-                    <XAxis type="number" hide />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      width={100}
-                      tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
-                    />
-                    <Tooltip 
-                      cursor={{ fill: 'transparent' }}
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div className="bg-white p-3 border border-slate-200 shadow-xl rounded-lg">
-                              <p className="text-xs font-bold text-slate-500 uppercase">{payload[0].payload.name}</p>
-                              <p className="text-lg font-black text-rose-600">{formatCurrency(payload[0].value as number)}</p>
-                              <p className="text-[10px] text-slate-400 italic">{( (payload[0].value as number / totalMonthlyExpense) * 100).toFixed(1)}% del total</p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 italic">
-                Sin datos para graficar
-              </div>
-            )}
-          </div>
-
-          <div className="card p-6">
-            <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-              <Tag className="text-blue-600" size={18} />
-              Resumen Detallado
-            </h3>
-            <div className="space-y-4">
-              {categoryData.sort((a, b) => b.value - a.value).map((item) => (
-                <div key={item.name} className="flex items-center group">
-                  <div className="w-1 h-8 rounded-full mr-3" style={{ backgroundColor: item.color }} />
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-slate-700">{item.name}</p>
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1 overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-1000" 
-                        style={{ 
-                          width: `${(item.value / totalMonthlyExpense) * 100}%`,
-                          backgroundColor: item.color
-                        }} 
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right ml-4">
-                    <p className="text-sm font-bold text-slate-900">{formatCurrency(item.value)}</p>
-                    <p className="text-[10px] font-bold text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(item.value * (exchangeRate || 1))}</p>
-                    <p className="text-[10px] font-bold text-slate-400 italic tracking-tighter mt-1">
-                      {((item.value / totalMonthlyExpense) * 100).toFixed(1)}%
-                    </p>
-                  </div>
-                </div>
               ))}
-              {categoryData.length === 0 && (
-                <div className="py-20 text-center text-slate-400 italic">No hay gastos registrados este mes</div>
+              {filteredExpenses.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="table-cell text-center py-10 text-slate-500 italic">No hay egresos en este periodo.</td>
+                </tr>
               )}
-            </div>
-            
-            {categoryData.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-slate-100">
-                <div className="flex items-center justify-between text-slate-800">
-                  <span className="text-sm font-black uppercase tracking-widest text-slate-400">Total Acumulado</span>
-                  <div className="text-right">
-                    <span className="block text-2xl font-black text-rose-600">{formatCurrency(totalMonthlyExpense)}</span>
-                    <span className="block text-xs font-bold text-slate-400 mt-1">Bs. {new Intl.NumberFormat('es-VE').format(totalMonthlyExpense * (exchangeRate || 1))}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }
