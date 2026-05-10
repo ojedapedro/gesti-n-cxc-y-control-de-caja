@@ -54,13 +54,27 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         transactions?.forEach(t => {
           if (t.type !== TransactionType.SALE && t.type !== TransactionType.INCOME) return;
           const d = getOrCreateDate(t.date);
-          d.inflowUsd += t.amountUsd || 0;
-          d.cashUsd += t.amountUsdCash || 0;
-          d.zelleUsd += t.amountZelle || 0;
           
-          if (t.amountBs && t.exchangeRate) {
-             d.bsUsd += t.amountBs / t.exchangeRate;
+          let cashAmount = 0;
+          let bsEquivalentUsd = 0;
+
+          // USD Cash
+          if (t.amountUsdCash !== undefined && t.amountUsdCash > 0) {
+            cashAmount = t.amountUsdCash;
+          } else if (t.paymentMethod === PaymentMethod.USD_CASH) {
+            cashAmount = t.amountUsd || 0;
           }
+
+          // BS Cash
+          if (t.amountBs && t.exchangeRate) {
+            bsEquivalentUsd = t.amountBs / t.exchangeRate;
+          } else if (t.paymentMethod === PaymentMethod.BS) {
+            bsEquivalentUsd = t.amountUsd || 0;
+          }
+          
+          d.inflowUsd += cashAmount + bsEquivalentUsd;
+          d.cashUsd += cashAmount;
+          d.bsUsd += bsEquivalentUsd;
         });
 
         expenses?.forEach(e => {
@@ -173,7 +187,11 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
               <div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Ingresos Totales</p>
                 <h3 className="text-3xl font-black mt-2 tracking-tight text-slate-900">{formatCurrency(totalInflow)}</h3>
-                <p className="text-xs font-bold text-emerald-600/70 mt-1">Bs. {new Intl.NumberFormat('es-VE').format(totalInflow * (exchangeRate || 1))}</p>
+                <div className="text-xs font-bold text-emerald-600/70 mt-1 flex gap-2">
+                  <span>Efectivo USD: {formatCurrency(filteredData.reduce((acc, curr) => acc + curr.cashUsd, 0))}</span>
+                  <span>|</span>
+                  <span>Efec. Bs(Eq): {formatCurrency(filteredData.reduce((acc, curr) => acc + curr.bsUsd, 0))}</span>
+                </div>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-50 text-emerald-600">
                 <TrendingUp size={22} strokeWidth={2.5} />
@@ -217,7 +235,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
               <tr className="bg-slate-50/80 border-b border-slate-200">
                 <th className="p-4 px-5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Día</th>
                 <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-emerald-700 bg-emerald-50/30">Ingresos</th>
-                <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-rose-700 bg-rose-50/30">Gastos</th>
+                <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-rose-700 bg-rose-50/30">Egresos</th>
                 <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-amber-700 bg-amber-50/30">Retiros</th>
                 <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest bg-slate-100">Flujo Neto</th>
               </tr>
@@ -231,6 +249,16 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                   </td>
                   <td className="p-4 px-5 text-right bg-emerald-50/10 border-l border-emerald-100/50">
                     <div className="font-bold text-emerald-600">{formatCurrency(row.inflowUsd)}</div>
+                    {row.inflowUsd > 0 && (
+                      <div className="mt-0.5 space-y-0.5">
+                        <div className="text-[9px] font-medium text-emerald-600/70">
+                          USD: {formatCurrency(row.cashUsd)}
+                        </div>
+                        <div className="text-[9px] font-medium text-emerald-600/70">
+                          Bs (Eq): {formatCurrency(row.bsUsd)}
+                        </div>
+                      </div>
+                    )}
                   </td>
                   <td className="p-4 px-5 text-right bg-rose-50/10 border-l border-rose-100/50">
                     <div className="font-bold text-rose-600">{formatCurrency(row.outflowUsd)}</div>

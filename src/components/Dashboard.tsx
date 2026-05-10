@@ -6,7 +6,9 @@ import {
   DollarSign,
   ArrowUpRight,
   ArrowDownRight,
-  Calendar
+  Calendar,
+  Banknote,
+  CreditCard
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -58,10 +60,40 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     return true;
   };
 
-  const periodIncomes = transactions
+  let totalUsdNoCash = 0;
+  let totalUsdCash = 0;
+  let totalBsNoCashEq = 0;
+  let totalBsCashEq = 0;
+  let totalVendNetUsd = 0; 
+  
+  transactions
     .filter(t => (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) && filterByDate(t.date))
-    .reduce((sum, t) => sum + t.amountUsd, 0);
+    .forEach(t => {
+       const dest = (t.destinationBank || '').toUpperCase();
+       const isCash = dest.includes('EFECTIVO') || dest.includes('CAJA');
+       
+       // Handle BS exactly via amountBs
+       if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
+          const eqUsd = t.amountBs / t.exchangeRate;
+          if (isCash) totalBsCashEq += eqUsd;
+          else totalBsNoCashEq += eqUsd;
+       } 
+       
+       // Handle USD
+       const usdAmount = t.amountBs && t.exchangeRate ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd;
 
+       if (usdAmount > 0.001) {
+          if (isCash) totalUsdCash += usdAmount;
+          else totalUsdNoCash += usdAmount;
+       }
+       
+       totalVendNetUsd += t.amountUsd;
+    });
+
+  const totalPendingCXC = cxcAccounts.reduce((sum, acc) => sum + acc.totalBalance, 0);
+  const grandTotal = totalVendNetUsd + totalPendingCXC;
+
+  // We still calculate period expenses and withdrawals for the charts
   const periodWithdrawals = transactions
     .filter(t => t.type === 'withdrawal' && filterByDate(t.date))
     .reduce((sum, t) => sum + t.amountUsd, 0);
@@ -70,9 +102,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .filter(e => filterByDate(e.date))
     .reduce((sum, e) => sum + e.amountUsd, 0);
 
-  const totalPendingCXC = cxcAccounts.reduce((sum, acc) => sum + acc.totalBalance, 0);
-
-  const cashBalance = periodIncomes - periodWithdrawals - periodExpenses;
+  const cashBalance = totalVendNetUsd - periodWithdrawals - periodExpenses;
 
   // Chart data Preparation
   const getLast6MonthsData = () => {
@@ -105,10 +135,12 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
   const chartData = getLast6MonthsData();
 
   const stats = [
-    { label: 'Ingresos del Periodo', value: periodIncomes, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Egresos + Retiros', value: periodExpenses + periodWithdrawals, icon: TrendingDown, color: 'text-rose-600', bg: 'bg-rose-50' },
-    { label: 'Saldos Pendientes CXC', value: totalPendingCXC, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Balance de Caja', value: cashBalance, icon: DollarSign, color: cashBalance >= 0 ? 'text-emerald-600' : 'text-rose-600', bg: cashBalance >= 0 ? 'bg-emerald-50' : 'bg-rose-50' },
+    { label: 'USD (No Efectivo)', value: totalUsdNoCash, icon: CreditCard, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { label: 'USD (Efectivo)', value: totalUsdCash, icon: Banknote, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'BS (No Efectivo) Eq', value: totalBsNoCashEq, icon: CreditCard, color: 'text-sky-600', bg: 'bg-sky-50' },
+    { label: 'BS (Efectivo) Eq', value: totalBsCashEq, icon: Banknote, color: 'text-teal-600', bg: 'bg-teal-50' },
+    { label: 'Saldos Pendientes CXC', value: totalPendingCXC, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Total Venta Neta Gral', value: grandTotal, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
   ];
 
   if (loading) {
@@ -161,7 +193,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {stats.map((stat, i) => (
           <div key={i} className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300">
             <div className="flex items-start justify-between">
