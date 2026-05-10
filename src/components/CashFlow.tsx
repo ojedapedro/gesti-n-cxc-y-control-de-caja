@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../services/db';
-import { Transaction, Expense, Receipt, TransactionType } from '../types';
+import { Transaction, Expense, Receipt, TransactionType, PaymentMethod } from '../types';
 import { Activity, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, isValid, parseISO } from 'date-fns';
@@ -92,7 +92,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
 
         const dest = (t.destinationBank || '').toUpperCase();
         const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
-        const isCash = isCashByName || t.paymentMethod === 'USD_CASH' || (t.amountUsdCash !== undefined && t.amountUsdCash > 0) || dest === '';
+        const isCash = isCashByName || t.paymentMethod === PaymentMethod.USD_CASH || (t.amountUsdCash !== undefined && t.amountUsdCash > 0) || dest === '';
 
         if (isCash) {
           // Handle BS
@@ -101,7 +101,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
             if (dest === '' || isCashByName) {
                bsEquivalentUsd = Number(t.amountBs) / Number(t.exchangeRate);
             }
-          } else if (t.paymentMethod === 'BS' && (dest === '' || isCashByName)) {
+          } else if (t.paymentMethod === PaymentMethod.BS && (dest === '' || isCashByName)) {
              // Only apply if we haven't already calculated a precise bs equivalent.
              if (bsEquivalentUsd === 0) {
                bsEquivalentUsd = totalUsd;
@@ -111,14 +111,14 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
           // Handle USD
           if (t.amountUsdCash && t.amountUsdCash > 0) {
              cashAmount = Number(t.amountUsdCash);
-          } else if (isCashByName || t.paymentMethod === 'USD_CASH') {
+          } else if (isCashByName || t.paymentMethod === PaymentMethod.USD_CASH) {
              // Only assume it's cash if it's explicitly USD_CASH or the bank name implies cash
              const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (Number(t.amountBs) / Number(t.exchangeRate))) : totalUsd;
              if (rawUsdAmount > 0.001) {
                 cashAmount = rawUsdAmount;
              }
-          } else if (dest === '' && t.paymentMethod !== 'ZELLE') {
-              if (t.paymentMethod === 'USD_CASH') {
+          } else if (dest === '' && t.paymentMethod !== PaymentMethod.ZELLE) {
+              if (t.paymentMethod === PaymentMethod.USD_CASH) {
                  const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (Number(t.amountBs) / Number(t.exchangeRate))) : totalUsd;
                  if (rawUsdAmount > 0.001) {
                     cashAmount = rawUsdAmount;

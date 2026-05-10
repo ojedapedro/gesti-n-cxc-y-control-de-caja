@@ -302,6 +302,13 @@ export const dbService = {
     }, (error) => handleFirestoreError(error, OperationType.LIST, EXPENSES_PATH));
   },
 
+  subscribeToReceipts(callback: (data: Receipt[]) => void) {
+    const q = query(collection(db, RECEIPTS_PATH), orderBy('date', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Receipt)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, RECEIPTS_PATH));
+  },
+
   subscribeToCXCAccounts(callback: (data: CXCAccount[]) => void) {
     return onSnapshot(collection(db, CXC_ACCOUNTS_PATH), (snapshot) => {
       callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CXCAccount)));
