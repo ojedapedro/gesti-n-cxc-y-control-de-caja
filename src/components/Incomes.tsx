@@ -178,13 +178,6 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     if (!editingTransaction || !editingTransaction.id) return;
 
     try {
-      const isBs = editingTransaction.paymentMethod === PaymentMethod.BS || editingTransaction.paymentMethod === PaymentMethod.BS_CASH;
-      const amtUsd = Number(editingTransaction.amountUsd) || 0;
-      const inputAmtUsd = isBs ? (Number(editingTransaction.amountBs) || 0) / (Number(editingTransaction.exchangeRate) || 1) : amtUsd;
-      
-      const isUsdCash = editingTransaction.paymentMethod === PaymentMethod.USD_CASH;
-      const isZelle = editingTransaction.paymentMethod === PaymentMethod.ZELLE || editingTransaction.paymentMethod === PaymentMethod.BINANCE;
-  
       await dbService.updateTransaction(editingTransaction.id, {
         date: editingTransaction.date || format(new Date(), 'yyyy-MM-dd'),
         concept: editingTransaction.concept || '',
@@ -192,13 +185,15 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         amountBs: Number(editingTransaction.amountBs) || 0,
         exchangeRate: Number(editingTransaction.exchangeRate) || 1,
         amountUsd: Number(editingTransaction.amountUsd) || 0,
+        currency: editingTransaction.currency || '',
+        destinationBank: editingTransaction.destinationBank || '',
         paymentMethod: editingTransaction.paymentMethod,
         type: editingTransaction.type,
         isCXC: editingTransaction.isCXC || false,
-        cxcBalance: Number(editingTransaction.cxcBalance) || 0,
-        amountUsdCash: isUsdCash ? inputAmtUsd : 0,
-        amountZelle: isZelle ? inputAmtUsd : 0,
-        totalDailySale: inputAmtUsd
+        amountUsdCash: Number(editingTransaction.amountUsdCash) || 0,
+        amountZelle: Number(editingTransaction.amountZelle) || 0,
+        amountCXC: Number(editingTransaction.amountCXC) || 0,
+        totalDailySale: Number(editingTransaction.totalDailySale) || 0
       });
       setEditingTransaction(null);
     } catch (error) {
@@ -703,7 +698,102 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
             </div>
             
             <form onSubmit={handleUpdateTransaction} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Día / Fecha</label>
+                  <input 
+                    type="date" 
+                    value={editingTransaction.date || ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, date: e.target.value})}
+                    className="input-field" 
+                  />
+                  {editingTransaction.date && <p className="text-xs font-bold text-slate-500 uppercase">{getDayName(editingTransaction.date)}</p>}
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Moneda</label>
+                  <input 
+                    type="text" 
+                    value={editingTransaction.currency || ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, currency: e.target.value})}
+                    className="input-field uppercase" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Destino</label>
+                  <input 
+                    type="text" 
+                    value={editingTransaction.destinationBank || ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, destinationBank: e.target.value})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Bolívares</label>
+                  <input 
+                    type="number" step="0.01"
+                    value={editingTransaction.amountBs ?? ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, amountBs: parseFloat(e.target.value) || 0})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Tasa</label>
+                  <input 
+                    type="number" step="0.01"
+                    value={editingTransaction.exchangeRate ?? ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, exchangeRate: parseFloat(e.target.value) || 0})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Dolars Conv.</label>
+                  <input 
+                    type="number" step="0.01"
+                    value={editingTransaction.amountUsd ?? ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, amountUsd: parseFloat(e.target.value) || 0})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Efectivo ($)</label>
+                  <input 
+                    type="number" step="0.01"
+                    value={editingTransaction.amountUsdCash ?? ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, amountUsdCash: parseFloat(e.target.value) || 0})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Zelle/Binance</label>
+                  <input 
+                    type="number" step="0.01"
+                    value={editingTransaction.amountZelle ?? ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, amountZelle: parseFloat(e.target.value) || 0})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">C X C</label>
+                  <input 
+                    type="number" step="0.01"
+                    value={editingTransaction.amountCXC ?? ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, amountCXC: parseFloat(e.target.value) || 0})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Venta Diaria</label>
+                  <input 
+                    type="number" step="0.01"
+                    value={editingTransaction.totalDailySale ?? ''}
+                    onChange={(e) => setEditingTransaction({...editingTransaction, totalDailySale: parseFloat(e.target.value) || 0})}
+                    className="input-field" 
+                  />
+                </div>
+                {/* Metodo and Concept are not strictly required based on the list but might be useful, keep them or let them be? The prompt said "agrega los siguientes item a editar", so I'll append just Concept, Client, type in the modal but smaller, or just strictly what they asked. I'll just leave them under this grid and the other ones as a single block */}
+              </div>
+              
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 border-t border-slate-100 pt-4 mt-4">
                 <div className="space-y-1">
                   <label className="label">Concept</label>
                   <input 
@@ -719,33 +809,6 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                     type="text" 
                     value={editingTransaction.clientName || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, clientName: e.target.value})}
-                    className="input-field" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="label">Amount (BS)</label>
-                  <input 
-                    type="number" step="0.01"
-                    value={editingTransaction.amountBs || ''}
-                    onChange={(e) => setEditingTransaction({...editingTransaction, amountBs: parseFloat(e.target.value)})}
-                    className="input-field" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="label">Exchange Rate</label>
-                  <input 
-                    type="number" step="0.01"
-                    value={editingTransaction.exchangeRate || ''}
-                    onChange={(e) => setEditingTransaction({...editingTransaction, exchangeRate: parseFloat(e.target.value)})}
-                    className="input-field" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="label">Amount (USD)</label>
-                  <input 
-                    type="number" step="0.01"
-                    value={editingTransaction.amountUsd || ''}
-                    onChange={(e) => setEditingTransaction({...editingTransaction, amountUsd: parseFloat(e.target.value)})}
                     className="input-field" 
                   />
                 </div>
@@ -772,24 +835,6 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="label">CXC Balance</label>
-                  <input 
-                    type="number" step="0.01"
-                    value={editingTransaction.cxcBalance || ''}
-                    onChange={(e) => setEditingTransaction({...editingTransaction, cxcBalance: parseFloat(e.target.value)})}
-                    className="input-field" 
-                  />
-                </div>
-                <div className="space-y-1 flex items-center pt-6">
-                  <input 
-                    type="checkbox" id="isCXC"
-                    checked={editingTransaction.isCXC || false}
-                    onChange={(e) => setEditingTransaction({...editingTransaction, isCXC: e.target.checked})}
-                    className="mr-2"
-                  />
-                  <label htmlFor="isCXC" className="label mb-0 cursor-pointer">Is CXC?</label>
                 </div>
               </div>
 
