@@ -178,6 +178,13 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     if (!editingTransaction || !editingTransaction.id) return;
 
     try {
+      const isBs = editingTransaction.paymentMethod === PaymentMethod.BS || editingTransaction.paymentMethod === PaymentMethod.BS_CASH;
+      const amtUsd = Number(editingTransaction.amountUsd) || 0;
+      const inputAmtUsd = isBs ? (Number(editingTransaction.amountBs) || 0) / (Number(editingTransaction.exchangeRate) || 1) : amtUsd;
+      
+      const isUsdCash = editingTransaction.paymentMethod === PaymentMethod.USD_CASH;
+      const isZelle = editingTransaction.paymentMethod === PaymentMethod.ZELLE || editingTransaction.paymentMethod === PaymentMethod.BINANCE;
+  
       await dbService.updateTransaction(editingTransaction.id, {
         concept: editingTransaction.concept,
         clientName: editingTransaction.clientName,
@@ -187,7 +194,10 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
         paymentMethod: editingTransaction.paymentMethod,
         type: editingTransaction.type,
         isCXC: editingTransaction.isCXC,
-        cxcBalance: Number(editingTransaction.cxcBalance) || 0
+        cxcBalance: Number(editingTransaction.cxcBalance) || 0,
+        amountUsdCash: isUsdCash ? inputAmtUsd : 0,
+        amountZelle: isZelle ? inputAmtUsd : 0,
+        totalDailySale: inputAmtUsd
       });
       setEditingTransaction(null);
     } catch (error) {
