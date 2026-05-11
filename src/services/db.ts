@@ -12,7 +12,8 @@ import {
   orderBy, 
   serverTimestamp,
   type DocumentData,
-  onSnapshot
+  onSnapshot,
+  collectionGroup
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { 
@@ -247,6 +248,27 @@ export const dbService = {
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  },
+
+  async getGlobalCXCStats() {
+    try {
+      const q = query(collectionGroup(db, 'payments'));
+      const snapshot = await getDocs(q);
+      let totalCharges = 0;
+      let totalPayments = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.type === 'charge') {
+          totalCharges += Number(data.amountUsd) || 0;
+        } else {
+          totalPayments += Number(data.amountUsd) || 0;
+        }
+      });
+      return { totalCharges, totalPayments, balance: totalCharges - totalPayments };
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'collectionGroup:payments');
+      return { totalCharges: 0, totalPayments: 0, balance: 0 };
     }
   },
 

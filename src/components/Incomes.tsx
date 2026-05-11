@@ -723,24 +723,22 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                 </div>
                 <div className="space-y-1">
                   <label className="label">Destino</label>
-                  <input 
-                    type="text" 
+                  <select 
                     value={editingTransaction.destinationBank || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, destinationBank: e.target.value.toUpperCase()})}
                     className="input-field uppercase" 
-                    list="bancos-list-edit"
-                  />
-                  <datalist id="bancos-list-edit">
-                    <option value="BANESCO" />
-                    <option value="PROVINCIAL" />
-                    <option value="BDV" />
-                    <option value="MERCANTIL" />
-                    <option value="BNC" />
-                    <option value="EFECTIVO" />
-                    <option value="BINANCE P2P" />
-                    <option value="ZELLE" />
-                    <option value="CUENTAS CXC" />
-                  </datalist>
+                  >
+                    <option value="">Seleccione...</option>
+                    <option value="BANESCO">BANESCO</option>
+                    <option value="PROVINCIAL">PROVINCIAL</option>
+                    <option value="BDV">BDV</option>
+                    <option value="MERCANTIL">MERCANTIL</option>
+                    <option value="BNC">BNC</option>
+                    <option value="EFECTIVO">EFECTIVO</option>
+                    <option value="BINANCE P2P">BINANCE P2P</option>
+                    <option value="ZELLE">ZELLE</option>
+                    <option value="CUENTAS CXC">CUENTAS CXC</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="label">Bolívares</label>
