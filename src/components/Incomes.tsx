@@ -711,21 +711,36 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                 </div>
                 <div className="space-y-1">
                   <label className="label">Moneda</label>
-                  <input 
-                    type="text" 
+                  <select 
                     value={editingTransaction.currency || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, currency: e.target.value})}
                     className="input-field uppercase" 
-                  />
+                  >
+                    <option value="">Seleccione...</option>
+                    <option value="Bolívares (BS)">Bolívares (BS)</option>
+                    <option value="Dólares ($)">Dólares ($)</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="label">Destino</label>
                   <input 
                     type="text" 
                     value={editingTransaction.destinationBank || ''}
-                    onChange={(e) => setEditingTransaction({...editingTransaction, destinationBank: e.target.value})}
-                    className="input-field" 
+                    onChange={(e) => setEditingTransaction({...editingTransaction, destinationBank: e.target.value.toUpperCase()})}
+                    className="input-field uppercase" 
+                    list="bancos-list-edit"
                   />
+                  <datalist id="bancos-list-edit">
+                    <option value="BANESCO" />
+                    <option value="PROVINCIAL" />
+                    <option value="BDV" />
+                    <option value="MERCANTIL" />
+                    <option value="BNC" />
+                    <option value="EFECTIVO" />
+                    <option value="BINANCE P2P" />
+                    <option value="ZELLE" />
+                    <option value="CUENTAS CXC" />
+                  </datalist>
                 </div>
                 <div className="space-y-1">
                   <label className="label">Bolívares</label>
