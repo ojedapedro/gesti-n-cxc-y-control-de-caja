@@ -60,11 +60,10 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     return true;
   };
 
-  let totalUsdNoCash = 0;
-  let totalUsdCash = 0;
-  let totalBsNoCashEq = 0;
-  let totalBsCashEq = 0;
-  let totalVendNetUsd = 0; 
+  let totalBsBanco = 0;
+  let totalBsEfectivo = 0;
+  let totalUsdBanco = 0;
+  let totalUsdEfectivo = 0;
   
   transactions
     .filter(t => (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) && filterByDate(t.date))
@@ -72,14 +71,16 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        const dest = (t.destinationBank || '').toUpperCase();
        const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
        
-       // Handle BS exactly via amountBs
+       // Handle BS explicitly typed as Bs Equivalents
        if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
           const eqUsd = t.amountBs / t.exchangeRate;
           const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bolivares Efectivo';
-          if (isBsCash || dest === '') totalBsCashEq += eqUsd;
-          else totalBsNoCashEq += eqUsd;
+          if (isBsCash || (dest === '')) totalBsEfectivo += eqUsd;
+          else totalBsBanco += eqUsd;
        } else if ((t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo') && (dest === '' || isCashByName || t.paymentMethod === 'Bs Efectivo')) {
-          totalBsCashEq += t.amountUsd; 
+          totalBsEfectivo += t.amountUsd; 
+       } else if (t.paymentMethod === 'Transferencia Bs / Pago Móvil') {
+          totalBsBanco += t.amountUsd;
        }
        
        // Handle USD
@@ -87,15 +88,13 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
 
        if (usdAmount > 0.001) {
           const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === 'Dolares Efectivo' || (dest === '' && t.paymentMethod !== 'Zelle' && t.paymentMethod !== 'Binance');
-          if (isUsdCash) totalUsdCash += usdAmount;
-          else totalUsdNoCash += usdAmount;
+          if (isUsdCash) totalUsdEfectivo += usdAmount;
+          else totalUsdBanco += usdAmount;
        }
-       
-       totalVendNetUsd += t.amountUsd;
     });
 
-  const totalPendingCXC = cxcAccounts.reduce((sum, acc) => sum + acc.totalBalance, 0);
-  const grandTotal = totalVendNetUsd + totalPendingCXC;
+  const totalCXC = cxcAccounts.reduce((sum, acc) => sum + acc.totalBalance, 0);
+  const totalVentas = totalBsBanco + totalBsEfectivo + totalUsdBanco + totalUsdEfectivo + totalCXC;
 
   // We still calculate period expenses and withdrawals for the charts
   const periodWithdrawals = transactions
@@ -106,7 +105,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .filter(e => filterByDate(e.date))
     .reduce((sum, e) => sum + e.amountUsd, 0);
 
-  const cashBalance = (totalUsdCash + totalBsCashEq) - periodWithdrawals - periodExpenses;
+  const cashBalance = (totalUsdEfectivo + totalBsEfectivo) - periodWithdrawals - periodExpenses;
 
   // Chart data Preparation
   const getLast6MonthsData = () => {
@@ -139,12 +138,12 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
   const chartData = getLast6MonthsData();
 
   const stats = [
-    { label: 'USD (No Efectivo)', value: totalUsdNoCash, icon: CreditCard, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { label: 'USD (Efectivo)', value: totalUsdCash, icon: Banknote, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'BS (No Efectivo) Eq', value: totalBsNoCashEq, icon: CreditCard, color: 'text-sky-600', bg: 'bg-sky-50' },
-    { label: 'BS (Efectivo) Eq', value: totalBsCashEq, icon: Banknote, color: 'text-teal-600', bg: 'bg-teal-50' },
-    { label: 'Saldos Pendientes CXC', value: totalPendingCXC, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Total Venta Neta Gral', value: grandTotal, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'TOTAL VENTAS', value: totalVentas, icon: TrendingUp, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { label: 'TOTAL INGRESO BOLIVARES BANCO', value: totalBsBanco, icon: CreditCard, color: 'text-sky-600', bg: 'bg-sky-50' },
+    { label: 'TOTAL INGRESO BOLIVARES EFECTIVO', value: totalBsEfectivo, icon: Banknote, color: 'text-teal-600', bg: 'bg-teal-50' },
+    { label: 'TOTAL INGRESO DOLARES BANCO', value: totalUsdBanco, icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'TOTAL INGRESO DOLARES EFECTIVO', value: totalUsdEfectivo, icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'TOTAL C X C', value: totalCXC, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
   if (loading) {
