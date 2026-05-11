@@ -83,53 +83,35 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
 
       transactions?.forEach(t => {
         if (t.type !== TransactionType.SALE && t.type !== TransactionType.INCOME) return;
-        const d = getOrCreateDate(t.date);
         
         let cashAmount = 0;
         let bsEquivalentUsd = 0;
-        // All sales/incomes count towards total inflow
-        const totalUsd = Number(t.amountUsd) || 0;
 
         const dest = (t.destinationBank || '').toUpperCase();
         const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
-        const isCash = isCashByName || t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === PaymentMethod.BS_CASH || (t.amountUsdCash !== undefined && t.amountUsdCash > 0) || dest === '';
 
-        if (isCash) {
-          // Handle BS
-          if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
-            // Si el banco fue especificado y no es efectivo, no lo sumamos a caja BS
-            if (dest === '' || isCashByName || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo') {
-               bsEquivalentUsd = Number(t.amountBs) / Number(t.exchangeRate);
-            }
-          } else if ((t.paymentMethod === PaymentMethod.BS || t.paymentMethod === 'Bolivares' || t.paymentMethod === PaymentMethod.BS_CASH) && (dest === '' || isCashByName || t.paymentMethod === PaymentMethod.BS_CASH)) {
-             // Only apply if we haven't already calculated a precise bs equivalent.
-             if (bsEquivalentUsd === 0) {
-               bsEquivalentUsd = totalUsd;
-             }
-          }
-
-          // Handle USD
-          if (t.amountUsdCash && t.amountUsdCash > 0) {
-             cashAmount = Number(t.amountUsdCash);
-          } else if (isCashByName || t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === 'Dolares Efectivo') {
-             // Only assume it's cash if it's explicitly USD_CASH or the bank name implies cash
-             const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (Number(t.amountBs) / Number(t.exchangeRate))) : totalUsd;
-             if (rawUsdAmount > 0.001) {
-                cashAmount = rawUsdAmount;
-             }
-          } else if (dest === '' && t.paymentMethod !== PaymentMethod.ZELLE && t.paymentMethod !== 'Zelle') {
-              if (t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === 'Dolares Efectivo') {
-                 const rawUsdAmount = (t.amountBs && t.exchangeRate) ? Math.max(0, totalUsd - (Number(t.amountBs) / Number(t.exchangeRate))) : totalUsd;
-                 if (rawUsdAmount > 0.001) {
-                    cashAmount = rawUsdAmount;
-                 }
-              }
-          }
+        // USD Efectivo
+        if (t.amountUsdCash !== undefined && t.amountUsdCash > 0) {
+             cashAmount += Number(t.amountUsdCash);
+        } else if (isCashByName || t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === '$ Efectivo') {
+             cashAmount += Number(t.amountUsd) || 0;
         }
-        
-        d.inflowUsd += (cashAmount + bsEquivalentUsd);
-        d.cashUsd += cashAmount;
-        d.bsUsd += bsEquivalentUsd;
+
+        // BS Efectivo
+        if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
+             if (isCashByName || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
+                 bsEquivalentUsd += (Number(t.amountBs) / Number(t.exchangeRate));
+             }
+        } else if (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
+             bsEquivalentUsd += Number(t.amountUsd) || 0;
+        }
+
+        if (cashAmount > 0 || bsEquivalentUsd > 0) {
+           const d = getOrCreateDate(t.date);
+           d.inflowUsd += (cashAmount + bsEquivalentUsd);
+           d.cashUsd += cashAmount;
+           d.bsUsd += bsEquivalentUsd;
+        }
       });
 
       expenses?.forEach(e => {

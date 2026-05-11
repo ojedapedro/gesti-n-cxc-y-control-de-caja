@@ -226,14 +226,23 @@ export const dbService = {
 
       // Record as income in the main ledger ONLY if it's a payment
       if (data.type !== 'charge') {
+        let isUsdCash = data.paymentMethod === PaymentMethod.USD_CASH;
+        let isZelle = data.paymentMethod === PaymentMethod.ZELLE || data.paymentMethod === PaymentMethod.BINANCE;
+        let isCXCCuentas = data.destinationBank === 'CUENTAS CXC' || (data.paymentMethod as string) === 'CUENTAS CXC';
+
         await this.addTransaction({
           date: data.date,
           clientName: accountSnap.exists() ? accountSnap.data().clientName : 'Desconocido',
           concept: `ABONO CXC: ${data.concept || ''}`,
           amountUsd: data.amountUsd,
-          paymentMethod: PaymentMethod.USD_CASH, // Assuming payments are cash
+          amountBs: data.amountBs,
+          exchangeRate: data.exchangeRate,
+          paymentMethod: data.paymentMethod || PaymentMethod.USD_CASH,
+          destinationBank: data.destinationBank,
           type: TransactionType.INCOME,
-          isCXC: false
+          isCXC: false,
+          amountUsdCash: isUsdCash ? data.amountUsd : 0,
+          amountZelle: isZelle ? data.amountUsd : 0
         });
       }
     } catch (error) {

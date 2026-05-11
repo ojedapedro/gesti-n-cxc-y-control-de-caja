@@ -75,19 +75,19 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
           const eqUsd = t.amountBs / t.exchangeRate;
           const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bolivares Efectivo';
-          if (isBsCash || (dest === '')) totalBsEfectivo += eqUsd;
+          if (isBsCash) totalBsEfectivo += eqUsd;
           else totalBsBanco += eqUsd;
-       } else if ((t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo') && (dest === '' || isCashByName || t.paymentMethod === 'Bs Efectivo')) {
-          totalBsEfectivo += t.amountUsd; 
-       } else if (t.paymentMethod === 'Transferencia Bs / Pago Móvil') {
-          totalBsBanco += t.amountUsd;
+       } else if (t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo') {
+          if (isCashByName || t.paymentMethod === 'Bs Efectivo') totalBsEfectivo += t.amountUsd; 
+          else totalBsBanco += t.amountUsd;
        }
        
        // Handle USD
-       const usdAmount = t.amountBs && t.exchangeRate ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd;
+       const usdAmount = t.amountUsdCash && t.amountUsdCash > 0 ? t.amountUsdCash : 
+                         (t.amountBs && t.exchangeRate ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd);
 
        if (usdAmount > 0.001) {
-          const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === 'Dolares Efectivo' || (dest === '' && t.paymentMethod !== 'Zelle' && t.paymentMethod !== 'Binance');
+          const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === 'Dolares Efectivo';
           if (isUsdCash) totalUsdEfectivo += usdAmount;
           else totalUsdBanco += usdAmount;
        }
