@@ -33,8 +33,7 @@ service cloud.firestore {
              data.date is string &&
              data.amountUsd is number &&
              data.amountUsd >= 0 &&
-             data.type in ['income', 'sale', 'withdrawal'] &&
-             data.createdAt == request.time;
+             data.type in ['income', 'sale', 'withdrawal'];
     }
 
     function isValidExpense(data) {
@@ -43,16 +42,14 @@ service cloud.firestore {
              data.category is string &&
              data.category.size() <= 100 &&
              data.amountUsd is number &&
-             data.amountUsd >= 0 &&
-             data.createdAt == request.time;
+             data.amountUsd >= 0;
     }
 
     function isValidCXCAccount(data) {
       return data.keys().hasAll(['clientName', 'totalBalance', 'lastUpdated']) &&
              data.clientName is string &&
              data.clientName.size() <= 200 &&
-             data.totalBalance is number &&
-             data.lastUpdated == request.time;
+             data.totalBalance is number;
     }
 
     function isValidCXCPayment(data) {
@@ -60,8 +57,7 @@ service cloud.firestore {
              data.clientId is string &&
              data.amountUsd is number &&
              data.amountUsd >= 0 &&
-             data.date is string &&
-             data.createdAt == request.time;
+             data.date is string;
     }
 
     function isValidReceipt(data) {
@@ -69,24 +65,23 @@ service cloud.firestore {
              data.receiptNumber is string &&
              data.amountUsd is number &&
              data.recipient is string &&
-             data.date is string &&
-             data.createdAt == request.time;
+             data.date is string;
     }
 
     // MATCH BLOCKS
     match /transactions/{transactionId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
-      allow create: if isSignedIn() && isValidTransaction(incoming()) && isValidId(transactionId);
+      allow create: if isSignedIn() && isValidTransaction(incoming()) && isValidId(transactionId) && incoming().createdAt == request.time;
       allow update: if isSignedIn() && isValidTransaction(incoming()) && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['concept', 'clientName', 'amountBs', 'exchangeRate', 'amountUsd', 'paymentMethod', 'type', 'isCXC', 'cxcBalance']);
+                    incoming().diff(existing()).affectedKeys().hasOnly(['date', 'concept', 'clientName', 'amountBs', 'exchangeRate', 'amountUsd', 'paymentMethod', 'type', 'isCXC', 'cxcBalance', 'amountUsdCash', 'amountZelle', 'amountCXC', 'totalDailySale', 'currency', 'destinationBank']);
       allow delete: if isSignedIn(); // In a business app, admins might delete.
     }
 
     match /expenses/{expenseId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
-      allow create: if isSignedIn() && isValidExpense(incoming()) && isValidId(expenseId);
+      allow create: if isSignedIn() && isValidExpense(incoming()) && isValidId(expenseId) && incoming().createdAt == request.time;
       allow update: if isSignedIn() && isValidExpense(incoming()) &&
                     incoming().diff(existing()).affectedKeys().hasOnly(['category', 'note', 'amountBs', 'amountUsd', 'date']);
       allow delete: if isSignedIn();
@@ -95,7 +90,7 @@ service cloud.firestore {
     match /cxc_accounts/{clientId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
-      allow create: if isSignedIn() && isValidCXCAccount(incoming()) && isValidId(clientId);
+      allow create: if isSignedIn() && isValidCXCAccount(incoming()) && isValidId(clientId) && incoming().lastUpdated == request.time;
       allow update: if isSignedIn() && isValidCXCAccount(incoming()) &&
                     incoming().diff(existing()).affectedKeys().hasOnly(['totalBalance', 'lastUpdated', 'clientName']);
       allow delete: if isSignedIn();
@@ -103,9 +98,9 @@ service cloud.firestore {
       match /payments/{paymentId} {
         allow list: if isSignedIn();
         allow get: if isSignedIn();
-        allow create: if isSignedIn() && isValidCXCPayment(incoming()) && isValidId(paymentId);
+        allow create: if isSignedIn() && isValidCXCPayment(incoming()) && isValidId(paymentId) && incoming().createdAt == request.time;
         allow update: if isSignedIn() && isValidCXCPayment(incoming()) &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'date', 'concept']);
+                      incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'date', 'concept', 'invoiceNumber', 'sellerName', 'paymentMethod', 'destinationBank', 'type']);
         allow delete: if isSignedIn();
       }
     }
@@ -113,7 +108,7 @@ service cloud.firestore {
     match /receipts/{receiptId} {
       allow list: if isSignedIn();
       allow get: if isSignedIn();
-      allow create: if isSignedIn() && isValidReceipt(incoming()) && isValidId(receiptId);
+      allow create: if isSignedIn() && isValidReceipt(incoming()) && isValidId(receiptId) && incoming().createdAt == request.time;
       allow update: if isSignedIn() && isValidReceipt(incoming()) &&
                     incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'recipient', 'concept', 'date']);
       allow delete: if isSignedIn();

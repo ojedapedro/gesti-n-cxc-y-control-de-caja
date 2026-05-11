@@ -186,14 +186,15 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
       const isZelle = editingTransaction.paymentMethod === PaymentMethod.ZELLE || editingTransaction.paymentMethod === PaymentMethod.BINANCE;
   
       await dbService.updateTransaction(editingTransaction.id, {
-        concept: editingTransaction.concept,
-        clientName: editingTransaction.clientName,
+        date: editingTransaction.date || format(new Date(), 'yyyy-MM-dd'),
+        concept: editingTransaction.concept || '',
+        clientName: editingTransaction.clientName || '',
         amountBs: Number(editingTransaction.amountBs) || 0,
         exchangeRate: Number(editingTransaction.exchangeRate) || 1,
         amountUsd: Number(editingTransaction.amountUsd) || 0,
         paymentMethod: editingTransaction.paymentMethod,
         type: editingTransaction.type,
-        isCXC: editingTransaction.isCXC,
+        isCXC: editingTransaction.isCXC || false,
         cxcBalance: Number(editingTransaction.cxcBalance) || 0,
         amountUsdCash: isUsdCash ? inputAmtUsd : 0,
         amountZelle: isZelle ? inputAmtUsd : 0,
@@ -484,6 +485,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                   <option value="EFECTIVO" />
                   <option value="BINANCE P2P" />
                   <option value="ZELLE" />
+                  <option value="CUENTAS CXC" />
                 </datalist>
               </div>
 

@@ -29,13 +29,22 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     e.preventDefault();
     if (!selectedAccount?.id || !editingPayment?.id) return;
 
-    await dbService.updateCXCPayment(selectedAccount.id, editingPayment.id, {
+    const updates: Partial<CXCPayment> = {
       amountUsd: editingPayment.amountUsd,
-      date: editingPayment.date,
-      concept: editingPayment.concept,
-      invoiceNumber: editingPayment.invoiceNumber,
-      sellerName: editingPayment.sellerName,
-    });
+      date: editingPayment.date || format(new Date(), 'yyyy-MM-dd'),
+      concept: editingPayment.concept || '',
+      type: editingPayment.type || 'payment',
+      paymentMethod: editingPayment.paymentMethod || PaymentMethod.BS_CASH,
+    };
+    
+    if (updates.type === 'charge') {
+      updates.invoiceNumber = editingPayment.invoiceNumber || '';
+      updates.sellerName = editingPayment.sellerName || '';
+    } else {
+      updates.destinationBank = editingPayment.destinationBank || '';
+    }
+
+    await dbService.updateCXCPayment(selectedAccount.id, editingPayment.id, updates);
 
     const pays = await dbService.getCXCPayments(selectedAccount.id);
     setPayments(pays || []);
@@ -507,6 +516,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           <option value="BNC" />
                           <option value="ZELLE" />
                           <option value="BINANCE P2P" />
+                          <option value="CUENTAS CXC" />
                         </datalist>
                       </div>
                     </div>
