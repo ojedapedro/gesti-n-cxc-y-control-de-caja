@@ -18,7 +18,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
-    paymentMethod: PaymentMethod.BS,
+    paymentMethod: PaymentMethod.BS_CASH,
     destinationBank: '',
     amount: '',
     exchangeRate: exchangeRate?.toString() || '480',
@@ -119,7 +119,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
       amount: '',
       destinationBank: '',
       concept: 'INGRESO',
-      paymentMethod: PaymentMethod.BS,
+      paymentMethod: PaymentMethod.BS_CASH,
       exchangeRate: exchangeRate?.toString() || '480',
     });
   };
@@ -211,6 +211,16 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
     if (endDate && t.date > endDate) return false;
     return true;
   });
+
+  const totals = filteredTransactions.reduce((acc, t) => {
+    acc.bs += t.amountBs || 0;
+    acc.usdConv += (t.amountBs || 0) / (t.exchangeRate || 1);
+    acc.usdCash += t.amountUsdCash || 0;
+    acc.zelle += t.amountZelle || 0;
+    acc.cxc += t.amountCXC || 0;
+    acc.ventaDiaria += t.totalDailySale || t.amountUsd || 0;
+    return acc;
+  }, { bs: 0, usdConv: 0, usdCash: 0, zelle: 0, cxc: 0, ventaDiaria: 0 });
 
   return (
     <div className="space-y-6">
@@ -454,12 +464,8 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                   onChange={(e) => setFormData({...formData, paymentMethod: e.target.value as PaymentMethod})}
                   className="input-field cursor-pointer"
                 >
-                  <option value={PaymentMethod.BS}>{PaymentMethod.BS}</option>
                   <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
                   <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
-                  <option value={PaymentMethod.ZELLE}>{PaymentMethod.ZELLE}</option>
-                  <option value={PaymentMethod.BINANCE}>{PaymentMethod.BINANCE}</option>
-                  <option value={PaymentMethod.CXC}>{PaymentMethod.CXC}</option>
                 </select>
               </div>
 
@@ -617,6 +623,22 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
               </tr>
             </thead>
             <tbody>
+              <tr className="bg-slate-100 text-slate-800 font-black text-[11px] uppercase border-b-2 border-slate-300">
+                <td colSpan={5} className="p-3 text-right">TOTALES PERIODO:</td>
+                <td className="p-3 text-right text-orange-700 bg-orange-100/50">{new Intl.NumberFormat('es-VE').format(totals.bs)}</td>
+                <td className="p-3 bg-orange-100/50 text-right text-slate-400 font-mono">-</td>
+                <td className="p-3 text-right text-orange-700 bg-orange-100/50">{formatCurrency(totals.usdConv)}</td>
+                <td className="p-3 text-right text-emerald-700 bg-emerald-100/50">{formatCurrency(totals.usdCash)}</td>
+                <td className="p-3 text-right text-emerald-700 bg-emerald-100/50">{formatCurrency(totals.zelle)}</td>
+                <td className="p-3 text-right text-blue-700 bg-blue-100/50">{formatCurrency(totals.cxc)}</td>
+                <td className="p-3 text-right text-slate-900 bg-slate-200 border-r border-slate-300">
+                  {formatCurrency(totals.ventaDiaria)}
+                  <span className="block text-[9px] text-slate-500 font-bold mt-0.5 whitespace-nowrap">
+                    Bs. {new Intl.NumberFormat('es-VE').format(totals.ventaDiaria * (exchangeRate || 1))}
+                  </span>
+                </td>
+                <td className="p-3 bg-slate-100"></td>
+              </tr>
               {filteredTransactions.map((t, i) => {
                   const conv = (t.amountBs || 0) / (t.exchangeRate || 1);
                   return (
