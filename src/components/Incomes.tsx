@@ -95,6 +95,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
   const handleAddPending = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputAmt <= 0) return;
+    if (!formData.destinationBank.trim() || !formData.concept.trim()) return;
 
     setPendingIngresos(prev => [...prev, {
         date: formData.date,
@@ -140,7 +141,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
   const handleSubmitCXC = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cxcData.clientName || !cxcData.amountUsd) return;
+    if (!cxcData.clientName.trim() || !cxcData.amountUsd || !cxcData.concept.trim() || !cxcData.sellerName.trim() || !cxcData.invoiceNumber.trim()) return;
 
     try {
       await dbService.addCXCCharge(cxcData.clientName, {
@@ -358,10 +359,11 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                     <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <input 
                       type="text" 
+                      required
                       value={cxcData.invoiceNumber}
                       onChange={(e) => setCxcData({...cxcData, invoiceNumber: e.target.value})}
                       className="input-field pl-10" 
-                      placeholder="Opcional. Ej: FAC-00123"
+                      placeholder="Ej: FAC-00123"
                     />
                   </div>
                 </div>
@@ -372,6 +374,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                     <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <input 
                       type="text" 
+                      required
                       value={cxcData.sellerName}
                       onChange={(e) => setCxcData({...cxcData, sellerName: e.target.value.toUpperCase()})}
                       className="input-field pl-10 uppercase" 
@@ -381,7 +384,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-1">
                   <label className="label">Monto (USD)</label>
                   <div className="relative">
@@ -398,26 +401,6 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                         setCxcData({...cxcData, amountUsd: e.target.value, amountBs: e.target.value ? bs.toFixed(2) : ''});
                       }}
                       className="input-field pl-10 font-bold" 
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="label text-blue-600 truncate">Eq. (Bs) - Tasa: {cxcData.exchangeRate}</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-blue-400 font-bold text-sm">Bs</span>
-                    <input 
-                      type="number" 
-                      step="0.01"
-                      min="0.01"
-                      required
-                      value={cxcData.amountBs}
-                      onChange={(e) => {
-                        const bs = parseFloat(e.target.value) || 0;
-                        const usd = bs / (parseFloat(cxcData.exchangeRate) || 1);
-                        setCxcData({...cxcData, amountBs: e.target.value, amountUsd: e.target.value ? usd.toFixed(4) : ''});
-                      }}
-                      className="input-field pl-10 font-bold text-blue-700 bg-blue-50 border-blue-200" 
                       placeholder="0.00"
                     />
                   </div>

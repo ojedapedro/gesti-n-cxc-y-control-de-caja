@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/db';
 import { type CXCAccount, type CXCPayment, PaymentMethod } from '../types';
-import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search, Download, FileText, CreditCard, Landmark } from 'lucide-react';
+import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search, Download, FileText, CreditCard, Landmark, Edit, X } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -14,14 +14,33 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const [payments, setPayments] = useState<CXCPayment[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<CXCPayment | null>(null);
   const [paymentData, setPaymentData] = useState({
+
     amountUsd: '',
     amountBs: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     concept: '',
-    paymentMethod: PaymentMethod.BS,
+    paymentMethod: PaymentMethod.BS_CASH,
     destinationBank: '',
   });
+
+  const handleUpdatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAccount?.id || !editingPayment?.id) return;
+
+    await dbService.updateCXCPayment(selectedAccount.id, editingPayment.id, {
+      amountUsd: editingPayment.amountUsd,
+      date: editingPayment.date,
+      concept: editingPayment.concept,
+      invoiceNumber: editingPayment.invoiceNumber,
+      sellerName: editingPayment.sellerName,
+    });
+
+    const pays = await dbService.getCXCPayments(selectedAccount.id);
+    setPayments(pays || []);
+    setEditingPayment(null);
+  };
 
   useEffect(() => {
     if (exchangeRate && paymentData.amountUsd && !paymentData.amountBs) {
@@ -102,7 +121,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       amountBs: '',
       date: format(new Date(), 'yyyy-MM-dd'),
       concept: '',
-      paymentMethod: PaymentMethod.BS,
+      paymentMethod: PaymentMethod.BS_CASH,
       destinationBank: '',
     });
   };
@@ -461,9 +480,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         onChange={(e) => setPaymentData({...paymentData, paymentMethod: e.target.value as PaymentMethod})}
                         className="input-field pl-10"
                       >
-                        {Object.values(PaymentMethod).map(method => (
-                          <option key={method} value={method}>{method}</option>
-                        ))}
+                        <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
+                        <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
                       </select>
                     </div>
                   </div>
@@ -526,6 +544,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     <th className="table-header whitespace-nowrap">Factura N°</th>
                     <th className="table-header text-right text-rose-600">(+) Cargo</th>
                     <th className="table-header text-right text-emerald-600">(-) Abono</th>
+                    <th className="table-header text-center w-12">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -563,12 +582,21 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                             </>
                           ) : ''}
                         </td>
+                        <td className="table-cell text-center">
+                          <button 
+                            onClick={() => setEditingPayment(p)}
+                            className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                            title="Editar Registro"
+                          >
+                            <Edit size={14} />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
                   {payments.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="table-cell text-center py-10 text-slate-400 italic">No hay movimientos registrados para este cliente.</td>
+                      <td colSpan={9} className="table-cell text-center py-10 text-slate-400 italic">No hay movimientos registrados para este cliente.</td>
                     </tr>
                   )}
                 </tbody>
@@ -584,6 +612,100 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         )}
       </div>
     </div>
+
+    {editingPayment && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <Edit className="text-blue-500" size={20} />
+              Editar Registro {editingPayment.type === 'charge' ? '(Cargo)' : '(Abono)'}
+            </h3>
+            <button 
+              onClick={() => setEditingPayment(null)}
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+              title="Cerrar"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <form onSubmit={handleUpdatePayment} className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="label">Fecha</label>
+                <input 
+                  type="date" 
+                  required
+                  value={editingPayment.date}
+                  onChange={(e) => setEditingPayment({...editingPayment, date: e.target.value})}
+                  className="input-field" 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="label">Monto (USD)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  required
+                  value={editingPayment.amountUsd}
+                  onChange={(e) => setEditingPayment({...editingPayment, amountUsd: parseFloat(e.target.value) || 0})}
+                  className="input-field font-bold" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="label">Concepto</label>
+              <input 
+                type="text" 
+                required
+                value={editingPayment.concept || ''}
+                onChange={(e) => setEditingPayment({...editingPayment, concept: e.target.value})}
+                className="input-field" 
+              />
+            </div>
+
+            {editingPayment.type === 'charge' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Vendedor</label>
+                  <input 
+                    type="text" 
+                    value={editingPayment.sellerName || ''}
+                    onChange={(e) => setEditingPayment({...editingPayment, sellerName: e.target.value.toUpperCase()})}
+                    className="input-field uppercase" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">N° Factura</label>
+                  <input 
+                    type="text" 
+                    value={editingPayment.invoiceNumber || ''}
+                    onChange={(e) => setEditingPayment({...editingPayment, invoiceNumber: e.target.value})}
+                    className="input-field" 
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
+              <button 
+                type="button" 
+                onClick={() => setEditingPayment(null)} 
+                className="px-5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="btn-primary">
+                Guardar Cambios
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
     </div>
   );
 }

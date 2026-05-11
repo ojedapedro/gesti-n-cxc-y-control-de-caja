@@ -252,6 +252,50 @@ export const dbService = {
     }
   },
 
+  async updateCXCPayment(clientId: string, paymentId: string, updates: Partial<CXCPayment>) {
+    const path = `${CXC_ACCOUNTS_PATH}/${clientId}/payments/${paymentId}`;
+    try {
+      const paymentRef = doc(db, CXC_ACCOUNTS_PATH, clientId, 'payments', paymentId);
+      const paymentSnap = await getDoc(paymentRef);
+      
+      if (!paymentSnap.exists()) return;
+      
+      const oldData = paymentSnap.data() as CXCPayment;
+      const oldAmount = oldData.amountUsd;
+      const newAmount = updates.amountUsd !== undefined ? updates.amountUsd : oldAmount;
+      const oldType = oldData.type || 'payment';
+      const newType = updates.type !== undefined ? updates.type : oldType;
+      
+      await updateDoc(paymentRef, {
+        ...updates
+      });
+
+      // Update account balance if amount or type changed
+      if (oldAmount !== newAmount || oldType !== newType) {
+        const accountRef = doc(db, CXC_ACCOUNTS_PATH, clientId);
+        const accountSnap = await getDoc(accountRef);
+        if (accountSnap.exists()) {
+          let currentBalance = accountSnap.data().totalBalance || 0;
+          
+          // Revert old effect
+          if (oldType === 'charge') currentBalance -= oldAmount;
+          else currentBalance += oldAmount;
+
+          // Apply new effect
+          if (newType === 'charge') currentBalance += newAmount;
+          else currentBalance -= newAmount;
+
+          await updateDoc(accountRef, {
+            totalBalance: currentBalance,
+            lastUpdated: serverTimestamp()
+          });
+        }
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
   // Receipts
   async addReceipt(data: Omit<Receipt, 'id' | 'createdAt'>) {
     try {
