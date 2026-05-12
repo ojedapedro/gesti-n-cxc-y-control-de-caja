@@ -16,14 +16,25 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<CXCPayment | null>(null);
   const [paymentData, setPaymentData] = useState({
-
-    amountUsd: '',
-    amountBs: '',
+    amount: '',
+    exchangeRate: exchangeRate?.toString() || '1',
     date: format(new Date(), 'yyyy-MM-dd'),
-    concept: '',
+    concept: 'ABONO',
     paymentMethod: PaymentMethod.BS_CASH,
     destinationBank: '',
   });
+
+  useEffect(() => {
+    if (exchangeRate) {
+      setPaymentData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+    }
+  }, [exchangeRate, showPaymentForm]);
+
+  const inBolivares = paymentData.paymentMethod === PaymentMethod.BS || paymentData.paymentMethod === PaymentMethod.BS_CASH;
+  const inputAmt = parseFloat(paymentData.amount) || 0;
+  const amountUsdConv = inBolivares ? inputAmt / (parseFloat(paymentData.exchangeRate) || 1) : 0;
+  const amountBs = inBolivares ? inputAmt : 0;
+  const totalPaymentUsd = inBolivares ? amountUsdConv : inputAmt;
 
   const handleUpdatePayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,17 +64,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
   const [globalStats, setGlobalStats] = useState({ totalCharges: 0, totalPayments: 0, balance: 0 });
 
-  useEffect(() => {
-    if (exchangeRate && paymentData.amountUsd && !paymentData.amountBs) {
-       const usd = parseFloat(paymentData.amountUsd);
-       const bs = usd * exchangeRate;
-       setPaymentData(prev => ({ ...prev, amountBs: bs.toFixed(2) }));
-    } else if (exchangeRate && paymentData.amountUsd && paymentData.amountBs) {
-       const usd = parseFloat(paymentData.amountUsd);
-       const bs = usd * exchangeRate;
-       setPaymentData(prev => ({ ...prev, amountBs: bs.toFixed(2) }));
-    }
-  }, [exchangeRate]);
+
 
   useEffect(() => {
     dbService.getGlobalCXCStats().then(stats => setGlobalStats(stats));
@@ -114,9 +115,12 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAccount?.id) return;
+    if (inputAmt <= 0) return;
 
     await dbService.addCXCPayment(selectedAccount.id, {
-      amountUsd: parseFloat(paymentData.amountUsd),
+      amountUsd: totalPaymentUsd,
+      amountBs: amountBs > 0 ? amountBs : undefined,
+      exchangeRate: parseFloat(paymentData.exchangeRate) || 1,
       date: paymentData.date,
       concept: paymentData.concept,
       paymentMethod: paymentData.paymentMethod,
@@ -129,10 +133,10 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     
     setShowPaymentForm(false);
     setPaymentData({
-      amountUsd: '',
-      amountBs: '',
+      amount: '',
+      exchangeRate: exchangeRate?.toString() || '1',
       date: format(new Date(), 'yyyy-MM-dd'),
-      concept: '',
+      concept: 'ABONO',
       paymentMethod: PaymentMethod.BS_CASH,
       destinationBank: '',
     });
@@ -460,115 +464,129 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
             {showPaymentForm && (
               <div className="card p-6 bg-emerald-50/30 border-emerald-100">
-                <form onSubmit={handleAddPayment} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="label">Monto a Pagar (USD)</label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                      <input 
-                        type="number" 
-                        step="0.01"
-                        required
-                        placeholder="0.00"
-                        value={paymentData.amountUsd}
-                        onChange={(e) => {
-                          const usd = parseFloat(e.target.value) || 0;
-                          const bs = usd * (exchangeRate || 1);
-                          setPaymentData({...paymentData, amountUsd: e.target.value, amountBs: e.target.value ? bs.toFixed(2) : ''});
-                        }}
-                        className="input-field pl-10" 
-                      />
+                <form onSubmit={handleAddPayment} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <div className="space-y-1">
+                      <label className="label">Fecha</label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                        <input 
+                          type="date" 
+                          required
+                          value={paymentData.date}
+                          onChange={(e) => setPaymentData({...paymentData, date: e.target.value})}
+                          className="input-field pl-10" 
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="label text-blue-600 truncate">Eq. (Bs) - Tasa: {exchangeRate}</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-blue-400 font-bold text-sm">Bs</span>
-                      <input 
-                        type="number" 
-                        step="0.01"
+
+                    <div className="space-y-1">
+                      <label className="label">Moneda</label>
+                      <select
                         required
-                        placeholder="0.00"
-                        value={paymentData.amountBs}
-                        onChange={(e) => {
-                          const bs = parseFloat(e.target.value) || 0;
-                          const usd = bs / (exchangeRate || 1);
-                          setPaymentData({...paymentData, amountBs: e.target.value, amountUsd: e.target.value ? usd.toFixed(4) : ''});
-                        }}
-                        className="input-field pl-10 font-bold text-blue-700 bg-blue-50 border-blue-200" 
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="label">Fecha</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                      <input 
-                        type="date" 
-                        required
-                        value={paymentData.date}
-                        onChange={(e) => setPaymentData({...paymentData, date: e.target.value})}
-                        className="input-field pl-10" 
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="label">Forma de Pago</label>
-                    <div className="relative">
-                      <CreditCard className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                      <select 
                         value={paymentData.paymentMethod}
                         onChange={(e) => setPaymentData({...paymentData, paymentMethod: e.target.value as PaymentMethod})}
-                        className="input-field pl-10"
+                        className="input-field cursor-pointer"
                       >
                         <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
                         <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
+                        <option value={PaymentMethod.BS}>Transferencia/Pago Móvil</option>
+                        <option value={PaymentMethod.ZELLE}>Zelle</option>
+                        <option value={PaymentMethod.BINANCE}>Binance</option>
                       </select>
                     </div>
-                  </div>
-                  {(paymentData.paymentMethod === PaymentMethod.BS || paymentData.paymentMethod === PaymentMethod.ZELLE || paymentData.paymentMethod === PaymentMethod.BINANCE) && (
+
                     <div className="space-y-1">
                       <label className="label">Banco / Destino</label>
-                      <div className="relative">
-                        <Landmark className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                        <input 
-                          type="text" 
-                          placeholder="Ej: Banesco, Zelle, etc."
-                          value={paymentData.destinationBank}
-                          onChange={(e) => setPaymentData({...paymentData, destinationBank: e.target.value.toUpperCase()})}
-                          className="input-field pl-10 uppercase" 
-                          list="bancos-list-cxc"
-                        />
-                        <datalist id="bancos-list-cxc">
-                          <option value="BANESCO" />
-                          <option value="PROVINCIAL" />
-                          <option value="MERCANTIL" />
-                          <option value="VENEZUELA" />
-                          <option value="BANCO DEL TESORO" />
-                          <option value="BNC" />
-                          <option value="ZELLE" />
-                          <option value="BINANCE P2P" />
-                          <option value="CUENTAS CXC" />
-                        </datalist>
-                      </div>
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <label className="label">Concepto / Nota</label>
-                    <div className="relative">
-                       <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
                       <input 
                         type="text" 
-                        placeholder="Nota del pago"
-                        value={paymentData.concept}
-                        onChange={(e) => setPaymentData({...paymentData, concept: e.target.value})}
-                        className="input-field pl-10" 
+                        placeholder="Ej: Banesco, Zelle, etc."
+                        value={paymentData.destinationBank}
+                        onChange={(e) => setPaymentData({...paymentData, destinationBank: e.target.value.toUpperCase()})}
+                        className="input-field uppercase" 
+                        list="bancos-list-cxc"
+                      />
+                      <datalist id="bancos-list-cxc">
+                        <option value="BANESCO" />
+                        <option value="PROVINCIAL" />
+                        <option value="MERCANTIL" />
+                        <option value="VENEZUELA" />
+                        <option value="BANCO DEL TESORO" />
+                        <option value="BNC" />
+                        <option value="EFECTIVO EN CAJA" />
+                        <option value="EFECTIVO" />
+                        <option value="BINANCE P2P" />
+                        <option value="ZELLE" />
+                        <option value="CUENTAS CXC" />
+                      </datalist>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="label">Tasa de Cambio</label>
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        required
+                        placeholder="1.00"
+                        value={paymentData.exchangeRate}
+                        onChange={(e) => setPaymentData({...paymentData, exchangeRate: e.target.value})}
+                        className={`input-field font-mono font-bold ${inBolivares ? 'text-blue-600' : 'text-slate-400 opacity-50 bg-slate-50'}`} 
+                        readOnly={!inBolivares}
                       />
                     </div>
+
+                    <div className="space-y-1">
+                      <label className="label">Monto ({inBolivares ? 'Bs' : 'USD'})</label>
+                      <input 
+                        type="number"  
+                        step="0.01"
+                        required
+                        placeholder="0.00"
+                        value={paymentData.amount}
+                        onChange={(e) => setPaymentData({...paymentData, amount: e.target.value})}
+                        className="input-field font-bold" 
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="label">Concepto</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={paymentData.concept}
+                        onChange={(e) => setPaymentData({...paymentData, concept: e.target.value})}
+                        className="input-field" 
+                      />
+                    </div>
+
+                    {inBolivares && (
+                      <div className="space-y-1">
+                        <label className="label text-emerald-600">Dólares Conv.</label>
+                        <div className="input-field bg-emerald-50 text-emerald-700 font-bold border-dashed flex items-center">
+                          {formatCurrency(amountUsdConv)}
+                        </div>
+                        <p className="text-[10px] text-slate-400">BS / Tasa</p>
+                      </div>
+                    )}
+
+                    <div className="col-span-1 md:col-span-2 lg:col-span-2 space-y-1">
+                      <label className="label text-blue-600">Abono Total (USD)</label>
+                      <div className="h-14 px-4 bg-blue-600 text-white rounded-lg flex flex-col justify-center shadow-lg shadow-blue-200 text-right">
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-xs font-bold uppercase">Resultado:</span>
+                          <span className="text-xl font-black">{formatCurrency(totalPaymentUsd)}</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-blue-200 mt-0.5">Bs. {new Intl.NumberFormat('es-VE').format(totalPaymentUsd * (parseFloat(paymentData.exchangeRate) || 1))}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="md:col-span-3 flex justify-end gap-3">
+
+                  <div className="flex justify-end gap-3 pt-4 border-t border-emerald-100">
                     <button type="button" onClick={() => setShowPaymentForm(false)} className="px-4 py-2 text-slate-600 font-medium">Cancelar</button>
-                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-6 rounded-lg transition-colors">Guardar Pago</button>
+                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-6 rounded-lg transition-colors flex items-center justify-center">
+                      <Plus size={18} className="inline mr-2 -mt-0.5" />
+                      Guardar Pago
+                    </button>
                   </div>
                 </form>
               </div>
