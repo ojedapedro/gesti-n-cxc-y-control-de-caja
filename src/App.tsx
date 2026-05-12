@@ -70,9 +70,9 @@ export default function App() {
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'incomes', label: 'Ingresos Caja', icon: Wallet },
+    { id: 'incomes', label: 'Ingresos Caja Principal', icon: Wallet },
     { id: 'cxc', label: 'Cuentas por Cobrar', icon: Contact },
-    { id: 'expenses', label: 'Caja y Egresos', icon: Activity },
+    { id: 'expenses', label: 'Caja y Egresos Efectivo', icon: Activity },
     { id: 'settings', label: 'Configuración', icon: SettingsIcon },
   ];
 
