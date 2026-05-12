@@ -513,7 +513,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="label">Moneda</label>
+                    <label className="label">Forma de Pago</label>
                     <div className="relative">
                       <CreditCard className="absolute left-3 top-2.5 text-slate-400" size={18} />
                       <select 
@@ -580,17 +580,26 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="table-header">Fecha</th>
                     <th className="table-header">Concepto</th>
-                    <th className="table-header">Forma de Pago</th>
+                    <th className="table-header">Moneda</th>
                     <th className="table-header">Vendedor</th>
                     <th className="table-header">Item</th>
                     <th className="table-header whitespace-nowrap">Factura N°</th>
                     <th className="table-header text-right text-rose-600">(+) Cargo</th>
                     <th className="table-header text-right text-emerald-600">(-) Abono</th>
+                    <th className="table-header text-right text-blue-600">(=) Saldo</th>
                     <th className="table-header text-center w-12">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {payments.map((p) => {
+                  {[...payments].reverse().map((p, index, arr) => {
+                    // Calculate running balance from oldest to newest
+                    let runningBalanceUsd = 0;
+                    for (let i = 0; i <= index; i++) {
+                       if (arr[i].type === 'charge') runningBalanceUsd += arr[i].amountUsd;
+                       else runningBalanceUsd -= arr[i].amountUsd;
+                    }
+                    return { ...p, _runningBalance: runningBalanceUsd };
+                  }).reverse().map((p) => {
                     const isCharge = p.type === 'charge';
                     return (
                       <tr key={p.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
@@ -623,6 +632,12 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <span className="block text-[9px] text-emerald-400 font-normal">-Bs. {new Intl.NumberFormat('es-VE').format(p.amountUsd * exchangeRate)}</span>
                             </>
                           ) : ''}
+                        </td>
+                        <td className="table-cell text-right font-bold text-blue-600 bg-blue-50/30">
+                           <>
+                             {formatCurrency(p._runningBalance)}
+                             <span className="block text-[9px] text-blue-400 font-normal">Bs. {new Intl.NumberFormat('es-VE').format(p._runningBalance * exchangeRate)}</span>
+                           </>
                         </td>
                         <td className="table-cell text-center">
                           <button 

@@ -446,7 +446,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
               </div>
 
               <div className="space-y-1">
-                <label className="label">Forma de Pago</label>
+                <label className="label">Moneda</label>
                 <select
                   required
                   value={formData.paymentMethod}
@@ -826,7 +826,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="label">Payment Method</label>
+                  <label className="label">Forma de Pago</label>
                   <select
                     value={editingTransaction.paymentMethod || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, paymentMethod: e.target.value as PaymentMethod})}

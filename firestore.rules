@@ -6,6 +6,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /{path=**}/payments/{paymentId} {
+      allow read: if isSignedIn();
+    }
+
     // HELPER FUNCTIONS
     function isSignedIn() {
       return request.auth != null;

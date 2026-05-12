@@ -6,8 +6,8 @@ export enum TransactionType {
 
 export enum PaymentMethod {
   BS = 'Transferencia Bs / Pago Móvil',
-  BS_CASH = 'Bs Efectivo',
-  USD_CASH = '$ Efectivo',
+  BS_CASH = 'Bs',
+  USD_CASH = '$',
   ZELLE = 'Zelle',
   BINANCE = 'Binance',
   CXC = 'CXC (Por Cobrar)',

@@ -74,11 +74,11 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        // Handle BS explicitly typed as Bs Equivalents
        if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
           const eqUsd = t.amountBs / t.exchangeRate;
-          const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bolivares Efectivo';
+          const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares Efectivo';
           if (isBsCash) totalBsEfectivo += eqUsd;
           else totalBsBanco += eqUsd;
-       } else if (t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo') {
-          if (isCashByName || t.paymentMethod === 'Bs Efectivo') totalBsEfectivo += t.amountUsd; 
+       } else if (t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') {
+          if (isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') totalBsEfectivo += t.amountUsd; 
           else totalBsBanco += t.amountUsd;
        }
        
@@ -87,7 +87,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
                          (t.amountBs && t.exchangeRate ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd);
 
        if (usdAmount > 0.001) {
-          const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === 'Dolares Efectivo';
+          const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo';
           if (isUsdCash) totalUsdEfectivo += usdAmount;
           else totalUsdBanco += usdAmount;
        }
