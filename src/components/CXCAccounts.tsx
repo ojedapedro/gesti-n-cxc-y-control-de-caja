@@ -288,12 +288,12 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
           <p className="text-xs font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPayments * exchangeRate)}</p>
         </div>
         
-        <div className="card p-6 bg-slate-900 text-white shadow-xl relative overflow-hidden">
+        <div className="card p-6 bg-white border-slate-200 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-             <CircleDollarSign size={80} className="text-blue-200" />
+             <CircleDollarSign size={80} className="text-blue-600" />
           </div>
-          <p className="text-[11px] font-black text-blue-200 uppercase tracking-widest mb-1 relative z-10">Saldo Pendiente Global</p>
-          <p className="text-3xl font-black text-white tracking-tighter relative z-10">{formatCurrency(globalStats.balance)}</p>
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Saldo Pendiente Global</p>
+          <p className="text-3xl font-black text-blue-600 tracking-tighter relative z-10">{formatCurrency(globalStats.balance)}</p>
           <p className="text-xs font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.balance * exchangeRate)}</p>
         </div>
       </div>
@@ -513,7 +513,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="label">Forma de Pago</label>
+                    <label className="label">Moneda</label>
                     <div className="relative">
                       <CreditCard className="absolute left-3 top-2.5 text-slate-400" size={18} />
                       <select 
