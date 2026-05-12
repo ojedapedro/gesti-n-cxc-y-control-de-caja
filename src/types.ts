@@ -42,6 +42,8 @@ export interface Expense {
   note?: string;
   amountBs?: number;
   amountUsd: number;
+  paymentMethod?: string;
+  exchangeRate?: number;
   createdAt: any;
 }
 
@@ -73,6 +75,9 @@ export interface Receipt {
   id?: string;
   receiptNumber: string;
   amountUsd: number;
+  amountBs?: number;
+  paymentMethod?: string;
+  exchangeRate?: number;
   recipient: string;
   concept: string;
   date: string;

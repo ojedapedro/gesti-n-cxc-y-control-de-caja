@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/db';
-import { type Receipt } from '../types';
+import { PaymentMethod, type Receipt } from '../types';
 import { Plus, Printer, FileText, User, DollarSign, Calendar, Tag, Download } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
@@ -18,7 +18,9 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
   
   const [formData, setFormData] = useState({
     recipient: '',
-    amountUsd: '',
+    amount: '',
+    paymentMethod: PaymentMethod.USD_CASH as string,
+    exchangeRate: exchangeRate?.toString() || '1',
     concept: 'RETIRO EN EFECTIVO',
     date: format(new Date(), 'yyyy-MM-dd'),
   });
@@ -29,14 +31,31 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
     dbService.getReceipts().then(res => setReceipts(res || []));
   }, []);
 
+  useEffect(() => {
+    if (exchangeRate) {
+      setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+    }
+  }, [exchangeRate, showForm]);
+
+  const inBolivares = formData.paymentMethod === PaymentMethod.BS || formData.paymentMethod === PaymentMethod.BS_CASH;
+  const inputAmt = parseFloat(formData.amount) || 0;
+  const amountUsdConv = inBolivares ? inputAmt / (parseFloat(formData.exchangeRate) || 1) : 0;
+  const amountBs = inBolivares ? inputAmt : 0;
+  const totalPaymentUsd = inBolivares ? amountUsdConv : inputAmt;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (totalPaymentUsd <= 0) return;
+
     const nextNum = (receipts.length + 1).toString().padStart(5, '0');
     
     const newReceipt = {
       receiptNumber: nextNum,
       recipient: formData.recipient,
-      amountUsd: parseFloat(formData.amountUsd),
+      amountUsd: totalPaymentUsd,
+      amountBs: amountBs > 0 ? amountBs : undefined,
+      paymentMethod: formData.paymentMethod,
+      exchangeRate: parseFloat(formData.exchangeRate) || 1,
       concept: formData.concept,
       date: formData.date,
     };
@@ -47,6 +66,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
     const res = await dbService.getReceipts();
     setReceipts(res || []);
     setShowForm(false);
+    setFormData(prev => ({ ...prev, amount: '', concept: 'RETIRO EN EFECTIVO', recipient: '' }));
     
     // Auto Select for Preview with the actual document data (including ID)
     if (docRef) {
@@ -99,7 +119,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 no-print">
         <div>
           <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Recibos de Retiro</h2>
-          <p className="text-sm font-medium text-slate-500 mt-1">Vales de salida de efectivo que afectan CXC.</p>
+          <p className="text-sm font-medium text-slate-500 mt-1">Vales de salida de efectivo que afectan Caja.</p>
         </div>
         
         <div className="flex items-center gap-3 flex-wrap">
@@ -151,7 +171,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6 no-print">
           {showForm && (
-            <div className="card p-6 border-blue-100 bg-blue-50/10">
+            <div className="card p-6 border-amber-100 bg-amber-50/20">
               <h3 className="font-bold text-slate-800 mb-4">Nuevo Recibo</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -169,21 +189,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                       />
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="label">Monto (USD)</label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                      <input 
-                        type="number" 
-                        step="0.01"
-                        required
-                        placeholder="0.00"
-                        value={formData.amountUsd}
-                        onChange={(e) => setFormData({...formData, amountUsd: e.target.value})}
-                        className="input-field pl-10" 
-                      />
-                    </div>
-                  </div>
+                  
                   <div className="space-y-1">
                     <label className="label">Fecha</label>
                     <div className="relative">
@@ -197,7 +203,58 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                       />
                     </div>
                   </div>
+                  
                   <div className="space-y-1">
+                    <label className="label">Moneda (Entregada en)</label>
+                    <select
+                      required
+                      value={formData.paymentMethod}
+                      onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})}
+                      className="input-field cursor-pointer"
+                    >
+                      <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
+                      <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="label">Tasa de Cambio</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      required
+                      placeholder="1.00"
+                      value={formData.exchangeRate}
+                      onChange={(e) => setFormData({...formData, exchangeRate: e.target.value})}
+                      className={`input-field font-mono font-bold ${inBolivares ? 'text-blue-600' : 'text-slate-400 opacity-50 bg-slate-50'}`} 
+                      readOnly={!inBolivares}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="label">Monto ({inBolivares ? 'Bs' : 'USD'})</label>
+                    <input 
+                      type="number"  
+                      step="0.01"
+                      required
+                      placeholder="0.00"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                      className="input-field font-bold" 
+                    />
+                  </div>
+
+                  {inBolivares && (
+                    <div className="space-y-1">
+                      <label className="label text-amber-600">Dólares Conv.</label>
+                      <div className="input-field bg-amber-50 text-amber-700 font-bold border-dashed flex items-center">
+                        {formatCurrency(amountUsdConv)}
+                      </div>
+                      <p className="text-[10px] text-slate-400">BS / Tasa</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-1 md:col-span-2">
                     <label className="label">Concepto</label>
                     <div className="relative">
                       <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
@@ -211,8 +268,8 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                     </div>
                   </div>
                 </div>
-                <button type="submit" className="btn-primary w-full h-11 mt-2">
-                  Crear y Guardar (Afecta CXC)
+                <button type="submit" className="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 rounded-xl transition-colors shadow-lg shadow-amber-200 mt-2">
+                  Crear y Guardar Recibo
                 </button>
               </form>
             </div>
@@ -230,12 +287,15 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                     <th className="table-header">Nº</th>
                     <th className="table-header">Fecha</th>
                     <th className="table-header">Recibe</th>
-                    <th className="table-header text-right">Monto</th>
+                    <th className="table-header text-center whitespace-nowrap">Moneda O.</th>
+                    <th className="table-header text-right bg-amber-50/50">Monto Eq. USD</th>
                     <th className="table-header"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReceipts.map((r) => (
+                  {filteredReceipts.map((r) => {
+                    const isBs = r.paymentMethod === PaymentMethod.BS_CASH || r.paymentMethod === PaymentMethod.BS;
+                    return (
                     <tr 
                       key={r.id} 
                       onClick={() => setSelectedReceipt(r)}
@@ -252,18 +312,25 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                         })()}
                       </td>
                       <td className="table-cell font-medium">{r.recipient}</td>
-                      <td className="table-cell text-right font-bold">
+                      <td className="table-cell text-center">
+                         {isBs ? (
+                           <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded">Bs</span>
+                         ) : (
+                           <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded">USD</span>
+                         )}
+                      </td>
+                      <td className="table-cell text-right font-bold text-amber-700 bg-amber-50/10">
                         {formatCurrency(r.amountUsd)}
-                        <span className="block text-[10px] text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(r.amountUsd * exchangeRate)}</span>
+                        <span className="block text-[10px] text-slate-400 font-normal mt-0.5">Bs. {new Intl.NumberFormat('es-VE').format(r.amountUsd * (r.exchangeRate || exchangeRate || 1))}</span>
                       </td>
                       <td className="table-cell text-right">
                         <ChevronRight size={16} className="text-slate-300 ml-auto" />
                       </td>
                     </tr>
-                  ))}
+                  )})}
                   {filteredReceipts.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-10 text-center text-slate-400 italic">No hay registros de retiro para el periodo seleccionado.</td>
+                      <td colSpan={6} className="p-10 text-center text-slate-400 italic">No hay registros de retiro para el periodo seleccionado.</td>
                     </tr>
                   )}
                 </tbody>
@@ -311,7 +378,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                     <p className="text-[10px] font-bold uppercase text-slate-400">Por la cantidad de</p>
                     <p className="text-xl font-black">{formatCurrency(selectedReceipt.amountUsd)}</p>
                     <p className="text-[11px] font-bold text-slate-500 uppercase">
-                      Bs. {new Intl.NumberFormat('es-VE').format(selectedReceipt.amountUsd * exchangeRate)}
+                      Bs. {new Intl.NumberFormat('es-VE').format(selectedReceipt.amountUsd * (selectedReceipt.exchangeRate || exchangeRate || 1))}
                     </p>
                   </div>
                 </div>

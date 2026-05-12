@@ -3,18 +3,18 @@ import { dbService } from '../services/db';
 import { Transaction, Expense, Receipt, TransactionType, PaymentMethod } from '../types';
 import { Activity, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
-import { format, isValid, parseISO } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface DailyCashFlow {
   date: string;
-  inflowUsd: number;
-  cashUsd: number;
-  zelleUsd: number;
-  bsUsd: number;
-  outflowUsd: number;
-  withdrawalsUsd: number;
-  netFlow: number;
+  inflowUsdCash: number;
+  inflowBsAsUsd: number;
+  outflowUsdCash: number;
+  outflowBsAsUsd: number;
+  netUsdCash: number;
+  netBsAsUsd: number;
+  totalNetUsd: number;
 }
 
 export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
@@ -69,13 +69,13 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         if (!flowMap.has(dateStr)) {
           flowMap.set(dateStr, {
             date: dateStr,
-            inflowUsd: 0,
-            cashUsd: 0,
-            zelleUsd: 0,
-            bsUsd: 0,
-            outflowUsd: 0,
-            withdrawalsUsd: 0,
-            netFlow: 0
+            inflowUsdCash: 0,
+            inflowBsAsUsd: 0,
+            outflowUsdCash: 0,
+            outflowBsAsUsd: 0,
+            netUsdCash: 0,
+            netBsAsUsd: 0,
+            totalNetUsd: 0
           });
         }
         return flowMap.get(dateStr)!;
@@ -108,25 +108,36 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
 
         if (cashAmount > 0 || bsEquivalentUsd > 0) {
            const d = getOrCreateDate(t.date);
-           d.inflowUsd += (cashAmount + bsEquivalentUsd);
-           d.cashUsd += cashAmount;
-           d.bsUsd += bsEquivalentUsd;
+           d.inflowUsdCash += cashAmount;
+           d.inflowBsAsUsd += bsEquivalentUsd;
         }
       });
 
       expenses?.forEach(e => {
         const d = getOrCreateDate(e.date);
-        d.outflowUsd += Number(e.amountUsd) || 0;
+        const isBs = e.paymentMethod === PaymentMethod.BS_CASH || e.paymentMethod === PaymentMethod.BS;
+        if (isBs) {
+           d.outflowBsAsUsd += Number(e.amountUsd) || 0;
+        } else {
+           d.outflowUsdCash += Number(e.amountUsd) || 0;
+        }
       });
 
       receipts?.forEach(r => {
         const d = getOrCreateDate(r.date);
-        d.withdrawalsUsd += Number(r.amountUsd) || 0;
+        const isBs = r.paymentMethod === PaymentMethod.BS_CASH || r.paymentMethod === PaymentMethod.BS;
+        if (isBs) {
+           d.outflowBsAsUsd += Number(r.amountUsd) || 0;
+        } else {
+           d.outflowUsdCash += Number(r.amountUsd) || 0;
+        }
       });
 
       const aggregated = Array.from(flowMap.values()).map(d => ({
         ...d,
-        netFlow: d.inflowUsd - d.outflowUsd - d.withdrawalsUsd
+        netUsdCash: d.inflowUsdCash - d.outflowUsdCash,
+        netBsAsUsd: d.inflowBsAsUsd - d.outflowBsAsUsd,
+        totalNetUsd: (d.inflowUsdCash + d.inflowBsAsUsd) - (d.outflowUsdCash + d.outflowBsAsUsd)
       }));
 
       // Sort descending
@@ -156,9 +167,17 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
     });
   }, [data, startDate, endDate]);
 
-  const totalInflow = filteredData.reduce((acc, curr) => acc + curr.inflowUsd, 0);
-  const totalOutflow = filteredData.reduce((acc, curr) => acc + curr.outflowUsd + curr.withdrawalsUsd, 0);
-  const totalNet = totalInflow - totalOutflow;
+  const totalInflowUsdCash = filteredData.reduce((acc, curr) => acc + curr.inflowUsdCash, 0);
+  const totalInflowBsAsUsd = filteredData.reduce((acc, curr) => acc + curr.inflowBsAsUsd, 0);
+  const totalOutflowUsdCash = filteredData.reduce((acc, curr) => acc + curr.outflowUsdCash, 0);
+  const totalOutflowBsAsUsd = filteredData.reduce((acc, curr) => acc + curr.outflowBsAsUsd, 0);
+
+  const totalInflow = totalInflowUsdCash + totalInflowBsAsUsd;
+  const totalOutflow = totalOutflowUsdCash + totalOutflowBsAsUsd;
+
+  const totalNetUsdCash = totalInflowUsdCash - totalOutflowUsdCash;
+  const totalNetBsAsUsd = totalInflowBsAsUsd - totalOutflowBsAsUsd;
+  const totalNet = totalNetUsdCash + totalNetBsAsUsd;
 
   if (loading) {
     return (
@@ -173,7 +192,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Balance de Liquidez</h2>
-          <p className="text-sm font-medium text-slate-500 mt-1">Resumen del flujo de caja diario (Ingresos vs Egresos).</p>
+          <p className="text-sm font-medium text-slate-500 mt-1">Resumen del flujo de caja diario por moneda (USD y BS).</p>
         </div>
         
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto">
@@ -213,48 +232,77 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-         <div className="card p-6 border-slate-200/60 shadow-sm">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+         <div className="card p-6 border-emerald-100 bg-emerald-50/30">
             <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Ingresos Totales</p>
-                <h3 className="text-3xl font-black mt-2 tracking-tight text-slate-900">{formatCurrency(totalInflow)}</h3>
-                <div className="text-xs font-bold text-emerald-600/70 mt-1 flex gap-2">
-                  <span>Efectivo USD: {formatCurrency(filteredData.reduce((acc, curr) => acc + curr.cashUsd, 0))}</span>
-                  <span>|</span>
-                  <span>Efec. Bs(Eq): {formatCurrency(filteredData.reduce((acc, curr) => acc + curr.bsUsd, 0))}</span>
+              <div className="w-full">
+                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest">Ingresos Efectivo</p>
+                <div className="flex justify-between items-end mt-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">USD</p>
+                    <h3 className="text-2xl font-black tracking-tight text-emerald-700">{formatCurrency(totalInflowUsdCash)}</h3>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Bolívares (Eq $)</p>
+                    <h3 className="text-2xl font-black tracking-tight text-emerald-700">{formatCurrency(totalInflowBsAsUsd)}</h3>
+                    <p className="text-[10px] text-emerald-600/70">Bs. {new Intl.NumberFormat('es-VE').format(totalInflowBsAsUsd * (exchangeRate || 1))}</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-emerald-200/60 flex justify-between items-center text-sm">
+                   <span className="font-semibold text-emerald-800">Total Ingresos Eq USD</span>
+                   <span className="font-black text-emerald-800">{formatCurrency(totalInflow)}</span>
                 </div>
               </div>
-              <div className="p-3.5 rounded-2xl bg-slate-50 text-emerald-600">
-                <TrendingUp size={22} strokeWidth={2.5} />
+            </div>
+         </div>
+
+         <div className="card p-6 border-rose-100 bg-rose-50/30">
+            <div className="flex items-start justify-between">
+              <div className="w-full">
+                <p className="text-[11px] font-bold text-rose-600 uppercase tracking-widest">Salidas Efectivo</p>
+                <div className="flex justify-between items-end mt-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">USD</p>
+                    <h3 className="text-2xl font-black tracking-tight text-rose-700">{formatCurrency(totalOutflowUsdCash)}</h3>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Bolívares (Eq $)</p>
+                    <h3 className="text-2xl font-black tracking-tight text-rose-700">{formatCurrency(totalOutflowBsAsUsd)}</h3>
+                    <p className="text-[10px] text-rose-600/70">Bs. {new Intl.NumberFormat('es-VE').format(totalOutflowBsAsUsd * (exchangeRate || 1))}</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-rose-200/60 flex justify-between items-center text-sm">
+                   <span className="font-semibold text-rose-800">Total Salidas Eq USD</span>
+                   <span className="font-black text-rose-800">{formatCurrency(totalOutflow)}</span>
+                </div>
               </div>
             </div>
          </div>
-         <div className="card p-6 border-slate-200/60 shadow-sm">
+
+         <div className="card p-6 border-slate-200 shadow-sm relative overflow-hidden">
+            <div className={`absolute top-0 right-0 w-2 h-full ${totalNet >= 0 ? 'bg-blue-500' : 'bg-red-500'}`}></div>
             <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Egresos Totales</p>
-                <h3 className="text-3xl font-black mt-2 tracking-tight text-slate-900">{formatCurrency(totalOutflow)}</h3>
-                <p className="text-xs font-bold text-rose-600/70 mt-1">Bs. {new Intl.NumberFormat('es-VE').format(totalOutflow * (exchangeRate || 1))}</p>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-slate-50 text-rose-600">
-                <TrendingDown size={22} strokeWidth={2.5} />
-              </div>
-            </div>
-         </div>
-         <div className="card p-6 border-slate-200/60 shadow-sm">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Flujo Neto</p>
-                <h3 className={`text-3xl font-black mt-2 tracking-tight ${totalNet >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {formatCurrency(totalNet)}
-                </h3>
-                <p className={`text-xs font-bold mt-1 ${totalNet >= 0 ? 'text-emerald-600/70' : 'text-rose-600/70'}`}>
-                  Bs. {new Intl.NumberFormat('es-VE').format(totalNet * (exchangeRate || 1))}
-                </p>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-slate-50 text-slate-900">
-                <Activity size={22} strokeWidth={2.5} />
+              <div className="w-full relative z-10">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Saldos de Caja (Flujo Neto)</p>
+                <div className="flex justify-between items-end mt-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Saldo USD</p>
+                    <h3 className={`text-2xl font-black tracking-tight ${totalNetUsdCash >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                      {formatCurrency(totalNetUsdCash)}
+                    </h3>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Saldo Bs (Eq $)</p>
+                    <h3 className={`text-2xl font-black tracking-tight ${totalNetBsAsUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                      {formatCurrency(totalNetBsAsUsd)}
+                    </h3>
+                    <p className="text-[10px] text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(totalNetBsAsUsd * (exchangeRate || 1))}</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-200 flex justify-between items-center text-lg">
+                   <span className="font-semibold text-slate-700">Flujo Total Eq USD</span>
+                   <span className={`font-black ${totalNet >= 0 ? 'text-slate-900' : 'text-red-600'}`}>{formatCurrency(totalNet)}</span>
+                </div>
               </div>
             </div>
          </div>
@@ -264,53 +312,46 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200">
+              <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="p-4 px-5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Día</th>
-                <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-emerald-700 bg-emerald-50/30">Ingresos</th>
-                <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-rose-700 bg-rose-50/30">Egresos</th>
-                <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-amber-700 bg-amber-50/30">Retiros</th>
-                <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest bg-slate-100">Flujo Neto</th>
+                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-emerald-700 bg-emerald-50 border-l border-white">Ingresos (USD | Eq Bs)</th>
+                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-rose-700 bg-rose-50 border-l border-white">Salidas (USD | Eq Bs)</th>
+                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-blue-700 bg-blue-50 border-l border-white">Flujo Neto (USD | Eq Bs)</th>
               </tr>
             </thead>
             <tbody>
               {filteredData.map((row, i) => (
                 <tr key={i} className="hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors">
-                  <td className="p-4 px-5">
+                  <td className="p-4 px-5 whitespace-nowrap">
                     <div className="font-bold text-slate-900 capitalize">{getDayName(row.date)}</div>
                     <div className="text-[11px] text-slate-500">{row.date}</div>
                   </td>
-                  <td className="p-4 px-5 text-right bg-emerald-50/10 border-l border-emerald-100/50">
-                    <div className="font-bold text-emerald-600">{formatCurrency(row.inflowUsd)}</div>
-                    {row.inflowUsd > 0 && (
-                      <div className="mt-0.5 space-y-0.5">
-                        <div className="text-[9px] font-medium text-emerald-600/70">
-                          USD: {formatCurrency(row.cashUsd)}
-                        </div>
-                        <div className="text-[9px] font-medium text-emerald-600/70">
-                          Bs (Eq): {formatCurrency(row.bsUsd)}
-                        </div>
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-4 px-5 text-right bg-rose-50/10 border-l border-rose-100/50">
-                    <div className="font-bold text-rose-600">{formatCurrency(row.outflowUsd)}</div>
-                  </td>
-                  <td className="p-4 px-5 text-right bg-amber-50/10 border-l border-amber-100/50">
-                    <div className="font-bold text-amber-600">{formatCurrency(row.withdrawalsUsd)}</div>
-                  </td>
-                  <td className="p-4 px-5 text-right bg-slate-50 border-l border-slate-200">
-                    <div className={`font-black ${row.netFlow >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-                      {formatCurrency(row.netFlow)}
+                  <td className="p-4 px-5 text-center bg-emerald-50/20 border-l border-emerald-100">
+                    <div className="flex justify-center gap-4 text-xs">
+                      <div className="font-bold text-emerald-700">{formatCurrency(row.inflowUsdCash)}</div>
+                      <div className="text-slate-300">|</div>
+                      <div className="font-bold text-emerald-600">{formatCurrency(row.inflowBsAsUsd)}</div>
                     </div>
-                    <div className="text-[10px] font-bold text-slate-400 mt-0.5">
-                      Bs. {new Intl.NumberFormat('es-VE').format(row.netFlow * (exchangeRate || 1))}
+                  </td>
+                  <td className="p-4 px-5 text-center bg-rose-50/20 border-l border-rose-100">
+                    <div className="flex justify-center gap-4 text-xs">
+                      <div className="font-bold text-rose-700">{formatCurrency(row.outflowUsdCash)}</div>
+                      <div className="text-slate-300">|</div>
+                      <div className="font-bold text-rose-600">{formatCurrency(row.outflowBsAsUsd)}</div>
+                    </div>
+                  </td>
+                  <td className="p-4 px-5 text-center bg-blue-50/20 border-l border-blue-100">
+                     <div className="flex justify-center gap-4 text-xs">
+                      <div className={`font-bold ${row.netUsdCash >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatCurrency(row.netUsdCash)}</div>
+                      <div className="text-slate-300">|</div>
+                      <div className={`font-bold ${row.netBsAsUsd >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{formatCurrency(row.netBsAsUsd)}</div>
                     </div>
                   </td>
                 </tr>
               ))}
               {filteredData.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-10 text-center text-slate-400 italic">No hay registros de flujo de caja para el periodo seleccionado.</td>
+                  <td colSpan={4} className="p-10 text-center text-slate-400 italic">No hay registros de flujo de caja para el periodo seleccionado.</td>
                 </tr>
               )}
             </tbody>
