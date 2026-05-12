@@ -104,37 +104,47 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
   const diffUsd = actUsd - expectedUsd;
   const diffBs = actBs - expectedBs;
 
-  const handleCloseRegister = async () => {
-    const data: Omit<CashClosure, 'id' | 'createdAt'> = {
-      date: selectedDate,
-      initialBalanceUsd: initialUsd,
-      initialBalanceBs: initialBs,
-      incomesUsd,
-      incomesBs,
-      expensesUsd: expUsd,
-      expensesBs: expBs,
-      withdrawalsUsd: withUsd,
-      withdrawalsBs: withBs,
-      expectedBalanceUsd: expectedUsd,
-      expectedBalanceBs: expectedBs,
-      actualBalanceUsd: actUsd,
-      actualBalanceBs: actBs,
-      differenceUsd: diffUsd,
-      differenceBs: diffBs,
-      observations: observations,
-      isClosed: true,
-      closedAt: new Date(),
-    };
+  const [isClosing, setIsClosing] = useState(false);
 
-    if (currentClosure?.id) {
-       await dbService.updateCashClosure(currentClosure.id, { ...data, isClosed: true, closedAt: new Date() });
-    } else {
-       await dbService.addCashClosure(data);
+  const handleCloseRegister = async () => {
+    setIsClosing(true);
+    try {
+      const data: Omit<CashClosure, 'id' | 'createdAt'> = {
+        date: selectedDate,
+        initialBalanceUsd: initialUsd,
+        initialBalanceBs: initialBs,
+        incomesUsd,
+        incomesBs,
+        expensesUsd: expUsd,
+        expensesBs: expBs,
+        withdrawalsUsd: withUsd,
+        withdrawalsBs: withBs,
+        expectedBalanceUsd: expectedUsd,
+        expectedBalanceBs: expectedBs,
+        actualBalanceUsd: actUsd,
+        actualBalanceBs: actBs,
+        differenceUsd: diffUsd,
+        differenceBs: diffBs,
+        observations: observations,
+        isClosed: true,
+        closedAt: new Date(),
+      };
+
+      if (currentClosure?.id) {
+         await dbService.updateCashClosure(currentClosure.id, { ...data, isClosed: true, closedAt: new Date() });
+      } else {
+         await dbService.addCashClosure(data);
+      }
+      
+      setObservations('');
+      setActualUsd('0');
+      setActualBs('0');
+    } catch (e) {
+      console.error(e);
+      alert('Error cerrando caja: ' + String(e));
+    } finally {
+      setIsClosing(false);
     }
-    
-    setObservations('');
-    setActualUsd('0');
-    setActualBs('0');
   };
 
   const handleUnlock = async () => {
@@ -245,44 +255,40 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                    <h4 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2"><Activity size={16} /> Movimientos del Sistema</h4>
                    
                    <div className="space-y-3">
-                      <div className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100">
-                         <span className="text-sm font-semibold text-slate-600">Saldo Inicial</span>
-                         <div className="text-right">
-                           <div className="font-bold text-slate-900">{formatCurrency(initialUsd)}</div>
-                           <div className="text-[10px] text-slate-500">{formatBs(initialBs)}</div>
-                         </div>
+                      <div className="flex border-b border-slate-200 pb-2 mb-2 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                         <div className="flex-1">Concepto</div>
+                         <div className="w-[30%] text-right bg-slate-50/50 rounded-md">Efectivo USD ($)</div>
+                         <div className="w-[30%] text-right bg-slate-50/50 rounded-md ml-2">Efectivo BS</div>
                       </div>
 
-                      <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-50/50 border border-emerald-100">
-                         <span className="text-sm font-semibold text-emerald-800">Cuentas por Cobrar (Ingresos Efectivo)</span>
-                         <div className="text-right">
-                           <div className="font-bold text-emerald-700">{formatCurrency(incomesUsd)}</div>
-                           <div className="text-[10px] font-semibold text-emerald-600/70">{formatBs(incomesBs)}</div>
-                         </div>
+                      <div className="flex items-center px-3 py-2.5 rounded-xl border border-slate-100 bg-white">
+                         <span className="flex-1 text-sm font-semibold text-slate-600">Saldo Inicial</span>
+                         <div className="w-[30%] text-right font-bold text-slate-900">{formatCurrency(initialUsd)}</div>
+                         <div className="w-[30%] text-right font-bold text-slate-900 ml-2">{formatBs(initialBs)}</div>
                       </div>
 
-                      <div className="flex justify-between items-center p-3 rounded-xl bg-rose-50/50 border border-rose-100">
-                         <span className="text-sm font-semibold text-rose-800">Egresos / Gastos</span>
-                         <div className="text-right">
-                           <div className="font-bold text-rose-700">-{formatCurrency(expUsd)}</div>
-                           <div className="text-[10px] font-semibold text-rose-600/70">-{formatBs(expBs)}</div>
-                         </div>
+                      <div className="flex items-center px-3 py-2.5 rounded-xl border border-emerald-100 bg-emerald-50/30">
+                         <span className="flex-1 text-sm font-semibold text-emerald-800 text-left">Ingresos (<span className="opacity-70">efectivo</span>)</span>
+                         <div className="w-[30%] text-right font-bold text-emerald-700">+{formatCurrency(incomesUsd)}</div>
+                         <div className="w-[30%] text-right font-bold text-emerald-700 ml-2">+{formatBs(incomesBs)}</div>
                       </div>
 
-                      <div className="flex justify-between items-center p-3 rounded-xl bg-amber-50/50 border border-amber-100">
-                         <span className="text-sm font-semibold text-amber-800">Vales y Retiros</span>
-                         <div className="text-right">
-                           <div className="font-bold text-amber-700">-{formatCurrency(withUsd)}</div>
-                           <div className="text-[10px] font-semibold text-amber-600/70">-{formatBs(withBs)}</div>
-                         </div>
+                      <div className="flex items-center px-3 py-2.5 rounded-xl border border-rose-100 bg-rose-50/30">
+                         <span className="flex-1 text-sm font-semibold text-rose-800 text-left">Gastos / Egresos</span>
+                         <div className="w-[30%] text-right font-bold text-rose-700">-{formatCurrency(expUsd)}</div>
+                         <div className="w-[30%] text-right font-bold text-rose-700 ml-2">-{formatBs(expBs)}</div>
                       </div>
 
-                      <div className="flex justify-between items-center p-4 rounded-xl border border-slate-200 bg-slate-800 text-white mt-4">
-                         <span className="text-sm font-bold uppercase tracking-widest">Saldo Esperado</span>
-                         <div className="text-right">
-                           <div className="text-xl font-black">{formatCurrency(expectedUsd)}</div>
-                           <div className="text-xs text-slate-300 font-semibold">{formatBs(expectedBs)}</div>
-                         </div>
+                      <div className="flex items-center px-3 py-2.5 rounded-xl border border-amber-100 bg-amber-50/30">
+                         <span className="flex-1 text-sm font-semibold text-amber-800 text-left">Vales / Retiros</span>
+                         <div className="w-[30%] text-right font-bold text-amber-700">-{formatCurrency(withUsd)}</div>
+                         <div className="w-[30%] text-right font-bold text-amber-700 ml-2">-{formatBs(withBs)}</div>
+                      </div>
+
+                      <div className="flex items-center p-4 rounded-xl border border-slate-800 bg-slate-900 text-white shadow-md mt-6">
+                         <span className="flex-1 text-sm font-bold uppercase tracking-widest text-left">Saldo Esperado</span>
+                         <div className="w-[30%] text-right text-lg font-black text-emerald-400">{formatCurrency(expectedUsd)}</div>
+                         <div className="w-[30%] text-right text-sm font-black text-emerald-400 ml-2">{formatBs(expectedBs)}</div>
                       </div>
                    </div>
                 </div>
@@ -357,10 +363,11 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                   {!isClosed && (
                      <button 
                         onClick={handleCloseRegister}
-                        className="w-full bg-blue-600 text-white rounded-xl py-4 font-bold text-sm uppercase tracking-widest hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-blue-600/30"
+                        disabled={isClosing}
+                        className="w-full bg-blue-600 text-white rounded-xl py-4 font-bold text-sm uppercase tracking-widest hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed"
                      >
                         <Save size={18} />
-                        Cerrar y Asegurar Caja
+                        {isClosing ? 'Cerrando y Asegurando...' : 'Cerrar y Asegurar Caja'}
                      </button>
                   )}
                </div>
