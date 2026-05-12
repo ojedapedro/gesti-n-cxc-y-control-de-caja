@@ -9,12 +9,11 @@ import { es } from 'date-fns/locale';
 interface DailyCashFlow {
   date: string;
   inflowUsdCash: number;
-  inflowBsAsUsd: number;
+  inflowBsCash: number;
   outflowUsdCash: number;
-  outflowBsAsUsd: number;
+  outflowBsCash: number;
   netUsdCash: number;
-  netBsAsUsd: number;
-  totalNetUsd: number;
+  netBsCash: number;
 }
 
 export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
@@ -70,12 +69,11 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
           flowMap.set(dateStr, {
             date: dateStr,
             inflowUsdCash: 0,
-            inflowBsAsUsd: 0,
+            inflowBsCash: 0,
             outflowUsdCash: 0,
-            outflowBsAsUsd: 0,
+            outflowBsCash: 0,
             netUsdCash: 0,
-            netBsAsUsd: 0,
-            totalNetUsd: 0
+            netBsCash: 0,
           });
         }
         return flowMap.get(dateStr)!;
@@ -84,32 +82,32 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
       transactions?.forEach(t => {
         if (t.type !== TransactionType.SALE && t.type !== TransactionType.INCOME) return;
         
-        let cashAmount = 0;
-        let bsEquivalentUsd = 0;
+        let cashUsdAmount = 0;
+        let cashBsAmount = 0;
 
         const dest = (t.destinationBank || '').toUpperCase();
         const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
 
         // USD Efectivo
         if (t.amountUsdCash !== undefined && t.amountUsdCash > 0) {
-             cashAmount += Number(t.amountUsdCash);
+             cashUsdAmount += Number(t.amountUsdCash);
         } else if (isCashByName || t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === '$ Efectivo') {
-             cashAmount += Number(t.amountUsd) || 0;
+             cashUsdAmount += Number(t.amountUsd) || 0;
         }
 
         // BS Efectivo
         if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
              if (isCashByName || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
-                 bsEquivalentUsd += (Number(t.amountBs) / Number(t.exchangeRate));
+                  cashBsAmount += Number(t.amountBs);
              }
         } else if (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
-             bsEquivalentUsd += Number(t.amountUsd) || 0;
+             cashBsAmount += (Number(t.amountUsd) || 0) * (Number(t.exchangeRate) || exchangeRate || 1);
         }
 
-        if (cashAmount > 0 || bsEquivalentUsd > 0) {
+        if (cashUsdAmount > 0 || cashBsAmount > 0) {
            const d = getOrCreateDate(t.date);
-           d.inflowUsdCash += cashAmount;
-           d.inflowBsAsUsd += bsEquivalentUsd;
+           d.inflowUsdCash += cashUsdAmount;
+           d.inflowBsCash += cashBsAmount;
         }
       });
 
@@ -117,7 +115,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         const d = getOrCreateDate(e.date);
         const isBs = e.paymentMethod === PaymentMethod.BS_CASH || e.paymentMethod === PaymentMethod.BS;
         if (isBs) {
-           d.outflowBsAsUsd += Number(e.amountUsd) || 0;
+           d.outflowBsCash += Number(e.amountBs) || (Number(e.amountUsd) * (Number(e.exchangeRate) || exchangeRate || 1));
         } else {
            d.outflowUsdCash += Number(e.amountUsd) || 0;
         }
@@ -127,7 +125,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         const d = getOrCreateDate(r.date);
         const isBs = r.paymentMethod === PaymentMethod.BS_CASH || r.paymentMethod === PaymentMethod.BS;
         if (isBs) {
-           d.outflowBsAsUsd += Number(r.amountUsd) || 0;
+           d.outflowBsCash += Number(r.amountBs) || (Number(r.amountUsd) * (Number(r.exchangeRate) || exchangeRate || 1));
         } else {
            d.outflowUsdCash += Number(r.amountUsd) || 0;
         }
@@ -136,8 +134,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
       const aggregated = Array.from(flowMap.values()).map(d => ({
         ...d,
         netUsdCash: d.inflowUsdCash - d.outflowUsdCash,
-        netBsAsUsd: d.inflowBsAsUsd - d.outflowBsAsUsd,
-        totalNetUsd: (d.inflowUsdCash + d.inflowBsAsUsd) - (d.outflowUsdCash + d.outflowBsAsUsd)
+        netBsCash: d.inflowBsCash - d.outflowBsCash,
       }));
 
       // Sort descending
@@ -168,16 +165,16 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
   }, [data, startDate, endDate]);
 
   const totalInflowUsdCash = filteredData.reduce((acc, curr) => acc + curr.inflowUsdCash, 0);
-  const totalInflowBsAsUsd = filteredData.reduce((acc, curr) => acc + curr.inflowBsAsUsd, 0);
+  const totalInflowBsCash = filteredData.reduce((acc, curr) => acc + curr.inflowBsCash, 0);
   const totalOutflowUsdCash = filteredData.reduce((acc, curr) => acc + curr.outflowUsdCash, 0);
-  const totalOutflowBsAsUsd = filteredData.reduce((acc, curr) => acc + curr.outflowBsAsUsd, 0);
+  const totalOutflowBsCash = filteredData.reduce((acc, curr) => acc + curr.outflowBsCash, 0);
 
-  const totalInflow = totalInflowUsdCash + totalInflowBsAsUsd;
-  const totalOutflow = totalOutflowUsdCash + totalOutflowBsAsUsd;
+  const totalInflow = totalInflowUsdCash + (totalInflowBsCash / (exchangeRate || 1));
+  const totalOutflow = totalOutflowUsdCash + (totalOutflowBsCash / (exchangeRate || 1));
 
   const totalNetUsdCash = totalInflowUsdCash - totalOutflowUsdCash;
-  const totalNetBsAsUsd = totalInflowBsAsUsd - totalOutflowBsAsUsd;
-  const totalNet = totalNetUsdCash + totalNetBsAsUsd;
+  const totalNetBsCash = totalInflowBsCash - totalOutflowBsCash;
+  const totalNet = totalNetUsdCash + (totalNetBsCash / (exchangeRate || 1));
 
   if (loading) {
     return (
@@ -186,6 +183,10 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
       </div>
     );
   }
+
+  const formatBs = (amt: number) => {
+     return 'Bs ' + new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amt);
+  };
 
   return (
     <div className="space-y-6">
@@ -243,9 +244,9 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                     <h3 className="text-2xl font-black tracking-tight text-emerald-700">{formatCurrency(totalInflowUsdCash)}</h3>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Bolívares (Eq $)</p>
-                    <h3 className="text-2xl font-black tracking-tight text-emerald-700">{formatCurrency(totalInflowBsAsUsd)}</h3>
-                    <p className="text-[10px] text-emerald-600/70">Bs. {new Intl.NumberFormat('es-VE').format(totalInflowBsAsUsd * (exchangeRate || 1))}</p>
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Bolívares</p>
+                    <h3 className="text-2xl font-black tracking-tight text-emerald-700">{formatBs(totalInflowBsCash)}</h3>
+                    <p className="text-[10px] text-emerald-600/70">Eq {formatCurrency(totalInflowBsCash / (exchangeRate || 1))}</p>
                   </div>
                 </div>
                 <div className="mt-4 pt-3 border-t border-emerald-200/60 flex justify-between items-center text-sm">
@@ -266,9 +267,9 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                     <h3 className="text-2xl font-black tracking-tight text-rose-700">{formatCurrency(totalOutflowUsdCash)}</h3>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Bolívares (Eq $)</p>
-                    <h3 className="text-2xl font-black tracking-tight text-rose-700">{formatCurrency(totalOutflowBsAsUsd)}</h3>
-                    <p className="text-[10px] text-rose-600/70">Bs. {new Intl.NumberFormat('es-VE').format(totalOutflowBsAsUsd * (exchangeRate || 1))}</p>
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Bolívares</p>
+                    <h3 className="text-2xl font-black tracking-tight text-rose-700">{formatBs(totalOutflowBsCash)}</h3>
+                    <p className="text-[10px] text-rose-600/70">Eq {formatCurrency(totalOutflowBsCash / (exchangeRate || 1))}</p>
                   </div>
                 </div>
                 <div className="mt-4 pt-3 border-t border-rose-200/60 flex justify-between items-center text-sm">
@@ -292,11 +293,11 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                     </h3>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Saldo Bs (Eq $)</p>
-                    <h3 className={`text-2xl font-black tracking-tight ${totalNetBsAsUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                      {formatCurrency(totalNetBsAsUsd)}
+                    <p className="text-xs font-semibold text-slate-500 mb-0.5">Saldo Bs</p>
+                    <h3 className={`text-2xl font-black tracking-tight ${totalNetBsCash >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                      {formatBs(totalNetBsCash)}
                     </h3>
-                    <p className="text-[10px] text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(totalNetBsAsUsd * (exchangeRate || 1))}</p>
+                    <p className="text-[10px] text-slate-400">Eq {formatCurrency(totalNetBsCash / (exchangeRate || 1))}</p>
                   </div>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-200 flex justify-between items-center text-lg">
@@ -314,9 +315,9 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="p-4 px-5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Día</th>
-                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-emerald-700 bg-emerald-50 border-l border-white">Ingresos (USD | Eq Bs)</th>
-                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-rose-700 bg-rose-50 border-l border-white">Salidas (USD | Eq Bs)</th>
-                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-blue-700 bg-blue-50 border-l border-white">Flujo Neto (USD | Eq Bs)</th>
+                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-emerald-700 bg-emerald-50 border-l border-white">Ingresos (USD | BS)</th>
+                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-rose-700 bg-rose-50 border-l border-white">Salidas (USD | BS)</th>
+                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest text-blue-700 bg-blue-50 border-l border-white">Flujo Neto (USD | BS)</th>
               </tr>
             </thead>
             <tbody>
@@ -327,24 +328,24 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
                     <div className="text-[11px] text-slate-500">{row.date}</div>
                   </td>
                   <td className="p-4 px-5 text-center bg-emerald-50/20 border-l border-emerald-100">
-                    <div className="flex justify-center gap-4 text-xs">
-                      <div className="font-bold text-emerald-700">{formatCurrency(row.inflowUsdCash)}</div>
+                    <div className="flex justify-center gap-4 text-xs items-center">
+                      <div className="font-bold text-emerald-700 w-1/2 text-right">{formatCurrency(row.inflowUsdCash)}</div>
                       <div className="text-slate-300">|</div>
-                      <div className="font-bold text-emerald-600">{formatCurrency(row.inflowBsAsUsd)}</div>
+                      <div className="font-bold text-emerald-600 w-1/2 text-left">{formatBs(row.inflowBsCash)}</div>
                     </div>
                   </td>
                   <td className="p-4 px-5 text-center bg-rose-50/20 border-l border-rose-100">
-                    <div className="flex justify-center gap-4 text-xs">
-                      <div className="font-bold text-rose-700">{formatCurrency(row.outflowUsdCash)}</div>
+                    <div className="flex justify-center gap-4 text-xs items-center">
+                      <div className="font-bold text-rose-700 w-1/2 text-right">{formatCurrency(row.outflowUsdCash)}</div>
                       <div className="text-slate-300">|</div>
-                      <div className="font-bold text-rose-600">{formatCurrency(row.outflowBsAsUsd)}</div>
+                      <div className="font-bold text-rose-600 w-1/2 text-left">{formatBs(row.outflowBsCash)}</div>
                     </div>
                   </td>
                   <td className="p-4 px-5 text-center bg-blue-50/20 border-l border-blue-100">
-                     <div className="flex justify-center gap-4 text-xs">
-                      <div className={`font-bold ${row.netUsdCash >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatCurrency(row.netUsdCash)}</div>
+                     <div className="flex justify-center gap-4 text-xs items-center">
+                      <div className={`font-bold w-1/2 text-right ${row.netUsdCash >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatCurrency(row.netUsdCash)}</div>
                       <div className="text-slate-300">|</div>
-                      <div className={`font-bold ${row.netBsAsUsd >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{formatCurrency(row.netBsAsUsd)}</div>
+                      <div className={`font-bold w-1/2 text-left ${row.netBsCash >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{formatBs(row.netBsCash)}</div>
                     </div>
                   </td>
                 </tr>
