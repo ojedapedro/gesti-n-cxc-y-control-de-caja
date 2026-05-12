@@ -84,6 +84,31 @@ export interface Receipt {
   createdAt: any;
 }
 
+export interface CashClosure {
+  id?: string;
+  date: string;
+  initialBalanceUsd: number;
+  initialBalanceBs: number;
+  incomesUsd: number;
+  incomesBs: number;
+  expensesUsd: number;
+  expensesBs: number;
+  withdrawalsUsd: number;
+  withdrawalsBs: number;
+  expectedBalanceUsd: number;
+  expectedBalanceBs: number;
+  actualBalanceUsd: number;
+  actualBalanceBs: number;
+  differenceUsd: number;
+  differenceBs: number;
+  observations: string;
+  isClosed: boolean;
+  openedAt?: any;
+  closedAt: any;
+  createdAt: any;
+  digitalKeyHash?: string; // Optional simple mechanism to unlock
+}
+
 export interface Settings {
   exchangeRate: number;
   lastUpdated: any;

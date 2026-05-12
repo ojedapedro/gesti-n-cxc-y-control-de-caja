@@ -26,6 +26,7 @@ import {
   type CXCAccount, 
   type CXCPayment, 
   type Receipt,
+  type CashClosure,
   type FirestoreErrorInfo 
 } from '../types';
 
@@ -55,6 +56,7 @@ const TRANSACTIONS_PATH = 'transactions';
 const EXPENSES_PATH = 'expenses';
 const CXC_ACCOUNTS_PATH = 'cxc_accounts';
 const RECEIPTS_PATH = 'receipts';
+const CASH_CLOSURES_PATH = 'cash_closures';
 
 export const dbService = {
   // Transactions
@@ -388,6 +390,44 @@ export const dbService = {
     return onSnapshot(collection(db, CXC_ACCOUNTS_PATH), (snapshot) => {
       callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CXCAccount)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, CXC_ACCOUNTS_PATH));
+  },
+
+  // Cash Closures
+  async addCashClosure(data: Omit<CashClosure, 'id' | 'createdAt'>) {
+    try {
+      return await addDoc(collection(db, CASH_CLOSURES_PATH), {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, CASH_CLOSURES_PATH);
+    }
+  },
+
+  async updateCashClosure(id: string, data: Partial<CashClosure>) {
+    try {
+      const docRef = doc(db, CASH_CLOSURES_PATH, id);
+      await updateDoc(docRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, CASH_CLOSURES_PATH);
+    }
+  },
+
+  async getCashClosures() {
+    try {
+      const q = query(collection(db, CASH_CLOSURES_PATH), orderBy('date', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CashClosure));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, CASH_CLOSURES_PATH);
+    }
+  },
+
+  subscribeToCashClosures(callback: (data: CashClosure[]) => void) {
+    const q = query(collection(db, CASH_CLOSURES_PATH), orderBy('date', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CashClosure)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, CASH_CLOSURES_PATH));
   },
 
   // Settings
