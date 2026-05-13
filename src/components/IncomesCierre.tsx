@@ -41,6 +41,13 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
 
   let incomesUsd = 0;
   let incomesBs = 0;
+  
+  // New metrics
+  let totalSalesUsd = 0;
+  let totalBsInBanks = 0;
+  let totalUsdInBanks = 0;
+  let totalCxc = 0;
+
   dailyTransactions.forEach(t => {
      let cashUsdAmount = 0;
      let cashBsAmount = 0;
@@ -59,35 +66,31 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
      if (t.amountBs !== undefined && t.amountBs > 0) {
           if (isCashByName || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
                cashBsAmount += Number(t.amountBs);
+          } else {
+               totalBsInBanks += Number(t.amountBs);
           }
      } else if (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
           cashBsAmount += (Number(t.amountUsd) || 0) * (Number(t.exchangeRate) || exchangeRate || 1);
      }
 
+     // USD Banks (Zelle, Binance, Transferencia USD)
+     if (t.amountZelle !== undefined && t.amountZelle > 0) {
+         totalUsdInBanks += Number(t.amountZelle);
+     } else if (t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE || (t.currency?.includes('$') && !isCashByName && !cashUsdAmount)) {
+         totalUsdInBanks += Number(t.amountUsd) || 0;
+     }
+     
+     // CXC
+     if (t.amountCXC !== undefined && t.amountCXC > 0) {
+         totalCxc += Number(t.amountCXC);
+     } else if (t.isCXC) {
+         totalCxc += Number(t.amountUsd) || 0;
+     }
+
+     totalSalesUsd += Number(t.totalDailySale || t.amountUsd || 0);
+
      incomesUsd += cashUsdAmount;
      incomesBs += cashBsAmount;
-  });
-
-  let expUsd = 0;
-  let expBs = 0;
-  dailyExpenses.forEach(e => {
-      const isBs = e.paymentMethod === PaymentMethod.BS_CASH || e.paymentMethod === PaymentMethod.BS;
-      if (isBs) {
-         expBs += Number(e.amountBs) || (Number(e.amountUsd) * (Number(e.exchangeRate) || exchangeRate || 1));
-      } else {
-         expUsd += Number(e.amountUsd) || 0;
-      }
-  });
-
-  let withUsd = 0;
-  let withBs = 0;
-  dailyReceipts.forEach(r => {
-      const isBs = r.paymentMethod === PaymentMethod.BS_CASH || r.paymentMethod === PaymentMethod.BS;
-      if (isBs) {
-         withBs += Number(r.amountBs) || (Number(r.amountUsd) * (Number(r.exchangeRate) || exchangeRate || 1));
-      } else {
-         withUsd += Number(r.amountUsd) || 0;
-      }
   });
 
   // Expected balances. For simplicity, initial balance is 0 for the day. Can be enhanced to fetch previous day's actual balance.
@@ -95,8 +98,8 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
   const initialUsd = previousClosure?.actualBalanceUsd || 0;
   const initialBs = previousClosure?.actualBalanceBs || 0;
 
-  const expectedUsd = initialUsd + incomesUsd - expUsd - withUsd;
-  const expectedBs = initialBs + incomesBs - expBs - withBs;
+  const expectedUsd = initialUsd + incomesUsd;
+  const expectedBs = initialBs + incomesBs;
 
   // When physical inputs change
   const actUsd = parseFloat(actualUsd) || 0;
@@ -115,10 +118,10 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
         initialBalanceBs: initialBs,
         incomesUsd,
         incomesBs,
-        expensesUsd: expUsd,
-        expensesBs: expBs,
-        withdrawalsUsd: withUsd,
-        withdrawalsBs: withBs,
+        expensesUsd: 0,
+        expensesBs: 0,
+        withdrawalsUsd: 0,
+        withdrawalsBs: 0,
         expectedBalanceUsd: expectedUsd,
         expectedBalanceBs: expectedBs,
         actualBalanceUsd: actUsd,
@@ -269,14 +272,6 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                                 <span className="text-sm font-semibold text-emerald-600">Ingresos</span>
                                 <span className="font-bold text-emerald-600">+{formatCurrency(incomesUsd)}</span>
                              </div>
-                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-rose-600">Egresos / Gastos</span>
-                                <span className="font-bold text-rose-600">-{formatCurrency(expUsd)}</span>
-                             </div>
-                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-amber-600">Vales / Retiros</span>
-                                <span className="font-bold text-amber-600">-{formatCurrency(withUsd)}</span>
-                             </div>
                              <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
                                 <span className="text-sm font-black text-slate-800">Saldo Esperado USD</span>
                                 <span className="text-lg font-black text-emerald-600">{formatCurrency(expectedUsd)}</span>
@@ -298,17 +293,34 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                                 <span className="text-sm font-semibold text-emerald-600">Ingresos</span>
                                 <span className="font-bold text-emerald-600">+{formatBs(incomesBs)}</span>
                              </div>
-                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-rose-600">Egresos / Gastos</span>
-                                <span className="font-bold text-rose-600">-{formatBs(expBs)}</span>
-                             </div>
-                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-amber-600">Vales / Retiros</span>
-                                <span className="font-bold text-amber-600">-{formatBs(withBs)}</span>
-                             </div>
                              <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
                                 <span className="text-sm font-black text-slate-800">Saldo Esperado BS</span>
                                 <span className="text-sm font-black text-blue-600">{formatBs(expectedBs)}</span>
+                             </div>
+                         </div>
+                      </div>
+
+                      {/* OTROS TOTALES */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-4">
+                         <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
+                             <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2"><Activity size={14} className="text-blue-600"/> Resumen de Operaciones</h5>
+                         </div>
+                         <div className="p-3 space-y-2">
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-600">Total de Ventas</span>
+                                <span className="font-bold text-slate-900">{formatCurrency(totalSalesUsd)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-600">Total Bolívares en Bancos</span>
+                                <span className="font-bold text-blue-600">{formatBs(totalBsInBanks)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-600">Total Ingreso Dólares en Banco</span>
+                                <span className="font-bold text-emerald-600">{formatCurrency(totalUsdInBanks)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-600">Total de CXC</span>
+                                <span className="font-bold text-amber-600">{formatCurrency(totalCxc)}</span>
                              </div>
                          </div>
                       </div>
