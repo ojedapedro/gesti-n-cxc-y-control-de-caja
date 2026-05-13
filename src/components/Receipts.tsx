@@ -81,27 +81,125 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
   };
 
   const handleDownloadPDF = async () => {
-    if (!selectedReceipt || !printRef.current) return;
+    if (!selectedReceipt) return;
     try {
-      // Capture the element using html2canvas
-      const canvas = await html2canvas(printRef.current, { scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
-      
-      const pdf = new jsPDF({
+      const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       });
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      
-      // Calculate image dimensions to fit within PDF width with margin
-      const margin = 15;
-      const printWidth = pdfWidth - margin * 2;
-      const printHeight = (canvas.height * printWidth) / canvas.width;
 
-      pdf.addImage(imgData, 'PNG', margin, margin, printWidth, printHeight);
-      pdf.save(`Recibo_INVEPINCA_${selectedReceipt.receiptNumber}.pdf`);
+      // Recuadro exterior
+      doc.setLineWidth(0.5);
+      doc.rect(15, 15, 180, 100);
+
+      // Cabecera
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INVEPINCA, C.A', 20, 25);
+      
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text('RIF: J-40490348-8', 20, 30);
+      doc.text('Valencia, Carabobo, Zona postal 2001.', 20, 34);
+
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RECIBO DE PAGO', 190, 25, { align: 'right' });
+      
+      doc.setFontSize(10);
+      doc.setTextColor(220, 38, 38); // red
+      doc.text(`Nº ${selectedReceipt.receiptNumber}`, 190, 30, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+
+      // Linea separadora cabecera
+      doc.setLineWidth(0.2);
+      doc.line(15, 40, 195, 40);
+
+      // Quien Recibe y Montos
+      // Linea vertical
+      doc.line(125, 40, 125, 65);
+      
+      // Quien Recibe
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(150, 150, 150);
+      doc.text('QUIEN RECIBE', 20, 45);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text(selectedReceipt.recipient, 20, 52);
+      
+      // Linea punteada
+      doc.setLineDashPattern([1, 1], 0);
+      doc.line(20, 54, 115, 54);
+      doc.setLineDashPattern([], 0);
+
+      // Monto
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(150, 150, 150);
+      doc.text('POR LA CANTIDAD DE', 130, 45);
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.text(formatCurrency(selectedReceipt.amountUsd), 130, 53);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      const bsAmount = selectedReceipt.amountUsd * (selectedReceipt.exchangeRate || exchangeRate || 1);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Bs. ${new Intl.NumberFormat('es-VE').format(bsAmount)}`, 130, 60);
+
+      // Concepto
+      doc.setLineDashPattern([], 0);
+      doc.line(15, 65, 195, 65); // Linea separadora horizontal
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(150, 150, 150);
+      doc.text('POR CONCEPTO DE', 20, 71);
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const splitConcept = doc.splitTextToSize(selectedReceipt.concept, 170);
+      doc.text(splitConcept, 20, 78);
+
+      // Firmas
+      doc.line(15, 95, 195, 95); // Linea superior firmas
+      doc.line(105, 95, 105, 115); // Linea vertical medio
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RECIBÍ CONFORME', 60, 103, { align: 'center' });
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(150, 150, 150);
+      doc.text('Firma y Cédula', 60, 108, { align: 'center' });
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('ENTREGUÉ CONFORME', 150, 103, { align: 'center' });
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(150, 150, 150);
+      doc.text('Caja Principal', 150, 108, { align: 'center' });
+
+      // Fecha emision (debajo del cuadro)
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Fecha de emisión: ${selectedReceipt.date}`, 15, 120);
+      
+      try {
+        const formattedDate = format(new Date(selectedReceipt.date + 'T12:00:00'), 'EEEE dd MMMM yyyy', { locale: es });
+        doc.text(formattedDate, 195, 120, { align: 'right' });
+      } catch (e) {
+        // Ignore date format error
+      }
+
+      doc.save(`Recibo_INVEPINCA_${selectedReceipt.receiptNumber}.pdf`);
     } catch (error) {
       console.error('Error generando el PDF', error);
       alert('Hubo un error al generar el PDF. Por favor, intenta de nuevo.');
