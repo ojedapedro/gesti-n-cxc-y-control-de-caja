@@ -358,9 +358,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     </div>
                     <div className="text-right pl-2">
                       <p className={`text-sm font-black tracking-tighter ${acc.totalBalance > 200 ? 'text-rose-600' :
-                          acc.totalBalance > 50 ? 'text-orange-600' :
-                            acc.totalBalance > 0 ? 'text-amber-600' :
-                              'text-emerald-600'
+                        acc.totalBalance > 50 ? 'text-orange-600' :
+                          acc.totalBalance > 0 ? 'text-amber-600' :
+                            'text-emerald-600'
                         }`}>
                         {formatCurrency(acc.totalBalance)}
                       </p>
@@ -420,9 +420,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                             </div>
                           )}
                           <p className={`text-4xl font-black tracking-tighter ${selectedAccount.totalBalance > 200 ? 'text-rose-400' :
-                              selectedAccount.totalBalance > 50 ? 'text-orange-400' :
-                                selectedAccount.totalBalance > 0 ? 'text-amber-400' :
-                                  'text-emerald-400'
+                            selectedAccount.totalBalance > 50 ? 'text-orange-400' :
+                              selectedAccount.totalBalance > 0 ? 'text-amber-400' :
+                                'text-emerald-400'
                             }`}>
                             {formatCurrency(selectedAccount.totalBalance)}
                           </p>
