@@ -53,7 +53,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
       receiptNumber: nextNum,
       recipient: formData.recipient,
       amountUsd: totalPaymentUsd,
-      amountBs: amountBs > 0 ? amountBs : undefined,
+      amountBs: amountBs > 0 ? amountBs : null,
       paymentMethod: formData.paymentMethod,
       exchangeRate: parseFloat(formData.exchangeRate) || 1,
       concept: formData.concept,

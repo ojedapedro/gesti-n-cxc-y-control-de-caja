@@ -110,7 +110,7 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
       category: 'GENERAL',
       note: formData.note,
       amountUsd: totalPaymentUsd,
-      amountBs: amountBs > 0 ? amountBs : undefined,
+      amountBs: amountBs > 0 ? amountBs : null,
       paymentMethod: formData.paymentMethod,
       exchangeRate: parseFloat(formData.exchangeRate) || 1,
     });

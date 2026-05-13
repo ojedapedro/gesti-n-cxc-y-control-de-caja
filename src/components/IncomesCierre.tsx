@@ -254,41 +254,63 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                 <div>
                    <h4 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2"><Activity size={16} /> Movimientos del Sistema</h4>
                    
-                   <div className="space-y-3">
-                      <div className="flex border-b border-slate-200 pb-2 mb-2 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                         <div className="flex-1">Concepto</div>
-                         <div className="w-[30%] text-right bg-slate-50/50 rounded-md">Efectivo USD ($)</div>
-                         <div className="w-[30%] text-right bg-slate-50/50 rounded-md ml-2">Efectivo BS</div>
+                   <div className="space-y-6">
+                      {/* CAJA USD */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                         <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
+                             <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2"><DollarSign size={14} className="text-emerald-600"/> Caja Efectivo USD</h5>
+                         </div>
+                         <div className="p-3 space-y-2">
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-500">Saldo Inicial</span>
+                                <span className="font-bold text-slate-900">{formatCurrency(initialUsd)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-emerald-600">Ingresos</span>
+                                <span className="font-bold text-emerald-600">+{formatCurrency(incomesUsd)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-rose-600">Egresos / Gastos</span>
+                                <span className="font-bold text-rose-600">-{formatCurrency(expUsd)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-amber-600">Vales / Retiros</span>
+                                <span className="font-bold text-amber-600">-{formatCurrency(withUsd)}</span>
+                             </div>
+                             <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
+                                <span className="text-sm font-black text-slate-800">Saldo Esperado USD</span>
+                                <span className="text-lg font-black text-emerald-600">{formatCurrency(expectedUsd)}</span>
+                             </div>
+                         </div>
                       </div>
 
-                      <div className="flex items-center px-3 py-2.5 rounded-xl border border-slate-100 bg-white">
-                         <span className="flex-1 text-sm font-semibold text-slate-600">Saldo Inicial</span>
-                         <div className="w-[30%] text-right font-bold text-slate-900">{formatCurrency(initialUsd)}</div>
-                         <div className="w-[30%] text-right font-bold text-slate-900 ml-2">{formatBs(initialBs)}</div>
-                      </div>
-
-                      <div className="flex items-center px-3 py-2.5 rounded-xl border border-emerald-100 bg-emerald-50/30">
-                         <span className="flex-1 text-sm font-semibold text-emerald-800 text-left">Ingresos (<span className="opacity-70">efectivo</span>)</span>
-                         <div className="w-[30%] text-right font-bold text-emerald-700">+{formatCurrency(incomesUsd)}</div>
-                         <div className="w-[30%] text-right font-bold text-emerald-700 ml-2">+{formatBs(incomesBs)}</div>
-                      </div>
-
-                      <div className="flex items-center px-3 py-2.5 rounded-xl border border-rose-100 bg-rose-50/30">
-                         <span className="flex-1 text-sm font-semibold text-rose-800 text-left">Gastos / Egresos</span>
-                         <div className="w-[30%] text-right font-bold text-rose-700">-{formatCurrency(expUsd)}</div>
-                         <div className="w-[30%] text-right font-bold text-rose-700 ml-2">-{formatBs(expBs)}</div>
-                      </div>
-
-                      <div className="flex items-center px-3 py-2.5 rounded-xl border border-amber-100 bg-amber-50/30">
-                         <span className="flex-1 text-sm font-semibold text-amber-800 text-left">Vales / Retiros</span>
-                         <div className="w-[30%] text-right font-bold text-amber-700">-{formatCurrency(withUsd)}</div>
-                         <div className="w-[30%] text-right font-bold text-amber-700 ml-2">-{formatBs(withBs)}</div>
-                      </div>
-
-                      <div className="flex items-center p-4 rounded-xl border border-slate-800 bg-slate-900 text-white shadow-md mt-6">
-                         <span className="flex-1 text-sm font-bold uppercase tracking-widest text-left">Saldo Esperado</span>
-                         <div className="w-[30%] text-right text-lg font-black text-emerald-400">{formatCurrency(expectedUsd)}</div>
-                         <div className="w-[30%] text-right text-sm font-black text-emerald-400 ml-2">{formatBs(expectedBs)}</div>
+                      {/* CAJA BS */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                         <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
+                             <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2"><div className="font-bold font-serif text-blue-600 bg-blue-100 rounded-sm px-1 text-[10px]">Bs</div> Caja Efectivo Bolívares</h5>
+                         </div>
+                         <div className="p-3 space-y-2">
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-500">Saldo Inicial</span>
+                                <span className="font-bold text-slate-900">{formatBs(initialBs)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-emerald-600">Ingresos</span>
+                                <span className="font-bold text-emerald-600">+{formatBs(incomesBs)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-rose-600">Egresos / Gastos</span>
+                                <span className="font-bold text-rose-600">-{formatBs(expBs)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-amber-600">Vales / Retiros</span>
+                                <span className="font-bold text-amber-600">-{formatBs(withBs)}</span>
+                             </div>
+                             <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
+                                <span className="text-sm font-black text-slate-800">Saldo Esperado BS</span>
+                                <span className="text-sm font-black text-blue-600">{formatBs(expectedBs)}</span>
+                             </div>
+                         </div>
                       </div>
                    </div>
                 </div>

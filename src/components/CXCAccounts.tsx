@@ -119,7 +119,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
     await dbService.addCXCPayment(selectedAccount.id, {
       amountUsd: totalPaymentUsd,
-      amountBs: amountBs > 0 ? amountBs : undefined,
+      amountBs: amountBs > 0 ? amountBs : null,
       exchangeRate: parseFloat(paymentData.exchangeRate) || 1,
       date: paymentData.date,
       concept: paymentData.concept,
