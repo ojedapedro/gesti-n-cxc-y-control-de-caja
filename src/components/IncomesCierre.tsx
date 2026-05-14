@@ -52,19 +52,30 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
 
   dailyTransactions.forEach(t => {
      const rate = t.exchangeRate || exchangeRate || 1;
-     const dest = (t.destinationBank || '').toUpperCase();
-     const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
+     const dest = (t.destinationBank || '').trim().toUpperCase();
+     
+     // Keyword classification
+     const isCashWord = dest.includes('EFECTIVO') || dest.includes('CAJA');
+     const isBankWord = dest.length > 0 && !isCashWord;
 
-     // Primary logic: use explicit breakdown fields if available
+     // explicit breakdown fields
      const tBs = t.amountBs || 0;
      const tUsdCash = t.amountUsdCash || 0;
      const tZelle = t.amountZelle || 0;
      const tCxc = t.amountCXC || 0;
 
+     // 1. Handle explicit breakdown fields if present
      if (tBs > 0 || tUsdCash > 0 || tZelle > 0 || tCxc > 0) {
-        // BS Distribution
+        // BS classification
         if (tBs > 0) {
-           const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs' || t.paymentMethod === PaymentMethod.BS_CASH;
+           let isBsCash = false;
+           if (isBankWord) isBsCash = false;
+           else if (isCashWord) isBsCash = true;
+           else {
+              // Default to cash only if method is explicit cash
+              isBsCash = (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Efectivo Bs');
+           }
+
            if (isBsCash) {
               incomesBs += tBs;
               incomesBsUsd += (tBs / rate);
@@ -75,43 +86,57 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
         }
         
         // USD components
+        // Note: tUsdCash and tZelle are explicit by field name
         incomesUsd += tUsdCash;
         totalUsdInBanks += tZelle;
         totalCxc += tCxc;
         
-        // Final sum in USD
+        // Add to total sales (USD equivalent)
         totalSalesUsd += (tUsdCash + tZelle + tCxc + (tBs / rate));
      } else {
-        // Fallback: use main amountUsd field for legacy data
+        // 2. Fallback: classify based on amountUsd and paymentMethod (Legacy records)
+        const amt = t.amountUsd || 0;
+        
         if (t.isCXC || t.paymentMethod === PaymentMethod.CXC) {
-           totalCxc += t.amountUsd;
-           totalSalesUsd += t.amountUsd;
+           totalCxc += amt;
+           totalSalesUsd += amt;
         } else if (t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE || t.paymentMethod === 'Zelle' || t.paymentMethod === 'Binance') {
-           totalUsdInBanks += t.amountUsd;
-           totalSalesUsd += t.amountUsd;
+           totalUsdInBanks += amt;
+           totalSalesUsd += amt;
         } else {
+           // Distinguish BS vs USD method
            const isBsMethod = t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo';
-           const isUsdMethod = t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo';
+           const isUsdMethod = t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === 'USD';
 
            if (isBsMethod) {
-              const amountBs = t.amountUsd * rate;
-              const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs' || t.paymentMethod === PaymentMethod.BS_CASH;
+              const amountBs = amt * rate;
+              let isBsCash = false;
+              if (isBankWord) isBsCash = false;
+              else if (isCashWord) isBsCash = true;
+              else isBsCash = (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs Efectivo');
+
               if (isBsCash) {
                  incomesBs += amountBs;
-                 incomesBsUsd += t.amountUsd;
+                 incomesBsUsd += amt;
               } else {
                  totalBsInBanks += amountBs;
-                 totalBsInBanksUsd += t.amountUsd;
+                 totalBsInBanksUsd += amt;
               }
-              totalSalesUsd += t.amountUsd;
+              totalSalesUsd += amt;
            } else if (isUsdMethod) {
-              const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === PaymentMethod.USD_CASH;
-              if (isUsdCash) incomesUsd += t.amountUsd;
-              else totalUsdInBanks += t.amountUsd;
-              totalSalesUsd += t.amountUsd;
+              let isUsdCash = false;
+              if (isBankWord) isUsdCash = false;
+              else if (isCashWord) isUsdCash = true;
+              else isUsdCash = (t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === 'Dolares Efectivo');
+
+              if (isUsdCash) incomesUsd += amt;
+              else totalUsdInBanks += amt;
+              totalSalesUsd += amt;
            } else {
-              totalSalesUsd += t.amountUsd;
-              totalUsdInBanks += t.amountUsd;
+              // Catch-all
+              totalSalesUsd += amt;
+              if (isBankWord) totalUsdInBanks += amt;
+              else incomesUsd += amt;
            }
         }
      }
@@ -331,23 +356,23 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                          </div>
                          <div className="p-3 space-y-2 border-b border-slate-200">
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total Dólares Efectivo</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Caja Efectivo USD</span>
                                 <span className="font-bold text-slate-600">{formatCurrency(incomesUsd)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total Bolívares Efectivo <span className="text-[10px] font-bold text-slate-400">({formatCurrency(incomesBsUsd)})</span></span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Caja Efectivo BS <span className="text-[10px] font-bold text-slate-400">({formatCurrency(incomesBsUsd)})</span></span>
                                 <span className="font-bold text-slate-600">{formatBs(incomesBs)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total Bolívares en Bancos <span className="text-[10px] font-bold text-slate-400">({formatCurrency(totalBsInBanksUsd)})</span></span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Ingresos en Bancos BS <span className="text-[10px] font-bold text-slate-400">({formatCurrency(totalBsInBanksUsd)})</span></span>
                                 <span className="font-bold text-slate-600">{formatBs(totalBsInBanks)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total Ingreso Dólares en Banco</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Ingresos en Bancos USD</span>
                                 <span className="font-bold text-slate-600">{formatCurrency(totalUsdInBanks)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total de CXC</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Cuentas por Cobrar (CXC)</span>
                                 <span className="font-bold text-slate-600">{formatCurrency(totalCxc)}</span>
                              </div>
                          </div>
