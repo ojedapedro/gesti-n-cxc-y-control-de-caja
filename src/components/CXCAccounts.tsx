@@ -511,12 +511,16 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                             </>
                           ) : (
                             <>
+                              <option value="VENEZUELA" />
+                              <option value="BANESCO" />
+                              <option value="BNC" />
+                              <option value="MERCANTIL" />
+                              <option value="BANCO DEL TESORO" />
                               <option value="BINANCE P2P" />
                               <option value="ZELLE" />
                               <option value="EFECTIVO" />
                             </>
                           )}
-                          <option value="CAJA FUERTE" />
                         </datalist>
                       </div>
 
