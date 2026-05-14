@@ -39,51 +39,85 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
   const dailyExpenses = expenses.filter(e => e.date === selectedDate);
   const dailyReceipts = receipts.filter(r => r.date === selectedDate);
 
-  let incomesUsd = 0;
-  let incomesBs = 0;
+  let incomesUsd = 0; // Efectivo en Mano USD
+  let incomesBs = 0;  // Efectivo en Mano BS
+  let incomesBsUsd = 0; // Valor USD del Efectivo BS
   
-  // New metrics
+  // Breakdown metrics
   let totalSalesUsd = 0;
   let totalBsInBanks = 0;
+  let totalBsInBanksUsd = 0; // Valor USD de Bancos BS
   let totalUsdInBanks = 0;
   let totalCxc = 0;
 
   dailyTransactions.forEach(t => {
-     const cashUsd = t.amountUsdCash || 0;
-     const bankUsd = t.amountZelle || 0;
-     const cxc = t.amountCXC || 0;
-     const totalBs = t.amountBs || 0;
-     
-     // Distinguish BS Cash vs BS Bank
-     const isBsCash = t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo';
-     const bsCash = isBsCash ? totalBs : 0;
-     const bsBank = !isBsCash ? totalBs : 0;
+     const rate = t.exchangeRate || exchangeRate || 1;
+     const dest = (t.destinationBank || '').toUpperCase();
+     const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
 
-     if (!t.amountUsdCash && !t.amountBs && !t.amountZelle && !t.amountCXC) {
-         // Fallbacks for older data
-         if (t.paymentMethod === PaymentMethod.USD_CASH) {
-             incomesUsd += t.amountUsd || 0;
-         } else if (t.paymentMethod === PaymentMethod.BS_CASH) {
-             incomesBs += (t.amountUsd * (t.exchangeRate || exchangeRate || 1));
-         } else if (t.paymentMethod === PaymentMethod.BS || t.paymentMethod === 'Pago Movil' || t.paymentMethod === 'Transferencia BS') {
-             totalBsInBanks += (t.amountUsd * (t.exchangeRate || exchangeRate || 1));
-         } else if (t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE) {
-             totalUsdInBanks += t.amountUsd || 0;
-         } else if (t.isCXC) {
-             totalCxc += t.amountUsd || 0;
-         }
+     // Primary logic: use explicit breakdown fields if available
+     const tBs = t.amountBs || 0;
+     const tUsdCash = t.amountUsdCash || 0;
+     const tZelle = t.amountZelle || 0;
+     const tCxc = t.amountCXC || 0;
+
+     if (tBs > 0 || tUsdCash > 0 || tZelle > 0 || tCxc > 0) {
+        // BS Distribution
+        if (tBs > 0) {
+           const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs' || t.paymentMethod === PaymentMethod.BS_CASH;
+           if (isBsCash) {
+              incomesBs += tBs;
+              incomesBsUsd += (tBs / rate);
+           } else {
+              totalBsInBanks += tBs;
+              totalBsInBanksUsd += (tBs / rate);
+           }
+        }
+        
+        // USD components
+        incomesUsd += tUsdCash;
+        totalUsdInBanks += tZelle;
+        totalCxc += tCxc;
+        
+        // Final sum in USD
+        totalSalesUsd += (tUsdCash + tZelle + tCxc + (tBs / rate));
      } else {
-         incomesUsd += cashUsd;
-         incomesBs += bsCash;
-         totalBsInBanks += bsBank;
-         totalUsdInBanks += bankUsd;
-         totalCxc += cxc;
-     }
+        // Fallback: use main amountUsd field for legacy data
+        if (t.isCXC || t.paymentMethod === PaymentMethod.CXC) {
+           totalCxc += t.amountUsd;
+           totalSalesUsd += t.amountUsd;
+        } else if (t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE || t.paymentMethod === 'Zelle' || t.paymentMethod === 'Binance') {
+           totalUsdInBanks += t.amountUsd;
+           totalSalesUsd += t.amountUsd;
+        } else {
+           const isBsMethod = t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo';
+           const isUsdMethod = t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo';
 
-     totalSalesUsd += t.totalDailySale || t.amountUsd || 0;
+           if (isBsMethod) {
+              const amountBs = t.amountUsd * rate;
+              const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs' || t.paymentMethod === PaymentMethod.BS_CASH;
+              if (isBsCash) {
+                 incomesBs += amountBs;
+                 incomesBsUsd += t.amountUsd;
+              } else {
+                 totalBsInBanks += amountBs;
+                 totalBsInBanksUsd += t.amountUsd;
+              }
+              totalSalesUsd += t.amountUsd;
+           } else if (isUsdMethod) {
+              const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === PaymentMethod.USD_CASH;
+              if (isUsdCash) incomesUsd += t.amountUsd;
+              else totalUsdInBanks += t.amountUsd;
+              totalSalesUsd += t.amountUsd;
+           } else {
+              totalSalesUsd += t.amountUsd;
+              totalUsdInBanks += t.amountUsd;
+           }
+        }
+     }
   });
 
-  // Expected balances. For simplicity, initial balance is 0 for the day. Can be enhanced to fetch previous day's actual balance.
+  // Expected balances
   const previousClosure = closures.find(c => c.date < selectedDate && c.isClosed);
   const initialUsd = previousClosure?.actualBalanceUsd || 0;
   const initialBs = previousClosure?.actualBalanceBs || 0;
@@ -94,8 +128,8 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
   // When physical inputs change
   const actUsd = parseFloat(actualUsd) || 0;
   const actBs = parseFloat(actualBs) || 0;
-  const diffUsd = actUsd - expectedUsd;
-  const diffBs = actBs - expectedBs;
+  const diffUsd = Number((actUsd - expectedUsd).toFixed(2));
+  const diffBs = Number((actBs - expectedBs).toFixed(2));
 
   const [isClosing, setIsClosing] = useState(false);
 
@@ -293,27 +327,27 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                       {/* OTROS TOTALES */}
                       <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-4">
                          <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
-                             <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2"><Activity size={14} className="text-blue-600"/> Resumen de Ventas / Ingresos</h5>
+                             <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2"><Activity size={14} className="text-blue-600"/> Resumen de Operaciones</h5>
                          </div>
                          <div className="p-3 space-y-2 border-b border-slate-200">
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Caja Efectivo USD</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total Dólares Efectivo</span>
                                 <span className="font-bold text-slate-600">{formatCurrency(incomesUsd)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Caja Efectivo BS <span className="text-[10px] font-bold text-slate-400">({formatCurrency(incomesBs / (exchangeRate || 1))})</span></span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total Bolívares Efectivo <span className="text-[10px] font-bold text-slate-400">({formatCurrency(incomesBsUsd)})</span></span>
                                 <span className="font-bold text-slate-600">{formatBs(incomesBs)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Ingresos en Bancos BS <span className="text-[10px] font-bold text-slate-400">({formatCurrency(totalBsInBanks / (exchangeRate || 1))})</span></span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total Bolívares en Bancos <span className="text-[10px] font-bold text-slate-400">({formatCurrency(totalBsInBanksUsd)})</span></span>
                                 <span className="font-bold text-slate-600">{formatBs(totalBsInBanks)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Ingresos en Bancos USD</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total Ingreso Dólares en Banco</span>
                                 <span className="font-bold text-slate-600">{formatCurrency(totalUsdInBanks)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Cuentas por Cobrar (CXC)</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Total de CXC</span>
                                 <span className="font-bold text-slate-600">{formatCurrency(totalCxc)}</span>
                              </div>
                          </div>
