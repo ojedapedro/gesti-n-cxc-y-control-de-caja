@@ -85,12 +85,22 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
   // Calculated Fields
   const inputAmt = parseFloat(formData.amount) || 0;
   const inBolivares = formData.paymentMethod === PaymentMethod.BS || formData.paymentMethod === PaymentMethod.BS_CASH;
+  
+  const destClean = (formData.destinationBank || '').trim().toUpperCase();
+  const isCXCDest = destClean.includes('CXC') || destClean.includes('COBRAR');
+  const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA');
+  const isBankDest = destClean.length > 0 && !isCashDest && !isCXCDest;
+
   const amountUsdConv = inBolivares ? inputAmt / (parseFloat(formData.exchangeRate) || 1) : 0;
   const amountUsdCash = formData.paymentMethod === PaymentMethod.USD_CASH ? inputAmt : 0;
   const amountZelle = formData.paymentMethod === PaymentMethod.ZELLE || formData.paymentMethod === PaymentMethod.BINANCE ? inputAmt : 0;
   const amountBs = inBolivares ? inputAmt : 0;
   
   const totalDailySale = inBolivares ? amountUsdConv : inputAmt;
+
+  const currentUsdCash = (formData.paymentMethod === PaymentMethod.USD_CASH && isCashDest) || (formData.paymentMethod === PaymentMethod.USD_CASH && !isBankDest && !isCXCDest) ? inputAmt : 0;
+  const currentZelle = (formData.paymentMethod === PaymentMethod.ZELLE || formData.paymentMethod === PaymentMethod.BINANCE || isBankDest) && !isCashDest && !isCXCDest ? (inBolivares ? 0 : inputAmt) : 0;
+  const currentCXC = isCXCDest ? (inBolivares ? 0 : inputAmt) : 0;
 
   const handleAddPending = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,17 +109,17 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
 
     setPendingIngresos(prev => [...prev, {
         date: formData.date,
-        clientName: 'CUADRE DIARIO',
+        clientName: isCXCDest ? 'VENTA CRÉDITO' : 'CUADRE DIARIO',
         concept: formData.concept,
         amountBs: amountBs,
         exchangeRate: parseFloat(formData.exchangeRate) || 1,
         amountUsd: totalDailySale,
         paymentMethod: formData.paymentMethod,
         type: TransactionType.SALE,
-        isCXC: false,
-        amountUsdCash: amountUsdCash,
-        amountZelle: amountZelle,
-        amountCXC: 0,
+        isCXC: isCXCDest,
+        amountUsdCash: currentUsdCash,
+        amountZelle: currentZelle,
+        amountCXC: currentCXC,
         totalDailySale: totalDailySale,
         currency: inBolivares ? 'Bolívares (BS)' : 'Dólares ($)',
         destinationBank: formData.destinationBank
@@ -169,7 +179,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
       });
     } catch (error) {
-      console.error("Error saving CXC:", error);
+      console.error("Error saving Cuentas por Cobrar (CXC):", error);
     }
   };
 
@@ -278,7 +288,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
             onClick={() => setShowCXCModal(!showCXCModal)}
             className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-5 rounded-xl transition-all shadow-sm text-sm"
           >
-            <FileText size={16} /> <span>Ingreso CXC</span>
+            <FileText size={16} /> <span>Ingreso Cuentas por Cobrar (CXC)</span>
           </button>
           <button 
             onClick={() => setShowForm(!showForm)}
@@ -295,7 +305,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
             <div className="p-4 border-b border-slate-100 bg-blue-50/50 flex items-center justify-between">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
                 <FileText className="text-blue-600" size={20} />
-                Registrar Ingreso CXC
+                Registrar Ingreso Cuentas por Cobrar (CXC)
               </h3>
               <button 
                 onClick={() => setShowCXCModal(false)}
@@ -418,7 +428,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   Cancelar
                 </button>
                 <button type="submit" className="btn-primary">
-                  Registrar CXC
+                  Registrar Cuentas por Cobrar (CXC)
                 </button>
               </div>
             </form>
@@ -480,7 +490,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <option value="EFECTIVO" />
                   <option value="BINANCE P2P" />
                   <option value="ZELLE" />
-                  <option value="CUENTAS CXC" />
+                  <option value="CUENTAS POR COBRAR (CXC)" />
                 </datalist>
               </div>
 
@@ -607,7 +617,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-orange-950/20">Dolars Conv.</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Efectivo ($)</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Zelle/Binance</th>
-                <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-blue-950/20">C X C</th>
+                <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-blue-950/20">Cuentas por Cobrar (CXC)</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700">Venta Diaria</th>
                 <th className="p-3 text-center text-[10px] uppercase font-black">Edit</th>
               </tr>
@@ -737,7 +747,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     <option value="EFECTIVO">EFECTIVO</option>
                     <option value="BINANCE P2P">BINANCE P2P</option>
                     <option value="ZELLE">ZELLE</option>
-                    <option value="CUENTAS CXC">CUENTAS CXC</option>
+                    <option value="CUENTAS POR COBRAR (CXC)">CUENTAS POR COBRAR (CXC)</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -786,7 +796,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="label">C X C</label>
+                  <label className="label">Cuentas por Cobrar (CXC)</label>
                   <input 
                     type="number" step="0.01"
                     value={editingTransaction.amountCXC ?? ''}

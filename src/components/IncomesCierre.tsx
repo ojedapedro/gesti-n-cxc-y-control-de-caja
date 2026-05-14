@@ -55,8 +55,9 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
      const dest = (t.destinationBank || '').trim().toUpperCase();
      
      // Keyword classification
-     const isCashWord = dest.includes('EFECTIVO') || dest.includes('CAJA');
-     const isBankWord = dest.length > 0 && !isCashWord;
+     const isCXCWord = dest.includes('CXC') || dest.includes('COBRAR');
+     const isCashWord = (dest.includes('EFECTIVO') || dest.includes('CAJA')) && !isCXCWord;
+     const isBankWord = dest.length > 0 && !isCashWord && !isCXCWord;
 
      // explicit breakdown fields
      const tBs = t.amountBs || 0;
@@ -69,7 +70,7 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
         // BS classification
         if (tBs > 0) {
            let isBsCash = false;
-           if (isBankWord) isBsCash = false;
+           if (isBankWord || isCXCWord) isBsCash = false;
            else if (isCashWord) isBsCash = true;
            else {
               // Default to cash only if method is explicit cash
@@ -86,10 +87,17 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
         }
         
         // USD components
-        // Note: tUsdCash and tZelle are explicit by field name
-        incomesUsd += tUsdCash;
-        totalUsdInBanks += tZelle;
-        totalCxc += tCxc;
+        // Note: We check keywords even for explicit fields to prevent misclassification
+        if (isCXCWord) {
+            totalCxc += (tUsdCash + tZelle + tCxc);
+        } else if (isBankWord) {
+            totalUsdInBanks += (tUsdCash + tZelle);
+            totalCxc += tCxc; // tCxc shouldn't be here but if it is, we count it as CXC
+        } else {
+            incomesUsd += tUsdCash;
+            totalUsdInBanks += tZelle;
+            totalCxc += tCxc;
+        }
         
         // Add to total sales (USD equivalent)
         totalSalesUsd += (tUsdCash + tZelle + tCxc + (tBs / rate));
@@ -97,21 +105,22 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
         // 2. Fallback: classify based on amountUsd and paymentMethod (Legacy records)
         const amt = t.amountUsd || 0;
         
-        if (t.isCXC || t.paymentMethod === PaymentMethod.CXC) {
+        const isCXCMethod = t.isCXC || t.paymentMethod === PaymentMethod.CXC || t.paymentMethod === 'CXC' || isCXCWord;
+        const isBankMethod = t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE || t.paymentMethod === 'Zelle' || t.paymentMethod === 'Binance' || isBankWord;
+
+        if (isCXCMethod) {
            totalCxc += amt;
-           totalSalesUsd += amt;
-        } else if (t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE || t.paymentMethod === 'Zelle' || t.paymentMethod === 'Binance') {
+        } else if (isBankMethod) {
            totalUsdInBanks += amt;
-           totalSalesUsd += amt;
         } else {
            // Distinguish BS vs USD method
-           const isBsMethod = t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo';
-           const isUsdMethod = t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === 'USD';
+           const isBsMethod = t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'BS (Bolívares)';
+           const isUsdMethod = t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === 'USD' || t.paymentMethod === 'Dólares ($)';
 
            if (isBsMethod) {
               const amountBs = amt * rate;
               let isBsCash = false;
-              if (isBankWord) isBsCash = false;
+              if (isBankWord || isCXCWord) isBsCash = false;
               else if (isCashWord) isBsCash = true;
               else isBsCash = (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs Efectivo');
 
@@ -122,23 +131,22 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                  totalBsInBanks += amountBs;
                  totalBsInBanksUsd += amt;
               }
-              totalSalesUsd += amt;
            } else if (isUsdMethod) {
               let isUsdCash = false;
-              if (isBankWord) isUsdCash = false;
+              if (isBankWord || isCXCWord) isUsdCash = false;
               else if (isCashWord) isUsdCash = true;
               else isUsdCash = (t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === 'Dolares Efectivo');
 
               if (isUsdCash) incomesUsd += amt;
               else totalUsdInBanks += amt;
-              totalSalesUsd += amt;
            } else {
               // Catch-all
-              totalSalesUsd += amt;
               if (isBankWord) totalUsdInBanks += amt;
+              else if (isCXCWord) totalCxc += amt;
               else incomesUsd += amt;
            }
         }
+        totalSalesUsd += amt;
      }
   });
 
