@@ -48,58 +48,47 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
   let totalUsdInBanks = 0;
   let totalCxc = 0;
 
-  // Helper: compare paymentMethod (enum) against legacy string values from Firestore
-  const pmIs = (pm: PaymentMethod, ...legacy: string[]) =>
-    [pm as string, ...legacy];
-
   dailyTransactions.forEach(t => {
-     let cashUsdAmount = 0;
+     let cashUsdAmount = t.amountUsdCash || 0;
      let cashBsAmount = 0;
+     let bankBsAmount = 0;
 
-     const dest = (t.destinationBank || '').toUpperCase();
-     const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
-     const pm = t.paymentMethod as string;
-
-     // USD Efectivo
-     if (t.amountUsdCash !== undefined && t.amountUsdCash > 0) {
-          cashUsdAmount += Number(t.amountUsdCash);
-     } else if (isCashByName || pmIs(PaymentMethod.USD_CASH, 'Dolares Efectivo', '$ Efectivo').includes(pm)) {
-          cashUsdAmount += Number(t.amountUsd) || 0;
+     // Calculate properties similar to IncomesRegistro
+     const conv = (t.amountBs || 0) / (t.exchangeRate || exchangeRate || 1);
+     
+     if (t.amountBs && t.amountBs > 0) {
+        // If it was explicitly marked as bank
+        if (t.paymentMethod === PaymentMethod.BS || t.paymentMethod === 'Transferencia BS' || t.paymentMethod === 'Pago Movil') {
+            bankBsAmount = t.amountBs;
+        } else {
+            // Otherwise consider it cash (BS)
+            cashBsAmount = t.amountBs;
+        }
      }
 
-     // BS Efectivo
-     if (t.amountBs !== undefined && t.amountBs > 0) {
-          if (isCashByName || pmIs(PaymentMethod.BS_CASH, 'Bolivares Efectivo', 'Bs Efectivo').includes(pm)) {
-               cashBsAmount += Number(t.amountBs);
-          } else {
-               totalBsInBanks += Number(t.amountBs);
-          }
-     } else if (pmIs(PaymentMethod.BS_CASH, 'Bolivares Efectivo', 'Bs Efectivo').includes(pm)) {
-          cashBsAmount += (Number(t.amountUsd) || 0) * (Number(t.exchangeRate) || exchangeRate || 1);
+     if (!t.amountUsdCash && !t.amountBs && !t.amountZelle && !t.amountCXC) {
+         // Fallbacks for older data where these extra columns don't exist
+         if (t.paymentMethod === PaymentMethod.USD_CASH) {
+             cashUsdAmount = t.amountUsd;
+         } else if (t.paymentMethod === PaymentMethod.BS_CASH) {
+             cashBsAmount = t.amountUsd * (t.exchangeRate || exchangeRate || 1);
+         } else if (t.paymentMethod === PaymentMethod.BS || t.paymentMethod === 'Pago Movil' || t.paymentMethod === 'Transferencia BS') {
+             bankBsAmount = t.amountUsd * (t.exchangeRate || exchangeRate || 1);
+         } else if (t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE) {
+             totalUsdInBanks += t.amountUsd;
+         } else if (t.isCXC) {
+             totalCxc += t.amountUsd;
+         }
+     } else {
+         totalUsdInBanks += t.amountZelle || 0;
+         totalCxc += t.amountCXC || 0;
      }
-
-     // USD Banks (Zelle, Binance, Transferencia USD)
-     if (t.amountZelle !== undefined && t.amountZelle > 0) {
-         totalUsdInBanks += Number(t.amountZelle);
-     } else if (
-         pmIs(PaymentMethod.ZELLE).includes(pm) ||
-         pmIs(PaymentMethod.BINANCE).includes(pm) ||
-         (t.currency?.includes('$') && !isCashByName && !cashUsdAmount)
-     ) {
-         totalUsdInBanks += Number(t.amountUsd) || 0;
-     }
-
-     // CXC
-     if (t.amountCXC !== undefined && t.amountCXC > 0) {
-         totalCxc += Number(t.amountCXC);
-     } else if (t.isCXC) {
-         totalCxc += Number(t.amountUsd) || 0;
-     }
-
-     totalSalesUsd += Number(t.totalDailySale || t.amountUsd || 0);
 
      incomesUsd += cashUsdAmount;
      incomesBs += cashBsAmount;
+     totalBsInBanks += bankBsAmount;
+
+     totalSalesUsd += t.totalDailySale || t.amountUsd || 0;
   });
 
   // Expected balances. For simplicity, initial balance is 0 for the day. Can be enhanced to fetch previous day's actual balance.
@@ -339,7 +328,7 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                          <div className="p-3 bg-white">
                              <div className="flex items-center justify-between">
                                 <span className="text-sm font-black text-slate-900 uppercase tracking-wide">Total de Ventas</span>
-                                <span className="font-black text-xl text-emerald-600">{formatCurrency(incomesUsd + (incomesBs / (exchangeRate || 1)) + (totalBsInBanks / (exchangeRate || 1)) + totalUsdInBanks + totalCxc)}</span>
+                                <span className="font-black text-xl text-emerald-600">{formatCurrency(totalSalesUsd)}</span>
                              </div>
                          </div>
                       </div>
