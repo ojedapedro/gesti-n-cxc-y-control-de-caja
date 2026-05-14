@@ -49,44 +49,36 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
   let totalCxc = 0;
 
   dailyTransactions.forEach(t => {
-     let cashUsdAmount = t.amountUsdCash || 0;
-     let cashBsAmount = 0;
-     let bankBsAmount = 0;
-
-     // Calculate properties similar to IncomesRegistro
-     const conv = (t.amountBs || 0) / (t.exchangeRate || exchangeRate || 1);
+     const cashUsd = t.amountUsdCash || 0;
+     const bankUsd = t.amountZelle || 0;
+     const cxc = t.amountCXC || 0;
+     const totalBs = t.amountBs || 0;
      
-     if (t.amountBs && t.amountBs > 0) {
-        // If it was explicitly marked as bank
-        if (t.paymentMethod === PaymentMethod.BS || t.paymentMethod === 'Transferencia BS' || t.paymentMethod === 'Pago Movil') {
-            bankBsAmount = t.amountBs;
-        } else {
-            // Otherwise consider it cash (BS)
-            cashBsAmount = t.amountBs;
-        }
-     }
+     // Distinguish BS Cash vs BS Bank
+     const isBsCash = t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo';
+     const bsCash = isBsCash ? totalBs : 0;
+     const bsBank = !isBsCash ? totalBs : 0;
 
      if (!t.amountUsdCash && !t.amountBs && !t.amountZelle && !t.amountCXC) {
-         // Fallbacks for older data where these extra columns don't exist
+         // Fallbacks for older data
          if (t.paymentMethod === PaymentMethod.USD_CASH) {
-             cashUsdAmount = t.amountUsd;
+             incomesUsd += t.amountUsd || 0;
          } else if (t.paymentMethod === PaymentMethod.BS_CASH) {
-             cashBsAmount = t.amountUsd * (t.exchangeRate || exchangeRate || 1);
+             incomesBs += (t.amountUsd * (t.exchangeRate || exchangeRate || 1));
          } else if (t.paymentMethod === PaymentMethod.BS || t.paymentMethod === 'Pago Movil' || t.paymentMethod === 'Transferencia BS') {
-             bankBsAmount = t.amountUsd * (t.exchangeRate || exchangeRate || 1);
+             totalBsInBanks += (t.amountUsd * (t.exchangeRate || exchangeRate || 1));
          } else if (t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE) {
-             totalUsdInBanks += t.amountUsd;
+             totalUsdInBanks += t.amountUsd || 0;
          } else if (t.isCXC) {
-             totalCxc += t.amountUsd;
+             totalCxc += t.amountUsd || 0;
          }
      } else {
-         totalUsdInBanks += t.amountZelle || 0;
-         totalCxc += t.amountCXC || 0;
+         incomesUsd += cashUsd;
+         incomesBs += bsCash;
+         totalBsInBanks += bsBank;
+         totalUsdInBanks += bankUsd;
+         totalCxc += cxc;
      }
-
-     incomesUsd += cashUsdAmount;
-     incomesBs += cashBsAmount;
-     totalBsInBanks += bankBsAmount;
 
      totalSalesUsd += t.totalDailySale || t.amountUsd || 0;
   });
