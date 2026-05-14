@@ -10,7 +10,7 @@ export enum PaymentMethod {
   USD_CASH = '$',
   ZELLE = 'Zelle',
   BINANCE = 'Binance',
-  CXC = 'CXC (Por Cobrar)',
+  CXC = 'Cuentas por Cobrar (CXC)',
 }
 
 export interface Transaction {
@@ -107,6 +107,14 @@ export interface CashClosure {
   closedAt: any;
   createdAt: any;
   digitalKeyHash?: string; // Optional simple mechanism to unlock
+}
+
+export interface Seller {
+  id: string; // CI
+  name: string;
+  region: string;
+  discountPercentage: number;
+  createdAt: any;
 }
 
 export interface Settings {

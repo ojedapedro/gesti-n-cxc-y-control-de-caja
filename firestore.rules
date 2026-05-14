@@ -104,9 +104,17 @@ service cloud.firestore {
         allow get: if isSignedIn();
         allow create: if isSignedIn() && isValidCXCPayment(incoming()) && isValidId(paymentId) && incoming().createdAt == request.time;
         allow update: if isSignedIn() && isValidCXCPayment(incoming()) &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'date', 'concept', 'invoiceNumber', 'sellerName', 'paymentMethod', 'destinationBank', 'type']);
+                      incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'date', 'concept', 'invoiceNumber', 'sellerName', 'sellerId', 'paymentMethod', 'destinationBank', 'type']);
         allow delete: if isSignedIn();
       }
+    }
+
+    match /sellers/{sellerId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(sellerId) && (incoming().createdAt == request.time);
+      allow update: if isSignedIn() && isValidId(sellerId);
+      allow delete: if isSignedIn() && isValidId(sellerId);
     }
 
     match /receipts/{receiptId} {
@@ -121,6 +129,14 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn(); 
+    }
+
+    match /cash_closures/{closureId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
   }
 }

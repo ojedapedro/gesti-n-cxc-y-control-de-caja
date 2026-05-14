@@ -15,7 +15,7 @@ export function LoginScreen() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-10 text-center">
         <img src="https://i.ibb.co/NgSYhpq5/logo-Azul-Iinvepinca.jpg" alt="Logo Invepinca" className="w-24 h-auto mx-auto rounded-xl shadow-lg border border-slate-100 mb-6" />
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">Gestión de Caja y CXC</h1>
+        <h1 className="text-2xl font-bold text-slate-800 mb-2">Gestión de Caja y Cuentas por Cobrar (CXC)</h1>
         <p className="text-slate-500 mb-8">Inicia sesión con tu cuenta corporativa para acceder al panel de control.</p>
         
         <button 

@@ -74,7 +74,7 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
            else if (isCashWord) isBsCash = true;
            else {
               // Default to cash only if method is explicit cash
-              isBsCash = (t.paymentMethod === PaymentMethod.BS_CASH || (t.paymentMethod as string) === 'Bs Efectivo' || (t.paymentMethod as string) === 'Efectivo Bs');
+              isBsCash = (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Efectivo Bs');
            }
 
            if (isBsCash) {
@@ -105,8 +105,8 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
         // 2. Fallback: classify based on amountUsd and paymentMethod (Legacy records)
         const amt = t.amountUsd || 0;
         
-        const isCXCMethod = t.isCXC || t.paymentMethod === PaymentMethod.CXC || (t.paymentMethod as string) === 'CXC' || isCXCWord;
-        const isBankMethod = t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE || (t.paymentMethod as string) === 'Zelle' || (t.paymentMethod as string) === 'Binance' || isBankWord;
+        const isCXCMethod = t.isCXC || t.paymentMethod === PaymentMethod.CXC || t.paymentMethod === 'CXC' || isCXCWord;
+        const isBankMethod = t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE || t.paymentMethod === 'Zelle' || t.paymentMethod === 'Binance' || isBankWord;
 
         if (isCXCMethod) {
            totalCxc += amt;
@@ -114,16 +114,15 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
            totalUsdInBanks += amt;
         } else {
            // Distinguish BS vs USD method
-           const pm = t.paymentMethod as string;
-           const isBsMethod = t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.BS_CASH || pm === 'Bs' || pm === 'Bolivares' || pm === 'Bs Efectivo' || pm === 'BS (Bolívares)';
-           const isUsdMethod = t.paymentMethod === PaymentMethod.USD_CASH || pm === '$ Efectivo' || pm === '$' || pm === 'Dolares Efectivo' || pm === 'USD' || pm === 'Dólares ($)';
+           const isBsMethod = t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'BS (Bolívares)';
+           const isUsdMethod = t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === 'USD' || t.paymentMethod === 'Dólares ($)';
 
            if (isBsMethod) {
               const amountBs = amt * rate;
               let isBsCash = false;
               if (isBankWord || isCXCWord) isBsCash = false;
               else if (isCashWord) isBsCash = true;
-              else isBsCash = (t.paymentMethod === PaymentMethod.BS_CASH || (t.paymentMethod as string) === 'Bs Efectivo');
+              else isBsCash = (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs Efectivo');
 
               if (isBsCash) {
                  incomesBs += amountBs;
@@ -136,7 +135,7 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
               let isUsdCash = false;
               if (isBankWord || isCXCWord) isUsdCash = false;
               else if (isCashWord) isUsdCash = true;
-              else isUsdCash = (t.paymentMethod === PaymentMethod.USD_CASH || (t.paymentMethod as string) === '$ Efectivo' || (t.paymentMethod as string) === 'Dolares Efectivo');
+              else isUsdCash = (t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === 'Dolares Efectivo');
 
               if (isUsdCash) incomesUsd += amt;
               else totalUsdInBanks += amt;

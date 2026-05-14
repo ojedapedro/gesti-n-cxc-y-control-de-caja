@@ -143,7 +143,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     { label: 'TOTAL INGRESO BOLIVARES EFECTIVO', value: totalBsEfectivo, icon: Banknote, color: 'text-teal-600', bg: 'bg-teal-50' },
     { label: 'TOTAL INGRESO DOLARES BANCO', value: totalUsdBanco, icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'TOTAL INGRESO DOLARES EFECTIVO', value: totalUsdEfectivo, icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'TOTAL C X C', value: totalCXC, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'TOTAL CUENTAS POR COBRAR (CXC)', value: totalCXC, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
   if (loading) {
@@ -249,7 +249,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
         {/* Top Debtors */}
         <div className="card p-6 border-slate-200/60">
           <h3 className="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-4">
-            Mayores Saldos CXC
+            Mayores Saldos Cuentas por Cobrar (CXC)
           </h3>
           <div className="space-y-3 mt-4">
             {cxcAccounts

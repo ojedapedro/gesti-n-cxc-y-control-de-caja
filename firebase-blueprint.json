@@ -11,7 +11,7 @@
         "amountBs": { "type": "number" },
         "exchangeRate": { "type": "number" },
         "amountUsd": { "type": "number" },
-        "paymentMethod": { "type": "string", "enum": ["Bolivares", "Dolares Efectivo", "Zelle", "CXC"] },
+        "paymentMethod": { "type": "string", "enum": ["Bolivares", "Dolares Efectivo", "Zelle", "Cuentas por Cobrar (CXC)"] },
         "type": { "type": "string", "enum": ["income", "sale", "withdrawal"] },
         "isCXC": { "type": "boolean" },
         "cxcBalance": { "type": "number" },
@@ -34,8 +34,8 @@
       "required": ["date", "category", "amountUsd"]
     },
     "CXCAccount": {
-      "title": "CXC Account",
-      "description": "Outstanding balance per client.",
+      "title": "Cuentas por Cobrar (CXC) Account",
+      "description": "Outstanding balance per client (CXC).",
       "type": "object",
       "properties": {
         "clientName": { "type": "string" },
@@ -45,8 +45,8 @@
       "required": ["clientName", "totalBalance"]
     },
     "CXCPayment": {
-      "title": "CXC Payment",
-      "description": "Payments made towards an outstanding CXC balance.",
+      "title": "Cuentas por Cobrar (CXC) Payment",
+      "description": "Payments made towards an outstanding Cuentas por Cobrar (CXC) balance.",
       "type": "object",
       "properties": {
         "clientId": { "type": "string" },
@@ -80,6 +80,19 @@
         "lastUpdated": { "type": "string", "format": "date-time" }
       },
       "required": ["exchangeRate"]
+    },
+    "Seller": {
+      "title": "Seller",
+      "description": "Vendedor profile.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "region": { "type": "string" },
+        "discountPercentage": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "region", "discountPercentage"]
     }
   },
   "firestore": {
@@ -98,6 +111,10 @@
     "/cxc_accounts/{clientId}/payments": {
       "schema": "CXCPayment",
       "description": "History of payments for a specific client."
+    },
+    "/sellers": {
+      "schema": "Seller",
+      "description": "List of authorized sellers for credit sales."
     },
     "/receipts": {
       "schema": "Receipt",

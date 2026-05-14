@@ -13,8 +13,8 @@ export default defineConfig(({mode}) => {
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
-          name: 'Gestión CXC y Control de Caja',
-          short_name: 'CXC App',
+          name: 'Gestión de Cuentas por Cobrar (CXC) y Control de Caja',
+          short_name: 'CXC (Cuentas por Cobrar)',
           description: 'Gestión de Cuentas por Cobrar y Control de Caja Invepinca',
           theme_color: '#0a0a0a',
           background_color: '#ffffff',

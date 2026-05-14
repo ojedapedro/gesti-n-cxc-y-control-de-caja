@@ -27,6 +27,7 @@ import {
   type CXCPayment, 
   type Receipt,
   type CashClosure,
+  type Seller,
   type FirestoreErrorInfo 
 } from '../types';
 
@@ -57,8 +58,46 @@ const EXPENSES_PATH = 'expenses';
 const CXC_ACCOUNTS_PATH = 'cxc_accounts';
 const RECEIPTS_PATH = 'receipts';
 const CASH_CLOSURES_PATH = 'cash_closures';
+const SELLERS_PATH = 'sellers';
+const SETTINGS_PATH = 'settings';
 
 export const dbService = {
+  // Sellers
+  async getSellers() {
+    try {
+      const snapshot = await getDocs(collection(db, SELLERS_PATH));
+      return snapshot.docs.map(doc => ({ ...doc.data() } as Seller));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, SELLERS_PATH);
+    }
+  },
+
+  async addOrUpdateSeller(seller: Seller) {
+    try {
+      const sellerRef = doc(db, SELLERS_PATH, seller.id);
+      await setDoc(sellerRef, {
+        ...seller,
+        createdAt: seller.createdAt || serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, SELLERS_PATH);
+    }
+  },
+
+  async deleteSeller(id: string) {
+    try {
+      await deleteDoc(doc(db, SELLERS_PATH, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, SELLERS_PATH);
+    }
+  },
+
+  subscribeToSellers(callback: (sellers: Seller[]) => void) {
+    return onSnapshot(collection(db, SELLERS_PATH), (snapshot) => {
+      callback(snapshot.docs.map(doc => ({ ...doc.data() } as Seller)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, SELLERS_PATH));
+  },
+
   // Transactions
   async addTransaction(data: Omit<Transaction, 'id' | 'createdAt'>) {
     try {
@@ -179,7 +218,7 @@ export const dbService = {
       await this.addTransaction({
         date: data.date,
         clientName: clientName,
-        concept: `VENTA A CRÉDITO CXC (Item: ${data.item || 'N/A'}): ${data.concept || ''}`,
+        concept: `VENTA A CRÉDITO CUENTAS POR COBRAR (CXC) (Item: ${data.item || 'N/A'}): ${data.concept || ''}`,
         amountUsd: data.amountUsd,
         amountBs: data.amountBs,
         exchangeRate: data.exchangeRate,
@@ -231,12 +270,12 @@ export const dbService = {
       if (data.type !== 'charge') {
         let isUsdCash = data.paymentMethod === PaymentMethod.USD_CASH;
         let isZelle = data.paymentMethod === PaymentMethod.ZELLE || data.paymentMethod === PaymentMethod.BINANCE;
-        let isCXCCuentas = data.destinationBank === 'CUENTAS CXC' || (data.paymentMethod as string) === 'CUENTAS CXC';
+        let isCXCCuentas = data.destinationBank === 'CUENTAS POR COBRAR (CXC)' || (data.paymentMethod as string) === 'CUENTAS POR COBRAR (CXC)';
 
         await this.addTransaction({
           date: data.date,
           clientName: accountSnap.exists() ? accountSnap.data().clientName : 'Desconocido',
-          concept: `ABONO CXC: ${data.concept || ''}`,
+          concept: `ABONO CUENTAS POR COBRAR (CXC): ${data.concept || ''}`,
           amountUsd: data.amountUsd,
           amountBs: data.amountBs,
           exchangeRate: data.exchangeRate,

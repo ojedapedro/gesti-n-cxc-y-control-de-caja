@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
-import { TransactionType, PaymentMethod, type Transaction } from '../types';
-import { Plus, Search, Calendar, User, DollarSign, Tag, Clock, FileText, Edit, X } from 'lucide-react';
+import { TransactionType, PaymentMethod, type Transaction, type Seller } from '../types';
+import { Plus, Search, Calendar, User, DollarSign, Tag, Clock, FileText, Edit, X, Percent } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -12,6 +12,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
   const [showCXCModal, setShowCXCModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [pendingIngresos, setPendingIngresos] = useState<any[]>([]);
+  const [sellers, setSellers] = useState<Seller[]>([]);
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -33,6 +34,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     amountBs: '',
     invoiceNumber: '',
     sellerName: '',
+    sellerId: '',
     exchangeRate: exchangeRate?.toString() || '1',
     item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
   });
@@ -43,6 +45,11 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
       setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
     }
   }, [exchangeRate, showForm]);
+
+  useEffect(() => {
+    const unsub = dbService.subscribeToSellers(setSellers);
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     return dbService.subscribeToTransactions(setTransactions);
@@ -163,6 +170,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         item: cxcData.item,
         invoiceNumber: cxcData.invoiceNumber,
         sellerName: cxcData.sellerName,
+        sellerId: cxcData.sellerId,
         type: 'charge'
       });
 
@@ -175,6 +183,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         amountBs: '',
         invoiceNumber: '',
         sellerName: '',
+        sellerId: '',
         exchangeRate: exchangeRate?.toString() || '1',
         item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
       });
@@ -385,24 +394,45 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 </div>
 
                 <div className="space-y-1">
-                  <label className="label">Vendedor</label>
+                  <label className="label">Vendedor / Perfil</label>
                   <div className="relative">
                     <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                    <input 
-                      type="text" 
+                    <select 
                       required
-                      value={cxcData.sellerName}
-                      onChange={(e) => setCxcData({...cxcData, sellerName: e.target.value.toUpperCase()})}
-                      className="input-field pl-10 uppercase" 
-                      placeholder="Nombre del vendedor"
-                    />
+                      value={cxcData.sellerId}
+                      onChange={(e) => {
+                        const sId = e.target.value;
+                        const seller = sellers.find(s => s.id === sId);
+                        if (seller) {
+                          const baseUsd = parseFloat(cxcData.amountUsd) || 0;
+                          const discount = seller.discountPercentage / 100;
+                          const finalUsd = baseUsd * (1 - discount);
+                          const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
+                          setCxcData({
+                            ...cxcData, 
+                            sellerId: sId, 
+                            sellerName: seller.name,
+                            amountUsd: finalUsd.toFixed(2),
+                            amountBs: finalBs.toFixed(2)
+                          });
+                        } else {
+                          setCxcData({...cxcData, sellerId: sId, sellerName: ''});
+                        }
+                      }}
+                      className="input-field pl-10 cursor-pointer"
+                    >
+                      <option value="">Seleccione Vendedor...</option>
+                      {sellers.map(s => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.discountPercentage}%)</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="label">Monto (USD)</label>
+                  <label className="label">Monto Bruto (USD)</label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <input 
@@ -410,16 +440,32 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       step="0.01"
                       min="0.01"
                       required
-                      value={cxcData.amountUsd}
+                      placeholder="0.00"
                       onChange={(e) => {
                         const usd = parseFloat(e.target.value) || 0;
-                        const bs = usd * (parseFloat(cxcData.exchangeRate) || 1);
-                        setCxcData({...cxcData, amountUsd: e.target.value, amountBs: e.target.value ? bs.toFixed(2) : ''});
+                        const seller = sellers.find(s => s.id === cxcData.sellerId);
+                        const discount = seller ? (seller.discountPercentage / 100) : 0;
+                        const finalUsd = usd * (1 - discount);
+                        const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
+                        setCxcData({...cxcData, amountUsd: finalUsd.toFixed(2), amountBs: finalBs.toFixed(2)});
                       }}
                       className="input-field pl-10 font-bold" 
-                      placeholder="0.00"
                     />
                   </div>
+                  <p className="text-[10px] text-slate-400">Ingrese el monto antes de descuento.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label text-blue-600">Monto Neto CXC (USD)</label>
+                  <div className="input-field bg-blue-50 text-blue-700 font-bold border-dashed flex items-center justify-between">
+                    <span>{formatCurrency(parseFloat(cxcData.amountUsd) || 0)}</span>
+                    {cxcData.sellerId && (
+                      <span className="text-[10px] bg-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <Percent size={10} /> {sellers.find(s => s.id === cxcData.sellerId)?.discountPercentage}% Descuento
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400">Este es el monto que se registrará.</p>
                 </div>
               </div>
               

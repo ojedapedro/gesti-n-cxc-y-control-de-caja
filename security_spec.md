@@ -1,7 +1,7 @@
-# Security Specification - CXC & Box Control
+# Security Specification - Cuentas por Cobrar (CXC) & Box Control
 
 ## Data Invariants
-- A CXC payment must refer to a valid client.
+1.  A Cuentas por Cobrar (CXC) payment must refer to a valid client.
 - Expenses must have a category.
 - Transactions must have a date and a USD amount (primary currency for balance).
 - All timestamps must be server-generated.
