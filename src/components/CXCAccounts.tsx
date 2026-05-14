@@ -484,10 +484,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           className="input-field cursor-pointer"
                         >
                           <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
-                          <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
-                          <option value={PaymentMethod.BS}>Transferencia/Pago Móvil</option>
-                          <option value={PaymentMethod.ZELLE}>Zelle</option>
-                          <option value={PaymentMethod.BINANCE}>Binance</option>
+                          <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>                          
                         </select>
                       </div>
 
@@ -508,11 +505,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           <option value="VENEZUELA" />
                           <option value="BANCO DEL TESORO" />
                           <option value="BNC" />
-                          <option value="EFECTIVO EN CAJA" />
                           <option value="EFECTIVO" />
-                          <option value="BINANCE P2P" />
-                          <option value="ZELLE" />
-                          <option value="CUENTAS CXC" />
                         </datalist>
                       </div>
 
