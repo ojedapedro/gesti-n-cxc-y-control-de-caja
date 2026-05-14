@@ -499,13 +499,24 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           list="bancos-list-cxc"
                         />
                         <datalist id="bancos-list-cxc">
-                          <option value="BANESCO" />
-                          <option value="PROVINCIAL" />
-                          <option value="MERCANTIL" />
-                          <option value="VENEZUELA" />
-                          <option value="BANCO DEL TESORO" />
-                          <option value="BNC" />
-                          <option value="EFECTIVO" />
+                          {inBolivares ? (
+                            <>
+                              <option value="BANESCO" />
+                              <option value="PROVINCIAL" />
+                              <option value="MERCANTIL" />
+                              <option value="VENEZUELA" />
+                              <option value="BANCO DEL TESORO" />
+                              <option value="BNC" />
+                              <option value="EFECTIVO" />
+                            </>
+                          ) : (
+                            <>
+                              <option value="BINANCE P2P" />
+                              <option value="ZELLE" />
+                              <option value="EFECTIVO" />
+                            </>
+                          )}
+                          <option value="CAJA FUERTE" />
                         </datalist>
                       </div>
 

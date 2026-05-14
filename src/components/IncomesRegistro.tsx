@@ -480,13 +480,25 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   list="bancos-list"
                 />
                 <datalist id="bancos-list">
-                  <option value="BANESCO" />
-                  <option value="PROVINCIAL" />
-                  <option value="MERCANTIL" />
-                  <option value="VENEZUELA" />
-                  <option value="BANCO DEL TESORO" />
-                  <option value="BNC" />
-                  <option value="EFECTIVO" />
+                  {inBolivares ? (
+                    <>
+                      <option value="BANESCO" />
+                      <option value="PROVINCIAL" />
+                      <option value="MERCANTIL" />
+                      <option value="VENEZUELA" />
+                      <option value="BANCO DEL TESORO" />
+                      <option value="BNC" />
+                      <option value="EFECTIVO" />
+                    </>
+                  ) : (
+                    <>
+                      <option value="BINANCE P2P" />
+                      <option value="ZELLE" />
+                      <option value="EFECTIVO" />
+                    </>
+                  )}
+                  <option value="CAJA FUERTE" />
+                  <option value="CUENTAS POR COBRAR (CXC)" />
                 </datalist>
               </div>
 
@@ -732,17 +744,27 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <select 
                     value={editingTransaction.destinationBank || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, destinationBank: e.target.value.toUpperCase()})}
-                    className="input-field uppercase" 
+                    className="input-field uppercase cursor-pointer" 
                   >
                     <option value="">Seleccione...</option>
-                    <option value="BANESCO">BANESCO</option>
-                    <option value="PROVINCIAL">PROVINCIAL</option>
-                    <option value="BDV">BDV</option>
-                    <option value="MERCANTIL">MERCANTIL</option>
-                    <option value="BNC">BNC</option>
-                    <option value="EFECTIVO">EFECTIVO</option>
-                    <option value="BINANCE P2P">BINANCE P2P</option>
-                    <option value="ZELLE">ZELLE</option>
+                    {editingTransaction.currency?.includes('Bolívares') ? (
+                      <>
+                        <option value="BANESCO">BANESCO</option>
+                        <option value="PROVINCIAL">PROVINCIAL</option>
+                        <option value="MERCANTIL">MERCANTIL</option>
+                        <option value="VENEZUELA">VENEZUELA</option>
+                        <option value="BANCO DEL TESORO">BANCO DEL TESORO</option>
+                        <option value="BNC">BNC</option>
+                        <option value="EFECTIVO">EFECTIVO</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="BINANCE P2P">BINANCE P2P</option>
+                        <option value="ZELLE">ZELLE</option>
+                        <option value="EFECTIVO">EFECTIVO</option>
+                      </>
+                    )}
+                    <option value="CAJA FUERTE">CAJA FUERTE</option>
                     <option value="CUENTAS POR COBRAR (CXC)">CUENTAS POR COBRAR (CXC)</option>
                   </select>
                 </div>
