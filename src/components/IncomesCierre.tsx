@@ -48,38 +48,47 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
   let totalUsdInBanks = 0;
   let totalCxc = 0;
 
+  // Helper: compare paymentMethod (enum) against legacy string values from Firestore
+  const pmIs = (pm: PaymentMethod, ...legacy: string[]) =>
+    [pm as string, ...legacy];
+
   dailyTransactions.forEach(t => {
      let cashUsdAmount = 0;
      let cashBsAmount = 0;
 
      const dest = (t.destinationBank || '').toUpperCase();
      const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
+     const pm = t.paymentMethod as string;
 
      // USD Efectivo
      if (t.amountUsdCash !== undefined && t.amountUsdCash > 0) {
           cashUsdAmount += Number(t.amountUsdCash);
-     } else if (isCashByName || t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === '$ Efectivo') {
+     } else if (isCashByName || pmIs(PaymentMethod.USD_CASH, 'Dolares Efectivo', '$ Efectivo').includes(pm)) {
           cashUsdAmount += Number(t.amountUsd) || 0;
      }
 
      // BS Efectivo
      if (t.amountBs !== undefined && t.amountBs > 0) {
-          if (isCashByName || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
+          if (isCashByName || pmIs(PaymentMethod.BS_CASH, 'Bolivares Efectivo', 'Bs Efectivo').includes(pm)) {
                cashBsAmount += Number(t.amountBs);
           } else {
                totalBsInBanks += Number(t.amountBs);
           }
-     } else if (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
+     } else if (pmIs(PaymentMethod.BS_CASH, 'Bolivares Efectivo', 'Bs Efectivo').includes(pm)) {
           cashBsAmount += (Number(t.amountUsd) || 0) * (Number(t.exchangeRate) || exchangeRate || 1);
      }
 
      // USD Banks (Zelle, Binance, Transferencia USD)
      if (t.amountZelle !== undefined && t.amountZelle > 0) {
          totalUsdInBanks += Number(t.amountZelle);
-     } else if (t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE || (t.currency?.includes('$') && !isCashByName && !cashUsdAmount)) {
+     } else if (
+         pmIs(PaymentMethod.ZELLE).includes(pm) ||
+         pmIs(PaymentMethod.BINANCE).includes(pm) ||
+         (t.currency?.includes('$') && !isCashByName && !cashUsdAmount)
+     ) {
          totalUsdInBanks += Number(t.amountUsd) || 0;
      }
-     
+
      // CXC
      if (t.amountCXC !== undefined && t.amountCXC > 0) {
          totalCxc += Number(t.amountCXC);
@@ -303,24 +312,34 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                       {/* OTROS TOTALES */}
                       <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-4">
                          <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
-                             <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2"><Activity size={14} className="text-blue-600"/> Resumen de Operaciones</h5>
+                             <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2"><Activity size={14} className="text-blue-600"/> Resumen de Ventas / Ingresos</h5>
                          </div>
-                         <div className="p-3 space-y-2">
+                         <div className="p-3 space-y-2 border-b border-slate-200">
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600">Total de Ventas</span>
-                                <span className="font-bold text-slate-900">{formatCurrency(totalSalesUsd)}</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Caja Efectivo USD</span>
+                                <span className="font-bold text-slate-600">{formatCurrency(incomesUsd)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600">Total Bolívares en Bancos</span>
-                                <span className="font-bold text-blue-600">{formatBs(totalBsInBanks)}</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Caja Efectivo BS <span className="text-[10px] font-bold text-slate-400">({formatCurrency(incomesBs / (exchangeRate || 1))})</span></span>
+                                <span className="font-bold text-slate-600">{formatBs(incomesBs)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600">Total Ingreso Dólares en Banco</span>
-                                <span className="font-bold text-emerald-600">{formatCurrency(totalUsdInBanks)}</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Ingresos en Bancos BS <span className="text-[10px] font-bold text-slate-400">({formatCurrency(totalBsInBanks / (exchangeRate || 1))})</span></span>
+                                <span className="font-bold text-slate-600">{formatBs(totalBsInBanks)}</span>
                              </div>
                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-slate-600">Total de CXC</span>
-                                <span className="font-bold text-amber-600">{formatCurrency(totalCxc)}</span>
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Ingresos en Bancos USD</span>
+                                <span className="font-bold text-slate-600">{formatCurrency(totalUsdInBanks)}</span>
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-600 ml-2">&bull; Cuentas por Cobrar (CXC)</span>
+                                <span className="font-bold text-slate-600">{formatCurrency(totalCxc)}</span>
+                             </div>
+                         </div>
+                         <div className="p-3 bg-white">
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-black text-slate-900 uppercase tracking-wide">Total de Ventas</span>
+                                <span className="font-black text-xl text-emerald-600">{formatCurrency(incomesUsd + (incomesBs / (exchangeRate || 1)) + (totalBsInBanks / (exchangeRate || 1)) + totalUsdInBanks + totalCxc)}</span>
                              </div>
                          </div>
                       </div>
