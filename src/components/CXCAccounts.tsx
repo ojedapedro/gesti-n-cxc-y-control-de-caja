@@ -40,8 +40,15 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     e.preventDefault();
     if (!selectedAccount?.id || !editingPayment?.id) return;
 
+    const isCharge = editingPayment.type === 'charge';
+    const gross = isCharge ? (editingPayment.grossAmountUsd || editingPayment.amountUsd) : editingPayment.amountUsd;
+    const net = editingPayment.amountUsd;
+    const discount = isCharge ? (gross - net) : 0;
+
     const updates: Partial<CXCPayment> = {
-      amountUsd: editingPayment.amountUsd,
+      amountUsd: net,
+      grossAmountUsd: gross,
+      discountAmountUsd: discount,
       date: editingPayment.date || format(new Date(), 'yyyy-MM-dd'),
       concept: editingPayment.concept || '',
       type: editingPayment.type || 'payment',
@@ -62,13 +69,23 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     setEditingPayment(null);
   };
 
-  const [globalStats, setGlobalStats] = useState({ totalCharges: 0, totalPayments: 0, balance: 0 });
+  const [globalStats, setGlobalStats] = useState({ 
+    totalCharges: 0, 
+    totalPayments: 0, 
+    balance: 0,
+    totalGrossCharges: 0,
+    totalDiscounts: 0
+  });
 
 
 
   useEffect(() => {
-    dbService.getGlobalCXCStats().then(stats => setGlobalStats(stats));
-    return dbService.subscribeToCXCAccounts(setAccounts);
+    const unsubStats = dbService.subscribeToGlobalCXCStats(setGlobalStats);
+    const unsubAccounts = dbService.subscribeToCXCAccounts(setAccounts);
+    return () => {
+      unsubStats();
+      unsubAccounts();
+    };
   }, []);
 
   const getUrgencyStyles = (balance: number) => {
@@ -273,32 +290,50 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card p-6 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-            <AlertTriangle size={80} className="text-amber-600" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <Landmark size={60} className="text-slate-900" />
           </div>
-          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total CXC (Cargos)</p>
-          <p className="text-3xl font-black text-amber-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalCharges)}</p>
-          <p className="text-xs font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalCharges * exchangeRate)}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Monto Bruto CXC</p>
+          <p className="text-2xl font-black text-slate-800 tracking-tighter relative z-10">{formatCurrency(globalStats.totalGrossCharges)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalGrossCharges * exchangeRate)}</p>
         </div>
 
-        <div className="card p-6 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-            <CheckCircle size={80} className="text-emerald-600" />
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <Tag size={60} className="text-rose-600" />
           </div>
-          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Abonos</p>
-          <p className="text-3xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalPayments)}</p>
-          <p className="text-xs font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPayments * exchangeRate)}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Descuentos CXC</p>
+          <p className="text-2xl font-black text-rose-600 tracking-tighter relative z-10">-{formatCurrency(globalStats.totalDiscounts)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalDiscounts * exchangeRate)}</p>
         </div>
 
-        <div className="card p-6 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-            <CircleDollarSign size={80} className="text-blue-600" />
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <AlertTriangle size={60} className="text-amber-600" />
           </div>
-          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Saldo Pendiente Global</p>
-          <p className="text-3xl font-black text-blue-600 tracking-tighter relative z-10">{formatCurrency(globalStats.balance)}</p>
-          <p className="text-xs font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.balance * exchangeRate)}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total CXC (Neto)</p>
+          <p className="text-2xl font-black text-amber-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalCharges)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalCharges * exchangeRate)}</p>
+        </div>
+
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <CheckCircle size={60} className="text-emerald-600" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Abonos</p>
+          <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalPayments)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPayments * exchangeRate)}</p>
+        </div>
+
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden col-span-1 md:col-span-2 lg:col-span-1">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <CircleDollarSign size={60} className="text-blue-600" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Saldo Pendiente Global</p>
+          <p className="text-2xl font-black text-blue-600 tracking-tighter relative z-10">{formatCurrency(globalStats.balance)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.balance * exchangeRate)}</p>
         </div>
       </div>
 
@@ -642,6 +677,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                             {isCharge ? (
                               <>
                                 {formatCurrency(p.amountUsd)}
+                                {p.grossAmountUsd && p.grossAmountUsd !== p.amountUsd && (
+                                  <span className="block text-[9px] text-slate-400 font-normal">Bruto: {formatCurrency(p.grossAmountUsd)}</span>
+                                )}
                                 <span className="block text-[9px] text-rose-400 font-normal">Bs. {new Intl.NumberFormat('es-VE').format(p.amountUsd * exchangeRate)}</span>
                               </>
                             ) : ''}
@@ -721,7 +759,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="label">Monto (USD)</label>
+                  <label className="label">{editingPayment.type === 'charge' ? 'Monto Neto (USD)' : 'Monto (USD)'}</label>
                   <input
                     type="number"
                     step="0.01"
@@ -730,8 +768,28 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     onChange={(e) => setEditingPayment({ ...editingPayment, amountUsd: parseFloat(e.target.value) || 0 })}
                     className="input-field font-bold"
                   />
+                  {editingPayment.type === 'charge' && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded text-[11px] flex justify-between items-center text-blue-700 font-bold">
+                      <span>Descuento Calculado:</span>
+                      <span>{formatCurrency((editingPayment.grossAmountUsd || editingPayment.amountUsd) - editingPayment.amountUsd)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {editingPayment.type === 'charge' && (
+                <div className="space-y-1">
+                  <label className="label">Monto Bruto (USD)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editingPayment.grossAmountUsd || editingPayment.amountUsd}
+                    onChange={(e) => setEditingPayment({ ...editingPayment, grossAmountUsd: parseFloat(e.target.value) || 0 })}
+                    className="input-field"
+                  />
+                  <p className="text-[10px] text-slate-400 italic">Ingrese el monto original antes del descuento si aplica.</p>
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="label">Concepto</label>

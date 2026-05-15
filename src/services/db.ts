@@ -292,24 +292,70 @@ export const dbService = {
     }
   },
 
+  subscribeToGlobalCXCStats(callback: (stats: { totalCharges: number, totalPayments: number, balance: number, totalGrossCharges: number, totalDiscounts: number }) => void) {
+    const q = query(collectionGroup(db, 'payments'));
+    return onSnapshot(q, (snapshot) => {
+      let totalCharges = 0;
+      let totalPayments = 0;
+      let totalGrossCharges = 0;
+      let totalDiscounts = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const amt = Number(data.amountUsd) || 0;
+        
+        if (data.type === 'charge') {
+          const grossAmt = Number(data.grossAmountUsd) || amt;
+          const discAmt = Number(data.discountAmountUsd) || (grossAmt > amt ? grossAmt - amt : 0);
+          
+          totalCharges += amt;
+          totalGrossCharges += grossAmt;
+          totalDiscounts += discAmt;
+        } else {
+          totalPayments += amt;
+        }
+      });
+      callback({ 
+        totalCharges, 
+        totalPayments, 
+        balance: totalCharges - totalPayments,
+        totalGrossCharges,
+        totalDiscounts 
+      });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'collectionGroup:payments'));
+  },
+
   async getGlobalCXCStats() {
     try {
       const q = query(collectionGroup(db, 'payments'));
       const snapshot = await getDocs(q);
       let totalCharges = 0;
       let totalPayments = 0;
+      let totalGrossCharges = 0;
+      let totalDiscounts = 0;
       snapshot.forEach(doc => {
         const data = doc.data();
+        const amt = Number(data.amountUsd) || 0;
         if (data.type === 'charge') {
-          totalCharges += Number(data.amountUsd) || 0;
+          const grossAmt = Number(data.grossAmountUsd) || amt;
+          const discAmt = Number(data.discountAmountUsd) || (grossAmt > amt ? grossAmt - amt : 0);
+          
+          totalCharges += amt;
+          totalGrossCharges += grossAmt;
+          totalDiscounts += discAmt;
         } else {
-          totalPayments += Number(data.amountUsd) || 0;
+          totalPayments += amt;
         }
       });
-      return { totalCharges, totalPayments, balance: totalCharges - totalPayments };
+      return { 
+        totalCharges, 
+        totalPayments, 
+        balance: totalCharges - totalPayments,
+        totalGrossCharges,
+        totalDiscounts 
+      };
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'collectionGroup:payments');
-      return { totalCharges: 0, totalPayments: 0, balance: 0 };
+      return { totalCharges: 0, totalPayments: 0, balance: 0, totalGrossCharges: 0, totalDiscounts: 0 };
     }
   },
 

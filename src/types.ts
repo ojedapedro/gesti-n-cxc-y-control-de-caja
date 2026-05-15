@@ -59,6 +59,8 @@ export interface CXCPayment {
   clientId: string;
   date: string;
   amountUsd: number;
+  grossAmountUsd?: number;
+  discountAmountUsd?: number;
   amountBs?: number;
   exchangeRate?: number;
   concept?: string;
@@ -66,6 +68,7 @@ export interface CXCPayment {
   item?: string; // Correlative item
   invoiceNumber?: string;
   sellerName?: string;
+  sellerId?: string;
   paymentMethod?: PaymentMethod;
   destinationBank?: string;
   createdAt: any;

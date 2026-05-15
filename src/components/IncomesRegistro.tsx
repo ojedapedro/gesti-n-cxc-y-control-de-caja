@@ -31,6 +31,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     clientName: '',
     concept: '',
     amountUsd: '',
+    grossAmountUsd: '',
     amountBs: '',
     invoiceNumber: '',
     sellerName: '',
@@ -161,9 +162,15 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     if (!cxcData.clientName.trim() || !cxcData.amountUsd || !cxcData.concept.trim() || !cxcData.sellerName.trim() || !cxcData.invoiceNumber.trim()) return;
 
     try {
+      const gross = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
+      const net = parseFloat(cxcData.amountUsd) || 0;
+      const discountAmount = gross - net;
+
       await dbService.addCXCCharge(cxcData.clientName, {
         date: cxcData.date,
-        amountUsd: parseFloat(cxcData.amountUsd) || 0,
+        amountUsd: net,
+        grossAmountUsd: gross,
+        discountAmountUsd: discountAmount,
         amountBs: parseFloat(cxcData.amountBs) || 0,
         exchangeRate: parseFloat(cxcData.exchangeRate) || parseFloat(exchangeRate?.toString() || '1'),
         concept: cxcData.concept,
@@ -180,6 +187,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         clientName: '',
         concept: '',
         amountUsd: '',
+        grossAmountUsd: '',
         amountBs: '',
         invoiceNumber: '',
         sellerName: '',
@@ -404,7 +412,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         const sId = e.target.value;
                         const seller = sellers.find(s => s.id === sId);
                         if (seller) {
-                          const baseUsd = parseFloat(cxcData.amountUsd) || 0;
+                          const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
                           const discount = seller.discountPercentage / 100;
                           const finalUsd = baseUsd * (1 - discount);
                           const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
@@ -412,6 +420,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                             ...cxcData, 
                             sellerId: sId, 
                             sellerName: seller.name,
+                            grossAmountUsd: baseUsd.toString(),
                             amountUsd: finalUsd.toFixed(2),
                             amountBs: finalBs.toFixed(2)
                           });
@@ -441,13 +450,19 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       min="0.01"
                       required
                       placeholder="0.00"
+                      value={cxcData.grossAmountUsd}
                       onChange={(e) => {
                         const usd = parseFloat(e.target.value) || 0;
                         const seller = sellers.find(s => s.id === cxcData.sellerId);
                         const discount = seller ? (seller.discountPercentage / 100) : 0;
                         const finalUsd = usd * (1 - discount);
                         const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
-                        setCxcData({...cxcData, amountUsd: finalUsd.toFixed(2), amountBs: finalBs.toFixed(2)});
+                        setCxcData({
+                          ...cxcData, 
+                          grossAmountUsd: e.target.value,
+                          amountUsd: finalUsd.toFixed(2), 
+                          amountBs: finalBs.toFixed(2)
+                        });
                       }}
                       className="input-field pl-10 font-bold" 
                     />
