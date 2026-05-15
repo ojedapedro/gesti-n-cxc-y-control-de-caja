@@ -69,6 +69,7 @@ export interface CXCPayment {
   invoiceNumber?: string;
   sellerName?: string;
   sellerId?: string;
+  rubroName?: string;
   paymentMethod?: PaymentMethod;
   destinationBank?: string;
   createdAt: any;
@@ -112,11 +113,17 @@ export interface CashClosure {
   digitalKeyHash?: string; // Optional simple mechanism to unlock
 }
 
+export interface RubroDiscount {
+  name: string;
+  discountPercentage: number;
+}
+
 export interface Seller {
   id: string; // CI
   name: string;
   region: string;
   discountPercentage: number;
+  rubros?: RubroDiscount[];
   createdAt: any;
 }
 

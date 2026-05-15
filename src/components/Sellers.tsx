@@ -20,6 +20,7 @@ export default function Sellers() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingSeller, setEditingSeller] = useState<Seller | null>(null);
+  const [rubros, setRubros] = useState<{name: string, discount: string}[]>([]);
   const [formData, setFormData] = useState({
     id: '',
     name: '',
@@ -40,6 +41,7 @@ export default function Sellers() {
       region: seller.region,
       discountPercentage: seller.discountPercentage.toString()
     });
+    setRubros(seller.rubros?.map(r => ({ name: r.name, discount: r.discountPercentage.toString() })) || []);
     setShowForm(true);
   };
 
@@ -56,6 +58,12 @@ export default function Sellers() {
       name: formData.name.trim().toUpperCase(),
       region: formData.region.trim().toUpperCase(),
       discountPercentage: parseFloat(formData.discountPercentage) || 0,
+      rubros: rubros
+        .filter(r => r.name.trim() !== '')
+        .map(r => ({
+          name: r.name.trim().toUpperCase(),
+          discountPercentage: parseFloat(r.discount) || 0
+        })),
       createdAt: editingSeller?.createdAt || null
     };
 
@@ -63,6 +71,7 @@ export default function Sellers() {
     setShowForm(false);
     setEditingSeller(null);
     setFormData({ id: '', name: '', region: '', discountPercentage: '' });
+    setRubros([]);
   };
 
   const filteredSellers = sellers.filter(s => 
@@ -77,10 +86,11 @@ export default function Sellers() {
           <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Perfiles de Vendedores</h2>
           <p className="text-sm font-medium text-slate-500 mt-1">Gestión de vendedores y sus porcentajes de descuento.</p>
         </div>
-        <button 
+                <button 
           onClick={() => {
             setEditingSeller(null);
             setFormData({ id: '', name: '', region: '', discountPercentage: '' });
+            setRubros([]);
             setShowForm(true);
           }}
           className="btn-primary"
@@ -154,11 +164,25 @@ export default function Sellers() {
                 </div>
                 <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
                   <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                    <Percent size={10} /> Descuento
+                    <Percent size={10} /> Descuento Base
                   </p>
                   <p className="text-sm font-black text-blue-700">{seller.discountPercentage}%</p>
                 </div>
               </div>
+
+              {seller.rubros && seller.rubros.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Descuentos por Rubro</p>
+                  <div className="flex flex-wrap gap-2">
+                    {seller.rubros.map((r, i) => (
+                      <div key={i} className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 flex items-center gap-1">
+                        <span>{r.name}:</span>
+                        <span className="text-blue-600">{r.discountPercentage}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
@@ -240,7 +264,63 @@ export default function Sellers() {
                     className="input-field pl-10" 
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 font-medium">Este porcentaje se aplicará al monto de CXC.</p>
+                <p className="text-[10px] text-slate-400 font-medium">Este porcentaje se aplicará al monto de CXC si no se especifica un rubro.</p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <label className="text-[12px] font-black text-slate-700 uppercase tracking-widest flex items-center justify-between">
+                  Rubros Específicos
+                  <button 
+                    type="button" 
+                    onClick={() => setRubros([...rubros, {name: '', discount: ''}])}
+                    className="text-blue-600 hover:text-blue-700 p-1 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </label>
+                <div className="max-h-40 overflow-y-auto pr-2 space-y-2">
+                  {rubros.length === 0 && (
+                    <p className="text-[10px] text-slate-400 italic text-center py-2 bg-slate-50 rounded-lg">No hay rubros específicos agregados.</p>
+                  )}
+                  {rubros.map((rubro, idx) => (
+                    <div key={idx} className="flex gap-2 items-end group bg-slate-50 p-2 rounded-xl border border-slate-100">
+                      <div className="flex-1 space-y-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">Rubro (Ej: Pintura)</label>
+                        <input 
+                          placeholder="NOMBRE DEL RUBRO" 
+                          value={rubro.name}
+                          onChange={(e) => {
+                            const newRubros = [...rubros];
+                            newRubros[idx].name = e.target.value.toUpperCase();
+                            setRubros(newRubros);
+                          }}
+                          className="input-field text-[11px] h-8 uppercase"
+                        />
+                      </div>
+                      <div className="w-16 space-y-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">%</label>
+                        <input 
+                          type="number"
+                          placeholder="%" 
+                          value={rubro.discount}
+                          onChange={(e) => {
+                            const newRubros = [...rubros];
+                            newRubros[idx].discount = e.target.value;
+                            setRubros(newRubros);
+                          }}
+                          className="input-field text-[11px] h-8 px-2"
+                        />
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => setRubros(rubros.filter((_, i) => i !== idx))}
+                        className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">

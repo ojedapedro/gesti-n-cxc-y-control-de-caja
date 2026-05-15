@@ -53,6 +53,7 @@
         "date": { "type": "string", "format": "date-time" },
         "amountUsd": { "type": "number" },
         "concept": { "type": "string" },
+        "rubroName": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["clientId", "date", "amountUsd"]
@@ -90,6 +91,16 @@
         "name": { "type": "string" },
         "region": { "type": "string" },
         "discountPercentage": { "type": "number" },
+        "rubros": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "discountPercentage": { "type": "number" }
+            }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "name", "region", "discountPercentage"]

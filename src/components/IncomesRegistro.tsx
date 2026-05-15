@@ -36,6 +36,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     invoiceNumber: '',
     sellerName: '',
     sellerId: '',
+    rubroName: '',
     exchangeRate: exchangeRate?.toString() || '1',
     item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
   });
@@ -178,6 +179,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         invoiceNumber: cxcData.invoiceNumber,
         sellerName: cxcData.sellerName,
         sellerId: cxcData.sellerId,
+        rubroName: cxcData.rubroName,
         type: 'charge'
       });
 
@@ -192,6 +194,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         invoiceNumber: '',
         sellerName: '',
         sellerId: '',
+        rubroName: '',
         exchangeRate: exchangeRate?.toString() || '1',
         item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
       });
@@ -413,6 +416,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         const seller = sellers.find(s => s.id === sId);
                         if (seller) {
                           const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
+                          // If seller changes, reset rubro or keep if exists? Let's reset rubro for safety
                           const discount = seller.discountPercentage / 100;
                           const finalUsd = baseUsd * (1 - discount);
                           const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
@@ -420,12 +424,13 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                             ...cxcData, 
                             sellerId: sId, 
                             sellerName: seller.name,
+                            rubroName: '', // Reset rubro when seller changes
                             grossAmountUsd: baseUsd.toString(),
                             amountUsd: finalUsd.toFixed(2),
                             amountBs: finalBs.toFixed(2)
                           });
                         } else {
-                          setCxcData({...cxcData, sellerId: sId, sellerName: ''});
+                          setCxcData({...cxcData, sellerId: sId, sellerName: '', rubroName: ''});
                         }
                       }}
                       className="input-field pl-10 cursor-pointer"
@@ -437,6 +442,48 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     </select>
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label flex items-center justify-between">
+                  <span>Rubro / Categoría de Venta</span>
+                  {cxcData.rubroName && (
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-black uppercase">
+                      {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.find(r => r.name === cxcData.rubroName)?.discountPercentage}% Desc.
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <select 
+                    value={cxcData.rubroName}
+                    onChange={(e) => {
+                      const rName = e.target.value;
+                      const seller = sellers.find(s => s.id === cxcData.sellerId);
+                      const rubro = seller?.rubros?.find(r => r.name === rName);
+                      const discount = rubro ? (rubro.discountPercentage / 100) : (seller ? (seller.discountPercentage / 100) : 0);
+                      
+                      const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
+                      const finalUsd = baseUsd * (1 - discount);
+                      const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
+                      
+                      setCxcData({
+                        ...cxcData,
+                        rubroName: rName,
+                        amountUsd: finalUsd.toFixed(2),
+                        amountBs: finalBs.toFixed(2)
+                      });
+                    }}
+                    className="input-field pl-10 cursor-pointer disabled:bg-slate-50 disabled:text-slate-400"
+                    disabled={!cxcData.sellerId}
+                  >
+                    <option value="">Descuento Base del Vendedor</option>
+                    {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.map(r => (
+                      <option key={r.name} value={r.name}>{r.name} ({r.discountPercentage}%)</option>
+                    ))}
+                  </select>
+                </div>
+                {!cxcData.sellerId && <p className="text-[10px] text-amber-600 font-bold mt-1">Seleccione un vendedor para ver sus rubros.</p>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -454,7 +501,9 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       onChange={(e) => {
                         const usd = parseFloat(e.target.value) || 0;
                         const seller = sellers.find(s => s.id === cxcData.sellerId);
-                        const discount = seller ? (seller.discountPercentage / 100) : 0;
+                        const rubro = seller?.rubros?.find(r => r.name === cxcData.rubroName);
+                        const discount = rubro ? (rubro.discountPercentage / 100) : (seller ? (seller.discountPercentage / 100) : 0);
+                        
                         const finalUsd = usd * (1 - discount);
                         const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
                         setCxcData({
@@ -476,7 +525,11 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     <span>{formatCurrency(parseFloat(cxcData.amountUsd) || 0)}</span>
                     {cxcData.sellerId && (
                       <span className="text-[10px] bg-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1">
-                        <Percent size={10} /> {sellers.find(s => s.id === cxcData.sellerId)?.discountPercentage}% Descuento
+                        <Percent size={10} /> {(() => {
+                          const seller = sellers.find(s => s.id === cxcData.sellerId);
+                          const rubro = seller?.rubros?.find(r => r.name === cxcData.rubroName);
+                          return rubro ? rubro.discountPercentage : (seller?.discountPercentage || 0);
+                        })()}% Desc.
                       </span>
                     )}
                   </div>

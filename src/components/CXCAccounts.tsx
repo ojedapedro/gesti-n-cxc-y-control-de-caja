@@ -240,7 +240,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         payment.date,
         payment.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago'),
         fp,
-        payment.sellerName || '-',
+        payment.sellerName ? (payment.rubroName ? `${payment.sellerName} (${payment.rubroName})` : payment.sellerName) : '-',
         payment.item || '-',
         payment.invoiceNumber || '-',
         isCharge ? formatCurrency(payment.amountUsd) : '',
@@ -670,7 +670,10 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                             )}
                             {isCharge && <span className="text-slate-400">-</span>}
                           </td>
-                          <td className="table-cell font-bold text-slate-700">{p.sellerName || '-'}</td>
+                          <td className="table-cell font-bold text-slate-700">
+                            {p.sellerName || '-'}
+                            {p.rubroName && <span className="block text-[9px] text-blue-500 font-bold uppercase mt-0.5">{p.rubroName}</span>}
+                          </td>
                           <td className="table-cell font-mono text-slate-400 text-xs">{p.item || '-'}</td>
                           <td className="table-cell font-bold text-slate-700">{p.invoiceNumber || '-'}</td>
                           <td className="table-cell text-right font-bold text-rose-600">
