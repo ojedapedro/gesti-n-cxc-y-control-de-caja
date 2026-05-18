@@ -80,7 +80,7 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
       const historicalRate = await dbService.getExchangeRateForDate(dateStr);
       if (historicalRate) {
         setFormData(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
-      } else if (exchangeRate) {
+      } else if (exchangeRate !== undefined) {
         setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
       }
       setFetchingRate(false);

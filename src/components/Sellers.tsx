@@ -38,10 +38,13 @@ export default function Sellers() {
     setFormData({
       id: seller.id,
       name: seller.name,
-      region: seller.region,
-      commissionPercentage: seller.commissionPercentage.toString()
+      region: seller.region || '',
+      commissionPercentage: (seller.commissionPercentage || 0).toString()
     });
-    setRubros(seller.rubros?.map(r => ({ name: r.name, commission: r.commissionPercentage.toString() })) || []);
+    setRubros(seller.rubros?.map(r => ({ 
+      name: r.name, 
+      commission: (r.commissionPercentage || 0).toString() 
+    })) || []);
     setShowForm(true);
   };
 
@@ -139,16 +142,18 @@ export default function Sellers() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1">
                   <button 
                     onClick={() => handleEdit(seller)}
-                    className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors bg-slate-50 hover:bg-blue-50 rounded-lg"
+                    title="Editar"
                   >
                     <Edit size={16} />
                   </button>
                   <button 
                     onClick={() => handleDelete(seller.id)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors bg-slate-50 hover:bg-rose-50 rounded-lg"
+                    title="Eliminar"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -160,13 +165,13 @@ export default function Sellers() {
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
                     <MapPin size={10} /> Región
                   </p>
-                  <p className="text-xs font-bold text-slate-700 truncate">{seller.region}</p>
+                  <p className="text-xs font-bold text-slate-700 truncate">{seller.region || 'N/A'}</p>
                 </div>
                 <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
                   <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1">
                     <Percent size={10} /> Comisión Base
                   </p>
-                  <p className="text-sm font-black text-blue-700">{seller.commissionPercentage}%</p>
+                  <p className="text-sm font-black text-blue-700">{(seller.commissionPercentage || 0)}%</p>
                 </div>
               </div>
 
@@ -177,7 +182,7 @@ export default function Sellers() {
                     {seller.rubros.map((r, i) => (
                       <div key={i} className="px-2 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 flex items-center gap-1">
                         <span>{r.name}:</span>
-                        <span className="text-blue-600">{r.commissionPercentage}%</span>
+                        <span className="text-blue-600">{(r.commissionPercentage || 0)}%</span>
                       </div>
                     ))}
                   </div>
@@ -331,8 +336,18 @@ export default function Sellers() {
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="btn-primary">
-                  {editingSeller ? 'Guardar Cambios' : 'Crear Vendedor'}
+                <button type="submit" className="btn-primary flex items-center justify-center gap-2 min-w-[140px]">
+                  {editingSeller ? (
+                    <>
+                      <Edit size={18} />
+                      Guardar Cambios
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={18} />
+                      Crear Vendedor
+                    </>
+                  )}
                 </button>
               </div>
             </form>

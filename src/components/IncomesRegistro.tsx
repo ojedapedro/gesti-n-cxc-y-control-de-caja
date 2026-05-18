@@ -54,7 +54,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         } else {
           setFormData(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
         }
-      } else if (exchangeRate) {
+      } else if (exchangeRate !== undefined) {
         // Fallback to prop if no history
         if (isCxc) {
           setCxcData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
@@ -74,7 +74,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
 
   // Sync rate when prop changes or when form is opened
   useEffect(() => {
-    if (exchangeRate) {
+    if (exchangeRate !== undefined) {
       setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
     }
   }, [exchangeRate, showForm]);
@@ -89,7 +89,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
   }, []);
 
   useEffect(() => {
-    const rateToUse = exchangeRate ? exchangeRate.toString() : '1';
+    const rateToUse = (exchangeRate !== undefined) ? exchangeRate.toString() : '1';
     
     // Attempt to find a transaction for the currently selected date to pick its exchange rate
     const dateTx = transactions.find(t => t.date === cxcData.date && t.exchangeRate && t.exchangeRate > 0);

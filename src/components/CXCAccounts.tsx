@@ -34,7 +34,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       const historicalRate = await dbService.getExchangeRateForDate(dateStr);
       if (historicalRate) {
         setPaymentData(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
-      } else if (exchangeRate) {
+      } else if (exchangeRate !== undefined) {
         setPaymentData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
       }
       setFetchingRate(false);
