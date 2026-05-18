@@ -91,15 +91,16 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        // We ignore credit sales (CXC charges) for the inflow counters as they represent debt, not received money.
        if (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) {
           if (t.paymentMethod === PaymentMethod.CXC) return;
+          const pm = t.paymentMethod as string;
 
           // Handle BS explicitly typed as Bs Equivalents
           if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
              const eqUsd = t.amountBs / t.exchangeRate;
-             const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares Efectivo';
+             const isBsCash = isCashByName || pm === 'Bs Efectivo' || pm === 'Bs' || pm === 'Bolivares Efectivo';
              if (isBsCash) totalBsEfectivo += eqUsd;
              else totalBsBanco += eqUsd;
-          } else if (t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') {
-             if (isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') totalBsEfectivo += t.amountUsd; 
+          } else if (pm === 'Transferencia Bs / Pago Móvil' || pm === 'Bolivares' || pm === 'Bs Efectivo' || pm === 'Bs') {
+             if (isCashByName || pm === 'Bs Efectivo' || pm === 'Bs') totalBsEfectivo += t.amountUsd; 
              else totalBsBanco += t.amountUsd;
           }
           
@@ -108,7 +109,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
                             (t.amountBs && t.exchangeRate ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd);
 
           if (usdAmount > 0.001) {
-             const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo';
+             const isUsdCash = isCashByName || pm === '$ Efectivo' || pm === '$' || pm === 'Dolares Efectivo';
              if (isUsdCash) totalUsdEfectivo += usdAmount;
              else totalUsdBanco += usdAmount;
           }
