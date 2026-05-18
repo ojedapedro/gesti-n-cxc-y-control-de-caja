@@ -106,7 +106,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     totalPayments: 0, 
     balance: 0,
     totalGrossCharges: 0,
-    totalCommissions: 0
+    totalCommissions: 0,
+    totalWarranty: 0,
+    totalDonation: 0
   });
 
 
@@ -322,7 +324,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
         <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
             <Landmark size={60} className="text-slate-900" />
@@ -332,7 +334,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
           <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalGrossCharges * exchangeRate)}</p>
         </div>
 
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden text-rose-600">
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
             <Tag size={60} className="text-rose-600" />
           </div>
@@ -357,6 +359,24 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Abonos</p>
           <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalPayments)}</p>
           <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPayments * exchangeRate)}</p>
+        </div>
+
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <History size={60} className="text-purple-600" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Garantías Aplicadas</p>
+          <p className="text-2xl font-black text-purple-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalWarranty)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalWarranty * exchangeRate)}</p>
+        </div>
+
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <Tag size={60} className="text-pink-600" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Donaciones/Excenciones</p>
+          <p className="text-2xl font-black text-pink-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalDonation)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalDonation * exchangeRate)}</p>
         </div>
 
         <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden col-span-1 md:col-span-2 lg:col-span-1">

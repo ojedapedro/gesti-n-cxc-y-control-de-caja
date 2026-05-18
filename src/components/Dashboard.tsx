@@ -23,7 +23,7 @@ import {
   Cell
 } from 'recharts';
 import { dbService } from '../services/db';
-import { TransactionType, type Transaction, type Expense, type CXCAccount } from '../types';
+import { TransactionType, PaymentMethod, type Transaction, type Expense, type CXCAccount } from '../types';
 import { formatCurrency } from '../lib/utils';
 import { startOfMonth, endOfMonth, format, subMonths, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -64,37 +64,66 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
   let totalBsEfectivo = 0;
   let totalUsdBanco = 0;
   let totalUsdEfectivo = 0;
+  let totalVentas = 0;
+  let periodCxcCharges = 0;
+  let periodCxcPayments = 0;
   
   transactions
-    .filter(t => (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) && filterByDate(t.date))
+    .filter(t => filterByDate(t.date))
     .forEach(t => {
        const dest = (t.destinationBank || '').toUpperCase();
        const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
        
-       // Handle BS explicitly typed as Bs Equivalents
-       if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
-          const eqUsd = t.amountBs / t.exchangeRate;
-          const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares Efectivo';
-          if (isBsCash) totalBsEfectivo += eqUsd;
-          else totalBsBanco += eqUsd;
-       } else if (t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') {
-          if (isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') totalBsEfectivo += t.amountUsd; 
-          else totalBsBanco += t.amountUsd;
+       // 1. SALES VOLUME: Sum all sales within period (Cash, Bank, and Credit)
+       if (t.type === TransactionType.SALE) {
+          totalVentas += t.amountUsd;
        }
-       
-       // Handle USD
-       const usdAmount = t.amountUsdCash && t.amountUsdCash > 0 ? t.amountUsdCash : 
-                         (t.amountBs && t.exchangeRate ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd);
 
-       if (usdAmount > 0.001) {
-          const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo';
-          if (isUsdCash) totalUsdEfectivo += usdAmount;
-          else totalUsdBanco += usdAmount;
+       // Track CXC movements for the period
+       if (t.isCXC && t.type === TransactionType.SALE) {
+          periodCxcCharges += t.amountUsd;
+       }
+       if (t.type === TransactionType.INCOME && t.concept?.includes('ABONO CUENTAS POR COBRAR')) {
+          periodCxcPayments += t.amountUsd;
+       }
+
+       // 2. CASH FLOW: Sum actual money entering (Cash Sales + All Incomes/Payments)
+       // We ignore credit sales (CXC charges) for the inflow counters as they represent debt, not received money.
+       if (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) {
+          if (t.paymentMethod === PaymentMethod.CXC) return;
+
+          // Handle BS explicitly typed as Bs Equivalents
+          if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
+             const eqUsd = t.amountBs / t.exchangeRate;
+             const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares Efectivo';
+             if (isBsCash) totalBsEfectivo += eqUsd;
+             else totalBsBanco += eqUsd;
+          } else if (t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') {
+             if (isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') totalBsEfectivo += t.amountUsd; 
+             else totalBsBanco += t.amountUsd;
+          }
+          
+          // Handle USD
+          const usdAmount = t.amountUsdCash && t.amountUsdCash > 0 ? t.amountUsdCash : 
+                            (t.amountBs && t.exchangeRate ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd);
+
+          if (usdAmount > 0.001) {
+             const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo';
+             if (isUsdCash) totalUsdEfectivo += usdAmount;
+             else totalUsdBanco += usdAmount;
+          }
        }
     });
 
-  const totalCXC = cxcAccounts.reduce((sum, acc) => sum + acc.totalBalance, 0);
-  const totalVentas = totalBsBanco + totalBsEfectivo + totalUsdBanco + totalUsdEfectivo + totalCXC;
+  // User requested CXC to only show gross sales (charges) without abonos
+  const isFiltered = !!(startDate || endDate);
+  
+  // Calculate total gross CXC charges across all time for non-filtered view
+  const totalGlobalGrossCxc = transactions
+    .filter(t => t.isCXC && t.type === TransactionType.SALE)
+    .reduce((sum, t) => sum + t.amountUsd, 0);
+
+  const displayCXCValue = isFiltered ? periodCxcCharges : totalGlobalGrossCxc;
 
   // We still calculate period expenses and withdrawals for the charts
   const periodWithdrawals = transactions
@@ -143,7 +172,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     { label: 'TOTAL INGRESO BOLIVARES EFECTIVO', value: totalBsEfectivo, icon: Banknote, color: 'text-teal-600', bg: 'bg-teal-50' },
     { label: 'TOTAL INGRESO DOLARES BANCO', value: totalUsdBanco, icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'TOTAL INGRESO DOLARES EFECTIVO', value: totalUsdEfectivo, icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'TOTAL CUENTAS POR COBRAR (CXC)', value: totalCXC, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: isFiltered ? 'VENTAS BRUTAS CXC (PERIODO)' : 'TOTAL VENTAS A CRÉDITO (CXC BRUTO)', value: displayCXCValue, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
   if (loading) {

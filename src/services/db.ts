@@ -293,13 +293,23 @@ export const dbService = {
     }
   },
 
-  subscribeToGlobalCXCStats(callback: (stats: { totalCharges: number, totalPayments: number, balance: number, totalGrossCharges: number, totalCommissions: number }) => void) {
+  subscribeToGlobalCXCStats(callback: (stats: { 
+    totalCharges: number, 
+    totalPayments: number, 
+    balance: number, 
+    totalGrossCharges: number, 
+    totalCommissions: number,
+    totalWarranty: number,
+    totalDonation: number
+  }) => void) {
     const q = query(collectionGroup(db, 'payments'));
     return onSnapshot(q, (snapshot) => {
       let totalCharges = 0;
       let totalPayments = 0;
       let totalGrossCharges = 0;
       let totalCommissions = 0;
+      let totalWarranty = 0;
+      let totalDonation = 0;
       snapshot.forEach(doc => {
         const data = doc.data();
         const amt = Number(data.amountUsd) || 0;
@@ -313,6 +323,17 @@ export const dbService = {
           totalCommissions += commAmt;
         } else {
           totalPayments += amt;
+          
+          // Check for Warranty or Donation in payment method or destination bank
+          const dest = (data.destinationBank || '').toUpperCase();
+          const pMethod = (data.paymentMethod || '').toUpperCase();
+          
+          if (dest.includes('GARANTÍA') || pMethod.includes('GARANTÍA')) {
+            totalWarranty += amt;
+          }
+          if (dest.includes('DONACIÓN') || pMethod.includes('DONACIÓN')) {
+            totalDonation += amt;
+          }
         }
       });
       callback({ 
@@ -320,7 +341,9 @@ export const dbService = {
         totalPayments, 
         balance: totalCharges - totalPayments,
         totalGrossCharges,
-        totalCommissions 
+        totalCommissions,
+        totalWarranty,
+        totalDonation
       });
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'collectionGroup:payments'));
   },
@@ -333,6 +356,8 @@ export const dbService = {
       let totalPayments = 0;
       let totalGrossCharges = 0;
       let totalCommissions = 0;
+      let totalWarranty = 0;
+      let totalDonation = 0;
       snapshot.forEach(doc => {
         const data = doc.data();
         const amt = Number(data.amountUsd) || 0;
@@ -345,6 +370,16 @@ export const dbService = {
           totalCommissions += commAmt;
         } else {
           totalPayments += amt;
+          
+          const dest = (data.destinationBank || '').toUpperCase();
+          const pMethod = (data.paymentMethod || '').toUpperCase();
+          
+          if (dest.includes('GARANTÍA') || pMethod.includes('GARANTÍA')) {
+            totalWarranty += amt;
+          }
+          if (dest.includes('DONACIÓN') || pMethod.includes('DONACIÓN')) {
+            totalDonation += amt;
+          }
         }
       });
       return { 
@@ -352,11 +387,13 @@ export const dbService = {
         totalPayments, 
         balance: totalCharges - totalPayments,
         totalGrossCharges,
-        totalCommissions 
+        totalCommissions,
+        totalWarranty,
+        totalDonation
       };
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'collectionGroup:payments');
-      return { totalCharges: 0, totalPayments: 0, balance: 0, totalGrossCharges: 0, totalCommissions: 0 };
+      return { totalCharges: 0, totalPayments: 0, balance: 0, totalGrossCharges: 0, totalCommissions: 0, totalWarranty: 0, totalDonation: 0 };
     }
   },
 
