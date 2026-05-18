@@ -132,6 +132,12 @@ export interface Settings {
   lastUpdated: any;
 }
 
+export interface ExchangeRateEntry {
+  date: string; // YYYY-MM-DD
+  rate: number;
+  updatedAt: any;
+}
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',

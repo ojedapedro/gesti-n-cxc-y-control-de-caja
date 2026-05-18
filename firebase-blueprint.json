@@ -104,6 +104,17 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "name", "region", "commissionPercentage"]
+    },
+    "ExchangeRateEntry": {
+      "title": "Exchange Rate History Entry",
+      "description": "Historical record of currency exchange rates by date.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "rate": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["date", "rate"]
     }
   },
   "firestore": {
@@ -134,6 +145,10 @@
     "/settings": {
       "schema": "Settings",
       "description": "Global configuration."
+    },
+    "/exchange_rates": {
+      "schema": "ExchangeRateEntry",
+      "description": "Historical exchange rates record."
     }
   }
 }

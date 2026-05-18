@@ -60,6 +60,7 @@ const RECEIPTS_PATH = 'receipts';
 const CASH_CLOSURES_PATH = 'cash_closures';
 const SELLERS_PATH = 'sellers';
 const SETTINGS_PATH = 'settings';
+const EXCHANGE_RATES_PATH = 'exchange_rates';
 
 export const dbService = {
   // Sellers
@@ -529,15 +530,38 @@ export const dbService = {
     }
   },
 
-  async updateExchangeRate(rate: number) {
+  async updateExchangeRate(rate: number, date?: string) {
     try {
-      const docRef = doc(db, 'settings', 'global');
-      await setDoc(docRef, {
+      // 1. Update global settings
+      const settingsRef = doc(db, 'settings', 'global');
+      await setDoc(settingsRef, {
         exchangeRate: rate,
         lastUpdated: serverTimestamp(),
       }, { merge: true });
+
+      // 2. Save to history
+      const targetDate = date || new Date().toISOString().split('T')[0];
+      const historyRef = doc(db, EXCHANGE_RATES_PATH, targetDate);
+      await setDoc(historyRef, {
+        date: targetDate,
+        rate: rate,
+        updatedAt: serverTimestamp()
+      });
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'settings');
+      handleFirestoreError(error, OperationType.WRITE, 'settings/exchange_rates');
+    }
+  },
+
+  async getExchangeRateForDate(date: string) {
+    try {
+      const docRef = doc(db, EXCHANGE_RATES_PATH, date);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return docSnap.data().rate as number;
+      }
+      return null;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, EXCHANGE_RATES_PATH);
     }
   },
 

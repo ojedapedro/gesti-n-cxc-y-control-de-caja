@@ -16,13 +16,14 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [fetchingRate, setFetchingRate] = useState(false);
 
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     paymentMethod: PaymentMethod.BS_CASH,
     destinationBank: '',
     amount: '',
-    exchangeRate: exchangeRate?.toString() || '480',
+    exchangeRate: exchangeRate?.toString() || '0',
     concept: 'INGRESO',
   });
 
@@ -37,9 +38,39 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     sellerName: '',
     sellerId: '',
     rubroName: '',
-    exchangeRate: exchangeRate?.toString() || '1',
+    exchangeRate: exchangeRate?.toString() || '0',
     item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
   });
+
+  // Fetch historical rate when date changes
+  useEffect(() => {
+    const fetchRate = async (date: string, isCxc: boolean) => {
+      if (!date) return;
+      setFetchingRate(true);
+      const historicalRate = await dbService.getExchangeRateForDate(date);
+      if (historicalRate) {
+        if (isCxc) {
+          setCxcData(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
+        } else {
+          setFormData(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
+        }
+      } else if (exchangeRate) {
+        // Fallback to prop if no history
+        if (isCxc) {
+          setCxcData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+        } else {
+          setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+        }
+      }
+      setFetchingRate(false);
+    };
+
+    if (!showCXCModal) {
+      fetchRate(formData.date, false);
+    } else {
+      fetchRate(cxcData.date, true);
+    }
+  }, [formData.date, cxcData.date, showCXCModal, exchangeRate]);
 
   // Sync rate when prop changes or when form is opened
   useEffect(() => {

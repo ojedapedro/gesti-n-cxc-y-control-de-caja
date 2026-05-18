@@ -67,14 +67,29 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
     note: '',
     amount: '',
     paymentMethod: PaymentMethod.USD_CASH as string,
-    exchangeRate: exchangeRate?.toString() || '1',
+    exchangeRate: exchangeRate?.toString() || '0',
   });
 
+  const [fetchingRate, setFetchingRate] = useState(false);
+
+  // Fetch historical rate when date changes
   useEffect(() => {
-    if (exchangeRate) {
-      setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+    const fetchRate = async (dateStr: string) => {
+      if (!dateStr) return;
+      setFetchingRate(true);
+      const historicalRate = await dbService.getExchangeRateForDate(dateStr);
+      if (historicalRate) {
+        setFormData(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
+      } else if (exchangeRate) {
+        setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+      }
+      setFetchingRate(false);
+    };
+
+    if (showForm) {
+      fetchRate(formData.date);
     }
-  }, [exchangeRate, showForm]);
+  }, [formData.date, showForm, exchangeRate]);
 
   const defaultStartDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const defaultEndDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');

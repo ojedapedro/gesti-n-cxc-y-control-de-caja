@@ -17,18 +17,50 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const [editingPayment, setEditingPayment] = useState<CXCPayment | null>(null);
   const [paymentData, setPaymentData] = useState({
     amount: '',
-    exchangeRate: exchangeRate?.toString() || '1',
+    exchangeRate: exchangeRate?.toString() || '0',
     date: format(new Date(), 'yyyy-MM-dd'),
     concept: 'ABONO',
     paymentMethod: PaymentMethod.BS_CASH,
     destinationBank: '',
   });
 
+  const [fetchingRate, setFetchingRate] = useState(false);
+
+  // Fetch historical rate when date changes
   useEffect(() => {
-    if (exchangeRate) {
-      setPaymentData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+    const fetchRate = async (dateStr: string) => {
+      if (!dateStr) return;
+      setFetchingRate(true);
+      const historicalRate = await dbService.getExchangeRateForDate(dateStr);
+      if (historicalRate) {
+        setPaymentData(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
+      } else if (exchangeRate) {
+        setPaymentData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+      }
+      setFetchingRate(false);
+    };
+
+    if (showPaymentForm) {
+      fetchRate(paymentData.date);
     }
-  }, [exchangeRate, showPaymentForm]);
+  }, [paymentData.date, showPaymentForm, exchangeRate]);
+
+  // Also handle editing payment rate if needed
+  useEffect(() => {
+    const fetchEditRate = async (dateStr: string) => {
+      if (!dateStr || !editingPayment) return;
+      setFetchingRate(true);
+      const historicalRate = await dbService.getExchangeRateForDate(dateStr);
+      if (historicalRate) {
+        setEditingPayment(prev => prev ? { ...prev, exchangeRate: historicalRate } : null);
+      }
+      setFetchingRate(false);
+    };
+
+    if (editingPayment?.date) {
+      fetchEditRate(editingPayment.date);
+    }
+  }, [editingPayment?.date]);
 
   const inBolivares = paymentData.paymentMethod === PaymentMethod.BS || paymentData.paymentMethod === PaymentMethod.BS_CASH;
   const inputAmt = parseFloat(paymentData.amount) || 0;

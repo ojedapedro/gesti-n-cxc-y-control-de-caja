@@ -8,6 +8,7 @@ import { es } from 'date-fns/locale';
 export default function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [rate, setRate] = useState<string>('');
+  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export default function Settings() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    await dbService.updateExchangeRate(parseFloat(rate));
+    await dbService.updateExchangeRate(parseFloat(rate), date);
     setSaving(false);
   };
 
@@ -45,46 +46,59 @@ export default function Settings() {
         </div>
 
         <form onSubmit={handleSave} className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex justify-between items-end mb-2">
-              <label className="label mb-0">Tasa Oficial (Venta)</label>
-              <button 
-                type="button" 
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
-                    const data = await res.json();
-                    if (data && data.promedio) {
-                      setRate(data.promedio.toString());
-                      await dbService.updateExchangeRate(data.promedio);
-                    }
-                  } catch (error) {
-                    console.error("Error fetching official rate", error);
-                    alert("No se pudo obtener la tasa oficial. Por favor intente manualmente.");
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-                disabled={saving}
-                className="text-xs bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-bold px-3 py-1.5 rounded flex items-center gap-2 transition-colors disabled:opacity-50"
-              >
-                <RefreshCcw size={14} className={saving ? "animate-spin" : ""} />
-                Obtener Oficial (BCV)
-              </button>
-            </div>
-            <div className="relative">
-              <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="label">Fecha de Aplicación</label>
               <input 
-                type="number" 
-                step="0.01"
-                required
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                placeholder="0.00"
-                className="w-full text-3xl font-black bg-slate-50 border-2 border-slate-200 rounded-2xl px-12 py-6 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all text-blue-600"
+                type="date" 
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="input-field"
               />
-              <span className="absolute right-6 top-1/2 -translate-y-1/2 font-bold text-slate-400">BS / $</span>
+              <p className="text-[10px] text-slate-400">La tasa se guardará en el historial para esta fecha.</p>
+            </div>
+            
+            <div className="space-y-1">
+              <div className="flex justify-between items-end mb-1">
+                <label className="label mb-0">Tasa Oficial (Venta)</label>
+                <button 
+                  type="button" 
+                  onClick={async () => {
+                    setSaving(true);
+                    try {
+                      const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+                      const data = await res.json();
+                      if (data && data.promedio) {
+                        setRate(data.promedio.toString());
+                        // When fetching official, we use the selected date
+                        await dbService.updateExchangeRate(data.promedio, date);
+                      }
+                    } catch (error) {
+                      console.error("Error fetching official rate", error);
+                      alert("No se pudo obtener la tasa oficial. Por favor intente manualmente.");
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="text-[10px] bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCcw size={12} className={saving ? "animate-spin" : ""} />
+                  BCV
+                </button>
+              </div>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                <input 
+                  type="number" 
+                  step="0.01"
+                  required
+                  value={rate}
+                  onChange={(e) => setRate(e.target.value)}
+                  placeholder="0.00"
+                  className="input-field pl-10 font-bold text-blue-600"
+                />
+              </div>
             </div>
           </div>
 

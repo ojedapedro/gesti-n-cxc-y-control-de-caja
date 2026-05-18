@@ -20,7 +20,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
     recipient: '',
     amount: '',
     paymentMethod: PaymentMethod.USD_CASH as string,
-    exchangeRate: exchangeRate?.toString() || '1',
+    exchangeRate: exchangeRate?.toString() || '0',
     concept: 'RETIRO EN EFECTIVO',
     date: format(new Date(), 'yyyy-MM-dd'),
   });
@@ -31,11 +31,26 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
     dbService.getReceipts().then(res => setReceipts(res || []));
   }, []);
 
+  const [fetchingRate, setFetchingRate] = useState(false);
+
+  // Fetch historical rate when date changes
   useEffect(() => {
-    if (exchangeRate) {
-      setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+    const fetchRate = async (dateStr: string) => {
+      if (!dateStr) return;
+      setFetchingRate(true);
+      const historicalRate = await dbService.getExchangeRateForDate(dateStr);
+      if (historicalRate) {
+        setFormData(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
+      } else if (exchangeRate) {
+        setFormData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+      }
+      setFetchingRate(false);
+    };
+
+    if (showForm) {
+      fetchRate(formData.date);
     }
-  }, [exchangeRate, showForm]);
+  }, [formData.date, showForm, exchangeRate]);
 
   const inBolivares = formData.paymentMethod === PaymentMethod.BS || formData.paymentMethod === PaymentMethod.BS_CASH;
   const inputAmt = parseFloat(formData.amount) || 0;
