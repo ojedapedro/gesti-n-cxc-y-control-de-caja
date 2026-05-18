@@ -43,12 +43,12 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     const isCharge = editingPayment.type === 'charge';
     const gross = isCharge ? (editingPayment.grossAmountUsd || editingPayment.amountUsd) : editingPayment.amountUsd;
     const net = editingPayment.amountUsd;
-    const discount = isCharge ? (gross - net) : 0;
+    const commission = isCharge ? (gross - net) : 0;
 
     const updates: Partial<CXCPayment> = {
       amountUsd: net,
       grossAmountUsd: gross,
-      discountAmountUsd: discount,
+      commissionAmountUsd: commission,
       date: editingPayment.date || format(new Date(), 'yyyy-MM-dd'),
       concept: editingPayment.concept || '',
       type: editingPayment.type || 'payment',
@@ -74,7 +74,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     totalPayments: 0, 
     balance: 0,
     totalGrossCharges: 0,
-    totalDiscounts: 0
+    totalCommissions: 0
   });
 
 
@@ -304,9 +304,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
             <Tag size={60} className="text-rose-600" />
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Descuentos CXC</p>
-          <p className="text-2xl font-black text-rose-600 tracking-tighter relative z-10">-{formatCurrency(globalStats.totalDiscounts)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalDiscounts * exchangeRate)}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Comisiones CXC</p>
+          <p className="text-2xl font-black text-rose-600 tracking-tighter relative z-10">-{formatCurrency(globalStats.totalCommissions)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalCommissions * exchangeRate)}</p>
         </div>
 
         <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
@@ -543,6 +543,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="BANCO DEL TESORO" />
                               <option value="BNC" />
                               <option value="EFECTIVO" />
+                              <option value="GARANTÍA" />
+                              <option value="DONACIÓN" />
+                              <option value="CUENTAS POR COBRAR (CXC)" />
                             </>
                           ) : (
                             <>
@@ -554,6 +557,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="BINANCE P2P" />
                               <option value="ZELLE" />
                               <option value="EFECTIVO" />
+                              <option value="GARANTÍA" />
+                              <option value="DONACIÓN" />
+                              <option value="CUENTAS POR COBRAR (CXC)" />
                             </>
                           )}
                         </datalist>
@@ -681,7 +687,11 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <>
                                 {formatCurrency(p.amountUsd)}
                                 {p.grossAmountUsd && p.grossAmountUsd !== p.amountUsd && (
-                                  <span className="block text-[9px] text-slate-400 font-normal">Bruto: {formatCurrency(p.grossAmountUsd)}</span>
+                                  <span className="block text-[9px] text-slate-400 font-normal">
+                                    Bruto: {formatCurrency(p.grossAmountUsd)} 
+                                    <span className="text-rose-400 mx-1">•</span> 
+                                    Comis: {formatCurrency(p.grossAmountUsd - p.amountUsd)}
+                                  </span>
                                 )}
                                 <span className="block text-[9px] text-rose-400 font-normal">Bs. {new Intl.NumberFormat('es-VE').format(p.amountUsd * exchangeRate)}</span>
                               </>
@@ -773,7 +783,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                   />
                   {editingPayment.type === 'charge' && (
                     <div className="mt-2 p-2 bg-blue-50 rounded text-[11px] flex justify-between items-center text-blue-700 font-bold">
-                      <span>Descuento Calculado:</span>
+                      <span>Comisión Calculada:</span>
                       <span>{formatCurrency((editingPayment.grossAmountUsd || editingPayment.amountUsd) - editingPayment.amountUsd)}</span>
                     </div>
                   )}
@@ -790,7 +800,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     onChange={(e) => setEditingPayment({ ...editingPayment, grossAmountUsd: parseFloat(e.target.value) || 0 })}
                     className="input-field"
                   />
-                  <p className="text-[10px] text-slate-400 italic">Ingrese el monto original antes del descuento si aplica.</p>
+                  <p className="text-[10px] text-slate-400 italic">Ingrese el monto original antes de la comisión si aplica.</p>
                 </div>
               )}
 
@@ -804,6 +814,33 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                   className="input-field"
                 />
               </div>
+
+              {editingPayment.type !== 'charge' && (
+                <div className="space-y-1">
+                  <label className="label">Banco / Destino</label>
+                  <input
+                    type="text"
+                    value={editingPayment.destinationBank || ''}
+                    onChange={(e) => setEditingPayment({ ...editingPayment, destinationBank: e.target.value.toUpperCase() })}
+                    className="input-field uppercase"
+                    list="bancos-list-edit-cxc"
+                  />
+                  <datalist id="bancos-list-edit-cxc">
+                    <option value="BANESCO" />
+                    <option value="PROVINCIAL" />
+                    <option value="MERCANTIL" />
+                    <option value="VENEZUELA" />
+                    <option value="BANCO DEL TESORO" />
+                    <option value="BNC" />
+                    <option value="EFECTIVO" />
+                    <option value="GARANTÍA" />
+                    <option value="DONACIÓN" />
+                    <option value="CUENTAS POR COBRAR (CXC)" />
+                    <option value="BINANCE P2P" />
+                    <option value="ZELLE" />
+                  </datalist>
+                </div>
+              )}
 
               {editingPayment.type === 'charge' && (
                 <div className="grid grid-cols-2 gap-4">

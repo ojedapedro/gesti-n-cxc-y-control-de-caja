@@ -165,13 +165,13 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     try {
       const gross = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
       const net = parseFloat(cxcData.amountUsd) || 0;
-      const discountAmount = gross - net;
+      const commissionAmount = gross - net;
 
       await dbService.addCXCCharge(cxcData.clientName, {
         date: cxcData.date,
         amountUsd: net,
         grossAmountUsd: gross,
-        discountAmountUsd: discountAmount,
+        commissionAmountUsd: commissionAmount,
         amountBs: parseFloat(cxcData.amountBs) || 0,
         exchangeRate: parseFloat(cxcData.exchangeRate) || parseFloat(exchangeRate?.toString() || '1'),
         concept: cxcData.concept,
@@ -417,8 +417,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         if (seller) {
                           const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
                           // If seller changes, reset rubro or keep if exists? Let's reset rubro for safety
-                          const discount = seller.discountPercentage / 100;
-                          const finalUsd = baseUsd * (1 - discount);
+                          const commission = seller.commissionPercentage / 100;
+                          const finalUsd = baseUsd * (1 - commission);
                           const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
                           setCxcData({
                             ...cxcData, 
@@ -437,7 +437,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     >
                       <option value="">Seleccione Vendedor...</option>
                       {sellers.map(s => (
-                        <option key={s.id} value={s.id}>{s.name} ({s.discountPercentage}%)</option>
+                        <option key={s.id} value={s.id}>{s.name} ({s.commissionPercentage}%)</option>
                       ))}
                     </select>
                   </div>
@@ -449,7 +449,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <span>Rubro / Categoría de Venta</span>
                   {cxcData.rubroName && (
                     <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-black uppercase">
-                      {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.find(r => r.name === cxcData.rubroName)?.discountPercentage}% Desc.
+                      {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.find(r => r.name === cxcData.rubroName)?.commissionPercentage}% Comis.
                     </span>
                   )}
                 </label>
@@ -461,10 +461,10 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       const rName = e.target.value;
                       const seller = sellers.find(s => s.id === cxcData.sellerId);
                       const rubro = seller?.rubros?.find(r => r.name === rName);
-                      const discount = rubro ? (rubro.discountPercentage / 100) : (seller ? (seller.discountPercentage / 100) : 0);
+                      const commission = rubro ? (rubro.commissionPercentage / 100) : (seller ? (seller.commissionPercentage / 100) : 0);
                       
                       const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
-                      const finalUsd = baseUsd * (1 - discount);
+                      const finalUsd = baseUsd * (1 - commission);
                       const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
                       
                       setCxcData({
@@ -477,9 +477,9 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     className="input-field pl-10 cursor-pointer disabled:bg-slate-50 disabled:text-slate-400"
                     disabled={!cxcData.sellerId}
                   >
-                    <option value="">Descuento Base del Vendedor</option>
+                    <option value="">Comisión Base del Vendedor</option>
                     {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.map(r => (
-                      <option key={r.name} value={r.name}>{r.name} ({r.discountPercentage}%)</option>
+                      <option key={r.name} value={r.name}>{r.name} ({r.commissionPercentage}%)</option>
                     ))}
                   </select>
                 </div>
@@ -502,9 +502,9 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         const usd = parseFloat(e.target.value) || 0;
                         const seller = sellers.find(s => s.id === cxcData.sellerId);
                         const rubro = seller?.rubros?.find(r => r.name === cxcData.rubroName);
-                        const discount = rubro ? (rubro.discountPercentage / 100) : (seller ? (seller.discountPercentage / 100) : 0);
+                        const commission = rubro ? (rubro.commissionPercentage / 100) : (seller ? (seller.commissionPercentage / 100) : 0);
                         
-                        const finalUsd = usd * (1 - discount);
+                        const finalUsd = usd * (1 - commission);
                         const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
                         setCxcData({
                           ...cxcData, 
@@ -516,7 +516,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       className="input-field pl-10 font-bold" 
                     />
                   </div>
-                  <p className="text-[10px] text-slate-400">Ingrese el monto antes de descuento.</p>
+                  <p className="text-[10px] text-slate-400">Ingrese el monto antes de comisión.</p>
                 </div>
 
                 <div className="space-y-1">
@@ -528,8 +528,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         <Percent size={10} /> {(() => {
                           const seller = sellers.find(s => s.id === cxcData.sellerId);
                           const rubro = seller?.rubros?.find(r => r.name === cxcData.rubroName);
-                          return rubro ? rubro.discountPercentage : (seller?.discountPercentage || 0);
-                        })()}% Desc.
+                          return rubro ? rubro.commissionPercentage : (seller?.commissionPercentage || 0);
+                        })()}% Comis.
                       </span>
                     )}
                   </div>
@@ -603,6 +603,9 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <option value="BANCO DEL TESORO" />
                       <option value="BNC" />
                       <option value="EFECTIVO" />
+                      <option value="GARANTÍA" />
+                      <option value="DONACIÓN" />
+                      <option value="CUENTAS POR COBRAR (CXC)" />
                     </>
                   ) : (
                     <>
@@ -614,6 +617,9 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <option value="BINANCE P2P" />
                       <option value="ZELLE" />
                       <option value="EFECTIVO" />
+                      <option value="GARANTÍA" />
+                      <option value="DONACIÓN" />
+                      <option value="CUENTAS POR COBRAR (CXC)" />
                     </>
                   )}
                 </datalist>
@@ -873,6 +879,9 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         <option value="BANCO DEL TESORO">BANCO DEL TESORO</option>
                         <option value="BNC">BNC</option>
                         <option value="EFECTIVO">EFECTIVO</option>
+                        <option value="GARANTÍA">GARANTÍA</option>
+                        <option value="DONACIÓN">DONACIÓN</option>
+                        <option value="CUENTAS POR COBRAR (CXC)">CUENTAS POR COBRAR (CXC)</option>
                       </>
                     ) : (
                       <>
@@ -884,6 +893,9 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         <option value="BINANCE P2P">BINANCE P2P</option>
                         <option value="ZELLE">ZELLE</option>
                         <option value="EFECTIVO">EFECTIVO</option>
+                        <option value="GARANTÍA">GARANTÍA</option>
+                        <option value="DONACIÓN">DONACIÓN</option>
+                        <option value="CUENTAS POR COBRAR (CXC)">CUENTAS POR COBRAR (CXC)</option>
                       </>
                     )}
                   </select>

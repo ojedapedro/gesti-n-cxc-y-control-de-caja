@@ -90,20 +90,20 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "region": { "type": "string" },
-        "discountPercentage": { "type": "number" },
+        "commissionPercentage": { "type": "number" },
         "rubros": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "name": { "type": "string" },
-              "discountPercentage": { "type": "number" }
+              "commissionPercentage": { "type": "number" }
             }
           }
         },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "name", "region", "discountPercentage"]
+      "required": ["id", "name", "region", "commissionPercentage"]
     }
   },
   "firestore": {

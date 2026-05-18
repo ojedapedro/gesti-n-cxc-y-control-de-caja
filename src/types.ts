@@ -60,7 +60,7 @@ export interface CXCPayment {
   date: string;
   amountUsd: number;
   grossAmountUsd?: number;
-  discountAmountUsd?: number;
+  commissionAmountUsd?: number;
   amountBs?: number;
   exchangeRate?: number;
   concept?: string;
@@ -113,17 +113,17 @@ export interface CashClosure {
   digitalKeyHash?: string; // Optional simple mechanism to unlock
 }
 
-export interface RubroDiscount {
+export interface RubroCommission {
   name: string;
-  discountPercentage: number;
+  commissionPercentage: number;
 }
 
 export interface Seller {
   id: string; // CI
   name: string;
   region: string;
-  discountPercentage: number;
-  rubros?: RubroDiscount[];
+  commissionPercentage: number;
+  rubros?: RubroCommission[];
   createdAt: any;
 }
 
