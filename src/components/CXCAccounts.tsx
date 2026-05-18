@@ -260,7 +260,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     doc.text(`ID Cliente: ${selectedAccount.id}`, 14, 36);
     doc.text(`Saldo Total Pendiente: ${formatCurrency(selectedAccount.totalBalance)}`, 14, 42);
 
-    const tableColumn = ["Fecha", "Concepto", "Forma Pago", "Vendedor", "Item", "Factura", "Cargo", "Abono"];
+    const tableColumn = ["Fecha", "Concepto", "Vendedor", "Factura", "Monto Bruto", "Comisión", "Monto Neto", "Abono"];
     const tableRows: any[] = [];
 
     let totalPagos = 0;
@@ -268,15 +268,14 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
     payments.forEach(payment => {
       const isCharge = payment.type === 'charge';
-      const fp = isCharge ? '-' : `${payment.paymentMethod || '-'}${payment.destinationBank ? ' (' + payment.destinationBank + ')' : ''}`;
-
+      
       const rowData = [
         payment.date,
         payment.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago'),
-        fp,
-        payment.sellerName ? (payment.rubroName ? `${payment.sellerName} (${payment.rubroName})` : payment.sellerName) : '-',
-        payment.item || '-',
+        payment.sellerName ? (payment.rubroName ? `${payment.sellerName} (${payment.rubroName})` : payment.sellerName) : (isCharge ? '-' : (payment.paymentMethod || '-')),
         payment.invoiceNumber || '-',
+        isCharge ? formatCurrency(payment.grossAmountUsd || payment.amountUsd) : '',
+        isCharge ? formatCurrency((payment.grossAmountUsd || payment.amountUsd) - payment.amountUsd) : '',
         isCharge ? formatCurrency(payment.amountUsd) : '',
         !isCharge ? formatCurrency(payment.amountUsd) : ''
       ];
@@ -694,11 +693,11 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     <tr className="bg-slate-50 border-b border-slate-100">
                       <th className="table-header">Fecha</th>
                       <th className="table-header">Concepto</th>
-                      <th className="table-header">Moneda</th>
-                      <th className="table-header">Vendedor</th>
-                      <th className="table-header">Item</th>
+                      <th className="table-header">Vendedor / Destino</th>
                       <th className="table-header whitespace-nowrap">Factura N°</th>
-                      <th className="table-header text-right text-rose-600">(+) Cargo</th>
+                      <th className="table-header text-right">Bruto</th>
+                      <th className="table-header text-right text-rose-400">Comis.</th>
+                      <th className="table-header text-right text-rose-600">Neto</th>
                       <th className="table-header text-right text-emerald-600">(-) Abono</th>
                       <th className="table-header text-right text-blue-600">(=) Saldo</th>
                       <th className="table-header text-center w-12">Acciones</th>
@@ -719,32 +718,30 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         <tr key={p.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
                           <td className="table-cell">{p.date}</td>
                           <td className="table-cell text-slate-600">{p.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago')}</td>
-                          <td className="table-cell text-slate-600">
-                            {!isCharge && (
-                              <span className="inline-flex flex-col">
+                          <td className="table-cell">
+                            {isCharge ? (
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-700">{p.sellerName || '-'}</span>
+                                {p.rubroName && <span className="text-[9px] text-blue-500 font-bold uppercase">{p.rubroName}</span>}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col">
                                 <span className="font-bold text-[10px] uppercase text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded w-fit">{p.paymentMethod || '-'}</span>
                                 {p.destinationBank && <span className="text-[10px] text-slate-500 mt-0.5">{p.destinationBank}</span>}
-                              </span>
+                              </div>
                             )}
-                            {isCharge && <span className="text-slate-400">-</span>}
                           </td>
-                          <td className="table-cell font-bold text-slate-700">
-                            {p.sellerName || '-'}
-                            {p.rubroName && <span className="block text-[9px] text-blue-500 font-bold uppercase mt-0.5">{p.rubroName}</span>}
-                          </td>
-                          <td className="table-cell font-mono text-slate-400 text-xs">{p.item || '-'}</td>
                           <td className="table-cell font-bold text-slate-700">{p.invoiceNumber || '-'}</td>
+                          <td className="table-cell text-right text-slate-500 text-[11px] font-medium">
+                            {isCharge ? formatCurrency(p.grossAmountUsd || p.amountUsd) : '-'}
+                          </td>
+                          <td className="table-cell text-right text-rose-400 text-[11px] font-medium">
+                            {isCharge ? formatCurrency((p.grossAmountUsd || p.amountUsd) - p.amountUsd) : '-'}
+                          </td>
                           <td className="table-cell text-right font-bold text-rose-600">
                             {isCharge ? (
                               <>
                                 {formatCurrency(p.amountUsd)}
-                                {p.grossAmountUsd && p.grossAmountUsd !== p.amountUsd && (
-                                  <span className="block text-[9px] text-slate-400 font-normal">
-                                    Bruto: {formatCurrency(p.grossAmountUsd)} 
-                                    <span className="text-rose-400 mx-1">•</span> 
-                                    Comis: {formatCurrency(p.grossAmountUsd - p.amountUsd)}
-                                  </span>
-                                )}
                                 <span className="block text-[9px] text-rose-400 font-normal">Bs. {new Intl.NumberFormat('es-VE').format(p.amountUsd * exchangeRate)}</span>
                               </>
                             ) : ''}
