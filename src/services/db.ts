@@ -324,14 +324,29 @@ export const dbService = {
         } else {
           totalPayments += amt;
           
-          // Check for Warranty or Donation in payment method or destination bank
+          // Check for Warranty or Donation in payment method, destination bank, or concept
           const dest = (data.destinationBank || '').toUpperCase();
           const pMethod = (data.paymentMethod || '').toUpperCase();
+          const concept = (data.concept || '').toUpperCase();
           
-          if (dest.includes('GARANTÍA') || pMethod.includes('GARANTÍA')) {
+          if (
+            dest.includes('GARANT') || 
+            pMethod.includes('GARANT') || 
+            concept.includes('GARANT')
+          ) {
             totalWarranty += amt;
           }
-          if (dest.includes('DONACIÓN') || pMethod.includes('DONACIÓN')) {
+          if (
+            dest.includes('DONAC') || 
+            pMethod.includes('DONAC') || 
+            concept.includes('DONAC') ||
+            dest.includes('EXENC') || 
+            pMethod.includes('EXENC') || 
+            concept.includes('EXENC') ||
+            dest.includes('EXCENC') || 
+            pMethod.includes('EXCENC') || 
+            concept.includes('EXCENC')
+          ) {
             totalDonation += amt;
           }
         }
@@ -373,11 +388,26 @@ export const dbService = {
           
           const dest = (data.destinationBank || '').toUpperCase();
           const pMethod = (data.paymentMethod || '').toUpperCase();
+          const concept = (data.concept || '').toUpperCase();
           
-          if (dest.includes('GARANTÍA') || pMethod.includes('GARANTÍA')) {
+          if (
+            dest.includes('GARANT') || 
+            pMethod.includes('GARANT') || 
+            concept.includes('GARANT')
+          ) {
             totalWarranty += amt;
           }
-          if (dest.includes('DONACIÓN') || pMethod.includes('DONACIÓN')) {
+          if (
+            dest.includes('DONAC') || 
+            pMethod.includes('DONAC') || 
+            concept.includes('DONAC') ||
+            dest.includes('EXENC') || 
+            pMethod.includes('EXENC') || 
+            concept.includes('EXENC') ||
+            dest.includes('EXCENC') || 
+            pMethod.includes('EXCENC') || 
+            concept.includes('EXCENC')
+          ) {
             totalDonation += amt;
           }
         }
