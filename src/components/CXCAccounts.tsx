@@ -83,6 +83,54 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
   const inBolivares = (parseFloat(paymentData.amountBs) || 0) > 0;
 
+  const [editLastEdited, setEditLastEdited] = useState<'usd' | 'bs'>('usd');
+
+  const handleEditUsdChange = (valStr: string) => {
+    setEditLastEdited('usd');
+    const val = parseFloat(valStr) || 0;
+    const rate = parseFloat(editingPayment?.exchangeRate?.toString() || '0') || 0;
+    const bs = rate > 0 ? (val * rate).toFixed(2) : '';
+    setEditingPayment(prev => prev ? {
+      ...prev,
+      amountUsd: val,
+      amountBs: val > 0 ? bs : ''
+    } : null);
+  };
+
+  const handleEditBsChange = (valStr: string) => {
+    setEditLastEdited('bs');
+    const val = parseFloat(valStr) || 0;
+    const rate = parseFloat(editingPayment?.exchangeRate?.toString() || '0') || 0;
+    const usd = rate > 0 ? (val / rate).toFixed(2) : '';
+    setEditingPayment(prev => prev ? {
+      ...prev,
+      amountBs: valStr,
+      amountUsd: val > 0 ? parseFloat(usd) || 0 : 0
+    } : null);
+  };
+
+  const handleEditRateChange = (valStr: string) => {
+    const rate = parseFloat(valStr) || 0;
+    const usd = parseFloat(editingPayment?.amountUsd?.toString() || '0') || 0;
+    const bs = parseFloat(editingPayment?.amountBs?.toString() || '0') || 0;
+
+    let newBs = editingPayment?.amountBs || '';
+    let newUsd = editingPayment?.amountUsd || 0;
+
+    if (editLastEdited === 'usd' && usd > 0 && rate > 0) {
+      newBs = (usd * rate).toFixed(2);
+    } else if (editLastEdited === 'bs' && bs > 0 && rate > 0) {
+      newUsd = parseFloat((bs / rate).toFixed(2)) || 0;
+    }
+
+    setEditingPayment(prev => prev ? {
+      ...prev,
+      exchangeRate: valStr,
+      amountBs: newBs,
+      amountUsd: newUsd
+    } : null);
+  };
+
   const handleUpdatePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAccount?.id || !editingPayment?.id) return;
@@ -107,6 +155,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       updates.sellerName = editingPayment.sellerName || '';
     } else {
       updates.destinationBank = editingPayment.destinationBank || '';
+      updates.amountBs = (editingPayment.amountBs !== undefined && editingPayment.amountBs !== null && editingPayment.amountBs !== '') ? parseFloat(editingPayment.amountBs as any) : null;
+      updates.exchangeRate = (editingPayment.exchangeRate !== undefined && editingPayment.exchangeRate !== null && editingPayment.exchangeRate !== '') ? parseFloat(editingPayment.exchangeRate as any) : 1;
     }
 
     await dbService.updateCXCPayment(selectedAccount.id, editingPayment.id, updates);
@@ -837,109 +887,205 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             </div>
 
             <form onSubmit={handleUpdatePayment} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="label">Fecha</label>
-                  <input
-                    type="date"
-                    required
-                    value={editingPayment.date}
-                    onChange={(e) => setEditingPayment({ ...editingPayment, date: e.target.value })}
-                    className="input-field"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="label">{editingPayment.type === 'charge' ? 'Monto Neto (USD)' : 'Monto (USD)'}</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={editingPayment.amountUsd}
-                    onChange={(e) => setEditingPayment({ ...editingPayment, amountUsd: parseFloat(e.target.value) || 0 })}
-                    className="input-field font-bold"
-                  />
-                  {editingPayment.type === 'charge' && (
-                    <div className="mt-2 p-2 bg-blue-50 rounded text-[11px] flex justify-between items-center text-blue-700 font-bold">
-                      <span>Comisión Calculada:</span>
-                      <span>{formatCurrency((editingPayment.grossAmountUsd || editingPayment.amountUsd) - editingPayment.amountUsd)}</span>
+              {editingPayment.type === 'charge' ? (
+                <>
+                  {/* Charge View fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="label">Fecha</label>
+                      <input
+                        type="date"
+                        required
+                        value={editingPayment.date}
+                        onChange={(e) => setEditingPayment({ ...editingPayment, date: e.target.value })}
+                        className="input-field"
+                      />
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {editingPayment.type === 'charge' && (
-                <div className="space-y-1">
-                  <label className="label">Monto Bruto (USD)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={editingPayment.grossAmountUsd || editingPayment.amountUsd}
-                    onChange={(e) => setEditingPayment({ ...editingPayment, grossAmountUsd: parseFloat(e.target.value) || 0 })}
-                    className="input-field"
-                  />
-                  <p className="text-[10px] text-slate-400 italic">Ingrese el monto original antes de la comisión si aplica.</p>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <label className="label">Concepto</label>
-                <input
-                  type="text"
-                  required
-                  value={editingPayment.concept || ''}
-                  onChange={(e) => setEditingPayment({ ...editingPayment, concept: e.target.value })}
-                  className="input-field"
-                />
-              </div>
-
-              {editingPayment.type !== 'charge' && (
-                <div className="space-y-1">
-                  <label className="label">Banco / Destino</label>
-                  <input
-                    type="text"
-                    value={editingPayment.destinationBank || ''}
-                    onChange={(e) => setEditingPayment({ ...editingPayment, destinationBank: e.target.value.toUpperCase() })}
-                    className="input-field uppercase"
-                    list="bancos-list-edit-cxc"
-                  />
-                  <datalist id="bancos-list-edit-cxc">
-                    <option value="BANESCO" />
-                    <option value="PROVINCIAL" />
-                    <option value="MERCANTIL" />
-                    <option value="VENEZUELA" />
-                    <option value="BANCO DEL TESORO" />
-                    <option value="BNC" />
-                    <option value="EFECTIVO" />
-                    <option value="GARANTÍA" />
-                    <option value="DONACIÓN" />
-                    <option value="CUENTAS POR COBRAR (CXC)" />
-                    <option value="BINANCE P2P" />
-                    <option value="ZELLE" />
-                  </datalist>
-                </div>
-              )}
-
-              {editingPayment.type === 'charge' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="label">Vendedor</label>
-                    <input
-                      type="text"
-                      value={editingPayment.sellerName || ''}
-                      onChange={(e) => setEditingPayment({ ...editingPayment, sellerName: e.target.value.toUpperCase() })}
-                      className="input-field uppercase"
-                    />
+                    <div className="space-y-1">
+                      <label className="label">Monto Neto (USD)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={editingPayment.amountUsd}
+                        onChange={(e) => setEditingPayment({ ...editingPayment, amountUsd: parseFloat(e.target.value) || 0 })}
+                        className="input-field font-bold"
+                      />
+                      <div className="mt-2 p-2 bg-blue-50 rounded text-[11px] flex justify-between items-center text-blue-700 font-bold">
+                        <span>Comisión Calculada:</span>
+                        <span>{formatCurrency((editingPayment.grossAmountUsd || editingPayment.amountUsd) - editingPayment.amountUsd)}</span>
+                      </div>
+                    </div>
                   </div>
+
                   <div className="space-y-1">
-                    <label className="label">N° Factura</label>
+                    <label className="label">Monto Bruto (USD)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingPayment.grossAmountUsd || editingPayment.amountUsd}
+                      onChange={(e) => setEditingPayment({ ...editingPayment, grossAmountUsd: parseFloat(e.target.value) || 0 })}
+                      className="input-field"
+                    />
+                    <p className="text-[10px] text-slate-400 italic">Ingrese el monto original antes de la comisión si aplica.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="label">Concepto</label>
                     <input
                       type="text"
-                      value={editingPayment.invoiceNumber || ''}
-                      onChange={(e) => setEditingPayment({ ...editingPayment, invoiceNumber: e.target.value })}
+                      required
+                      value={editingPayment.concept || ''}
+                      onChange={(e) => setEditingPayment({ ...editingPayment, concept: e.target.value })}
                       className="input-field"
                     />
                   </div>
-                </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="label">Vendedor</label>
+                      <input
+                        type="text"
+                        value={editingPayment.sellerName || ''}
+                        onChange={(e) => setEditingPayment({ ...editingPayment, sellerName: e.target.value.toUpperCase() })}
+                        className="input-field uppercase"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="label">N° Factura</label>
+                      <input
+                        type="text"
+                        value={editingPayment.invoiceNumber || ''}
+                        onChange={(e) => setEditingPayment({ ...editingPayment, invoiceNumber: e.target.value })}
+                        className="input-field"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Payment/Abono View fields (including dual currency) */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="label">Fecha</label>
+                      <input
+                        type="date"
+                        required
+                        value={editingPayment.date}
+                        onChange={(e) => setEditingPayment({ ...editingPayment, date: e.target.value })}
+                        className="input-field"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="label">Método de Pago</label>
+                      <select
+                        required
+                        value={editingPayment.paymentMethod || PaymentMethod.BS_CASH}
+                        onChange={(e) => setEditingPayment({ ...editingPayment, paymentMethod: e.target.value as PaymentMethod })}
+                        className="input-field cursor-pointer font-bold text-emerald-700 bg-emerald-50/50"
+                      >
+                        {Object.values(PaymentMethod).map(method => (
+                          <option key={method} value={method}>{method}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="label">Banco / Destino</label>
+                      <input
+                        type="text"
+                        value={editingPayment.destinationBank || ''}
+                        onChange={(e) => setEditingPayment({ ...editingPayment, destinationBank: e.target.value.toUpperCase() })}
+                        className="input-field uppercase"
+                        list="bancos-list-edit-cxc"
+                      />
+                      <datalist id="bancos-list-edit-cxc">
+                        {(parseFloat(editingPayment.amountBs) || 0) > 0 ? (
+                          <>
+                            <option value="BANESCO" />
+                            <option value="PROVINCIAL" />
+                            <option value="MERCANTIL" />
+                            <option value="VENEZUELA" />
+                            <option value="BANCO DEL TESORO" />
+                            <option value="BNC" />
+                            <option value="EFECTIVO" />
+                            <option value="GARANTÍA" />
+                            <option value="DONACIÓN" />
+                            <option value="CUENTAS POR COBRAR (CXC)" />
+                          </>
+                        ) : (
+                          <>
+                            <option value="VENEZUELA" />
+                            <option value="BANESCO" />
+                            <option value="BNC" />
+                            <option value="MERCANTIL" />
+                            <option value="BANCO DEL TESORO" />
+                            <option value="BINANCE P2P" />
+                            <option value="ZELLE" />
+                            <option value="EFECTIVO" />
+                            <option value="GARANTÍA" />
+                            <option value="DONACIÓN" />
+                            <option value="CUENTAS POR COBRAR (CXC)" />
+                          </>
+                        )}
+                      </datalist>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="label">Tasa de Cambio</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={editingPayment.exchangeRate !== undefined ? editingPayment.exchangeRate : '1'}
+                        onChange={(e) => handleEditRateChange(e.target.value)}
+                        className="input-field font-mono font-bold text-blue-600 bg-blue-50/30"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="label">Monto (USD)</label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-2.5 text-blue-400" size={16} />
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={editingPayment.amountUsd}
+                          onChange={(e) => handleEditUsdChange(e.target.value)}
+                          className="input-field pl-9 font-bold text-blue-600 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="label font-medium text-emerald-700">Monto (Bs.)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-[10px] font-black text-emerald-400">Bs</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingPayment.amountBs !== undefined && editingPayment.amountBs !== null ? editingPayment.amountBs : ''}
+                          onChange={(e) => handleEditBsChange(e.target.value)}
+                          className="input-field pl-9 font-bold text-emerald-600 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="label">Concepto</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingPayment.concept || ''}
+                      onChange={(e) => setEditingPayment({ ...editingPayment, concept: e.target.value })}
+                      className="input-field"
+                    />
+                  </div>
+                </>
               )}
 
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">

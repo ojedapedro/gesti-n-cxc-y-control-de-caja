@@ -103,8 +103,10 @@ service cloud.firestore {
         allow list: if isSignedIn();
         allow get: if isSignedIn();
         allow create: if isSignedIn() && isValidCXCPayment(incoming()) && isValidId(paymentId) && incoming().createdAt == request.time;
-        allow update: if isSignedIn() && isValidCXCPayment(incoming()) &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'date', 'concept', 'invoiceNumber', 'sellerName', 'sellerId', 'paymentMethod', 'destinationBank', 'type']);
+        allow update: if isSignedIn() &&
+                      (!incoming().keys().hasAny(['amountUsd']) || (incoming().amountUsd is number && incoming().amountUsd >= 0)) &&
+                      (!incoming().keys().hasAny(['date']) || incoming().date is string) &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'grossAmountUsd', 'commissionAmountUsd', 'amountBs', 'exchangeRate', 'date', 'concept', 'item', 'invoiceNumber', 'sellerName', 'sellerId', 'rubroName', 'paymentMethod', 'destinationBank', 'type']);
         allow delete: if isSignedIn();
       }
     }
@@ -124,6 +126,11 @@ service cloud.firestore {
       allow update: if isSignedIn() && isValidReceipt(incoming()) &&
                     incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'recipient', 'concept', 'date']);
       allow delete: if isSignedIn();
+    }
+
+    match /exchange_rates/{date} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     match /settings/{settingId} {

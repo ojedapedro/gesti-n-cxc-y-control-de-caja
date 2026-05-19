@@ -303,6 +303,14 @@ export const dbService = {
     totalDonation: number
   }) => void) {
     const q = query(collectionGroup(db, 'payments'));
+    const normalizeText = (str: string): string => {
+      if (!str) return '';
+      return str
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    };
+
     return onSnapshot(q, (snapshot) => {
       let totalCharges = 0;
       let totalPayments = 0;
@@ -325,9 +333,9 @@ export const dbService = {
           totalPayments += amt;
           
           // Check for Warranty or Donation in payment method, destination bank, or concept
-          const dest = (data.destinationBank || '').toUpperCase();
-          const pMethod = (data.paymentMethod || '').toUpperCase();
-          const concept = (data.concept || '').toUpperCase();
+          const dest = normalizeText(data.destinationBank);
+          const pMethod = normalizeText(data.paymentMethod);
+          const concept = normalizeText(data.concept);
           
           if (
             dest.includes('GARANT') || 
@@ -345,7 +353,25 @@ export const dbService = {
             concept.includes('EXENC') ||
             dest.includes('EXCENC') || 
             pMethod.includes('EXCENC') || 
-            concept.includes('EXCENC')
+            concept.includes('EXCENC') ||
+            dest.includes('EXENT') || 
+            pMethod.includes('EXENT') || 
+            concept.includes('EXENT') ||
+            dest.includes('EXCENT') || 
+            pMethod.includes('EXCENT') || 
+            concept.includes('EXCENT') ||
+            dest.includes('CORTES') || 
+            pMethod.includes('CORTES') || 
+            concept.includes('CORTES') ||
+            dest.includes('DESCUENT') || 
+            pMethod.includes('DESCUENT') || 
+            concept.includes('DESCUENT') ||
+            dest.includes('ANULA') || 
+            pMethod.includes('ANULA') || 
+            concept.includes('ANULA') ||
+            dest.includes('BONIF') || 
+            pMethod.includes('BONIF') || 
+            concept.includes('BONIF')
           ) {
             totalDonation += amt;
           }
@@ -364,6 +390,14 @@ export const dbService = {
   },
 
   async getGlobalCXCStats() {
+    const normalizeText = (str: string): string => {
+      if (!str) return '';
+      return str
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    };
+
     try {
       const q = query(collectionGroup(db, 'payments'));
       const snapshot = await getDocs(q);
@@ -386,9 +420,9 @@ export const dbService = {
         } else {
           totalPayments += amt;
           
-          const dest = (data.destinationBank || '').toUpperCase();
-          const pMethod = (data.paymentMethod || '').toUpperCase();
-          const concept = (data.concept || '').toUpperCase();
+          const dest = normalizeText(data.destinationBank);
+          const pMethod = normalizeText(data.paymentMethod);
+          const concept = normalizeText(data.concept);
           
           if (
             dest.includes('GARANT') || 
@@ -406,7 +440,25 @@ export const dbService = {
             concept.includes('EXENC') ||
             dest.includes('EXCENC') || 
             pMethod.includes('EXCENC') || 
-            concept.includes('EXCENC')
+            concept.includes('EXCENC') ||
+            dest.includes('EXENT') || 
+            pMethod.includes('EXENT') || 
+            concept.includes('EXENT') ||
+            dest.includes('EXCENT') || 
+            pMethod.includes('EXCENT') || 
+            concept.includes('EXCENT') ||
+            dest.includes('CORTES') || 
+            pMethod.includes('CORTES') || 
+            concept.includes('CORTES') ||
+            dest.includes('DESCUENT') || 
+            pMethod.includes('DESCUENT') || 
+            concept.includes('DESCUENT') ||
+            dest.includes('ANULA') || 
+            pMethod.includes('ANULA') || 
+            concept.includes('ANULA') ||
+            dest.includes('BONIF') || 
+            pMethod.includes('BONIF') || 
+            concept.includes('BONIF')
           ) {
             totalDonation += amt;
           }
