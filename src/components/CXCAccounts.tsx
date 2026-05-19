@@ -16,13 +16,16 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<CXCPayment | null>(null);
   const [paymentData, setPaymentData] = useState({
-    amount: '',
+    amountUsd: '',
+    amountBs: '',
     exchangeRate: exchangeRate?.toString() || '0',
     date: format(new Date(), 'yyyy-MM-dd'),
     concept: 'ABONO',
     paymentMethod: PaymentMethod.BS_CASH,
     destinationBank: '',
   });
+
+  const [lastEdited, setLastEdited] = useState<'usd' | 'bs' | null>(null);
 
   const [fetchingRate, setFetchingRate] = useState(false);
 
@@ -62,11 +65,23 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     }
   }, [editingPayment?.date]);
 
-  const inBolivares = paymentData.paymentMethod === PaymentMethod.BS || paymentData.paymentMethod === PaymentMethod.BS_CASH;
-  const inputAmt = parseFloat(paymentData.amount) || 0;
-  const amountUsdConv = inBolivares ? inputAmt / (parseFloat(paymentData.exchangeRate) || 1) : 0;
-  const amountBs = inBolivares ? inputAmt : 0;
-  const totalPaymentUsd = inBolivares ? amountUsdConv : inputAmt;
+  // Automatic conversion logic
+  useEffect(() => {
+    const rate = parseFloat(paymentData.exchangeRate) || 0;
+    if (rate <= 0) return;
+
+    if (lastEdited === 'usd') {
+      const usd = parseFloat(paymentData.amountUsd) || 0;
+      const bs = (usd * rate).toFixed(2);
+      setPaymentData(prev => ({ ...prev, amountBs: usd > 0 ? bs : '' }));
+    } else if (lastEdited === 'bs') {
+      const bs = parseFloat(paymentData.amountBs) || 0;
+      const usd = (bs / rate).toFixed(2);
+      setPaymentData(prev => ({ ...prev, amountUsd: bs > 0 ? usd : '' }));
+    }
+  }, [paymentData.amountUsd, paymentData.amountBs, paymentData.exchangeRate, lastEdited]);
+
+  const inBolivares = (parseFloat(paymentData.amountBs) || 0) > 0;
 
   const handleUpdatePayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,10 +181,14 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAccount?.id) return;
-    if (inputAmt <= 0) return;
+    
+    const amountUsd = parseFloat(paymentData.amountUsd) || 0;
+    const amountBs = parseFloat(paymentData.amountBs) || 0;
+    
+    if (amountUsd <= 0) return;
 
     await dbService.addCXCPayment(selectedAccount.id, {
-      amountUsd: totalPaymentUsd,
+      amountUsd: amountUsd,
       amountBs: amountBs > 0 ? amountBs : null,
       exchangeRate: parseFloat(paymentData.exchangeRate) || 1,
       date: paymentData.date,
@@ -184,13 +203,15 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
     setShowPaymentForm(false);
     setPaymentData({
-      amount: '',
+      amountUsd: '',
+      amountBs: '',
       exchangeRate: exchangeRate?.toString() || '1',
       date: format(new Date(), 'yyyy-MM-dd'),
       concept: 'ABONO',
       paymentMethod: PaymentMethod.BS_CASH,
       destinationBank: '',
     });
+    setLastEdited(null);
   };
 
   const handleDownloadBook = () => {
@@ -562,15 +583,16 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       </div>
 
                       <div className="space-y-1">
-                        <label className="label">Moneda</label>
+                        <label className="label">Método de Pago</label>
                         <select
                           required
                           value={paymentData.paymentMethod}
                           onChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.target.value as PaymentMethod })}
                           className="input-field cursor-pointer"
                         >
-                          <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
-                          <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>                          
+                          {Object.values(PaymentMethod).map(method => (
+                            <option key={method} value={method}>{method}</option>
+                          ))}
                         </select>
                       </div>
 
@@ -585,7 +607,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           list="bancos-list-cxc"
                         />
                         <datalist id="bancos-list-cxc">
-                          {inBolivares ? (
+                          {(parseFloat(paymentData.amountBs) || 0) > 0 ? (
                             <>
                               <option value="BANESCO" />
                               <option value="PROVINCIAL" />
@@ -625,22 +647,45 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           placeholder="1.00"
                           value={paymentData.exchangeRate}
                           onChange={(e) => setPaymentData({ ...paymentData, exchangeRate: e.target.value })}
-                          className={`input-field font-mono font-bold ${inBolivares ? 'text-blue-600' : 'text-slate-400 opacity-50 bg-slate-50'}`}
-                          readOnly={!inBolivares}
+                          className="input-field font-mono font-bold text-blue-600 bg-blue-50/30"
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="label">Monto ({inBolivares ? 'Bs' : 'USD'})</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          required
-                          placeholder="0.00"
-                          value={paymentData.amount}
-                          onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
-                          className="input-field font-bold"
-                        />
+                        <label className="label">Monto (USD)</label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-2.5 text-blue-400" size={16} />
+                          <input
+                            type="number"
+                            step="0.01"
+                            required
+                            placeholder="0.00"
+                            value={paymentData.amountUsd}
+                            onChange={(e) => {
+                              setLastEdited('usd');
+                              setPaymentData({ ...paymentData, amountUsd: e.target.value });
+                            }}
+                            className="input-field pl-9 font-bold text-blue-600 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="label">Monto (Bs.)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-[10px] font-black text-emerald-400">Bs</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={paymentData.amountBs}
+                            onChange={(e) => {
+                              setLastEdited('bs');
+                              setPaymentData({ ...paymentData, amountBs: e.target.value });
+                            }}
+                            className="input-field pl-9 font-bold text-emerald-600 focus:ring-emerald-500"
+                          />
+                        </div>
                       </div>
 
                       <div className="space-y-1">
@@ -653,32 +698,15 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           className="input-field"
                         />
                       </div>
-
-                      {inBolivares && (
-                        <div className="space-y-1">
-                          <label className="label text-emerald-600">Dólares Conv.</label>
-                          <div className="input-field bg-emerald-50 text-emerald-700 font-bold border-dashed flex items-center">
-                            {formatCurrency(amountUsdConv)}
-                          </div>
-                          <p className="text-[10px] text-slate-400">BS / Tasa</p>
-                        </div>
-                      )}
-
-                      <div className="col-span-1 md:col-span-2 lg:col-span-2 space-y-1">
-                        <label className="label text-blue-600">Abono Total (USD)</label>
-                        <div className="h-14 px-4 bg-blue-600 text-white rounded-lg flex flex-col justify-center shadow-lg shadow-blue-200 text-right">
-                          <div className="flex items-center justify-between w-full">
-                            <span className="text-xs font-bold uppercase">Resultado:</span>
-                            <span className="text-xl font-black">{formatCurrency(totalPaymentUsd)}</span>
-                          </div>
-                          <span className="text-[10px] font-bold text-blue-200 mt-0.5">Bs. {new Intl.NumberFormat('es-VE').format(totalPaymentUsd * (parseFloat(paymentData.exchangeRate) || 1))}</span>
-                        </div>
-                      </div>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-emerald-100">
                       <button type="button" onClick={() => setShowPaymentForm(false)} className="px-4 py-2 text-slate-600 font-medium">Cancelar</button>
-                      <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-6 rounded-lg transition-colors flex items-center justify-center">
+                      <button 
+                        type="submit" 
+                        disabled={!paymentData.amountUsd || parseFloat(paymentData.amountUsd) <= 0}
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 px-6 rounded-lg transition-colors flex items-center justify-center"
+                      >
                         <Plus size={18} className="inline mr-2 -mt-0.5" />
                         Guardar Pago
                       </button>
