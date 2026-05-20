@@ -773,7 +773,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-orange-950/20">Dolars Conv.</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Efectivo ($)</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Zelle/Binance</th>
-                <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-blue-950/20">Cuentas por Cobrar (CXC)</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700">Venta Diaria</th>
                 <th className="p-3 text-center text-[10px] uppercase font-black">Edit</th>
               </tr>
@@ -786,7 +785,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <td className="p-3 text-right text-orange-700 bg-orange-100/50">{formatCurrency(totals.usdConv)}</td>
                 <td className="p-3 text-right text-emerald-700 bg-emerald-100/50">{formatCurrency(totals.usdCash)}</td>
                 <td className="p-3 text-right text-emerald-700 bg-emerald-100/50">{formatCurrency(totals.zelle)}</td>
-                <td className="p-3 text-right text-blue-700 bg-blue-100/50">{formatCurrency(totals.cxc)}</td>
                 <td className="p-3 text-right text-slate-900 bg-slate-200 border-r border-slate-300">
                   {formatCurrency(totals.ventaDiaria)}
                   <span className="block text-[9px] text-slate-500 font-bold mt-0.5 whitespace-nowrap">
@@ -819,7 +817,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30">{formatCurrency(conv)}</td>
                       <td className="p-3 text-right border-r border-slate-100 bg-emerald-50/30">{formatCurrency(t.amountUsdCash || 0)}</td>
                       <td className="p-3 text-right border-r border-slate-100 bg-emerald-50/30">{formatCurrency(t.amountZelle || 0)}</td>
-                      <td className="p-3 text-right border-r border-slate-100 bg-blue-50/30">{formatCurrency(t.amountCXC || 0)}</td>
                       <td className="p-3 text-right font-black text-slate-900 bg-slate-50 border-r border-slate-100">
                         {formatCurrency(t.totalDailySale || t.amountUsd)}
                         <span className="block text-[9px] text-slate-400 font-bold mt-0.5 whitespace-nowrap">
@@ -839,7 +836,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 })}
               {filteredTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="p-10 text-center text-slate-400 italic">No hay cuadres de caja registrados en el periodo seleccionado.</td>
+                  <td colSpan={12} className="p-10 text-center text-slate-400 italic">No hay cuadres de caja registrados en el periodo seleccionado.</td>
                 </tr>
               )}
             </tbody>
