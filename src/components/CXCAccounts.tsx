@@ -666,9 +666,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="BANCO DEL TESORO" />
                               <option value="BNC" />
                               <option value="EFECTIVO" />
-                              <option value="GARANTÍA" />
-                              <option value="DONACIÓN" />
-                              <option value="CUENTAS POR COBRAR (CXC)" />
                             </>
                           ) : (
                             <>
