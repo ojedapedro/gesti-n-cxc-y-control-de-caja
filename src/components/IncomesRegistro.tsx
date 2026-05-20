@@ -634,9 +634,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <option value="BANCO DEL TESORO" />
                       <option value="BNC" />
                       <option value="EFECTIVO" />
-                      <option value="GARANTÍA" />
-                      <option value="DONACIÓN" />
-                      <option value="CUENTAS POR COBRAR (CXC)" />
                     </>
                   ) : (
                     <>
@@ -648,9 +645,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <option value="BINANCE P2P" />
                       <option value="ZELLE" />
                       <option value="EFECTIVO" />
-                      <option value="GARANTÍA" />
-                      <option value="DONACIÓN" />
-                      <option value="CUENTAS POR COBRAR (CXC)" />
                     </>
                   )}
                 </datalist>
@@ -910,9 +904,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         <option value="BANCO DEL TESORO">BANCO DEL TESORO</option>
                         <option value="BNC">BNC</option>
                         <option value="EFECTIVO">EFECTIVO</option>
-                        <option value="GARANTÍA">GARANTÍA</option>
-                        <option value="DONACIÓN">DONACIÓN</option>
-                        <option value="CUENTAS POR COBRAR (CXC)">CUENTAS POR COBRAR (CXC)</option>
                       </>
                     ) : (
                       <>
@@ -924,9 +915,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         <option value="BINANCE P2P">BINANCE P2P</option>
                         <option value="ZELLE">ZELLE</option>
                         <option value="EFECTIVO">EFECTIVO</option>
-                        <option value="GARANTÍA">GARANTÍA</option>
-                        <option value="DONACIÓN">DONACIÓN</option>
-                        <option value="CUENTAS POR COBRAR (CXC)">CUENTAS POR COBRAR (CXC)</option>
                       </>
                     )}
                   </select>

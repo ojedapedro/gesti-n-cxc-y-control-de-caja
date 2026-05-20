@@ -633,16 +633,15 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       </div>
 
                       <div className="space-y-1">
-                        <label className="label">Método de Pago</label>
+                        <label className="label">Moneda</label>
                         <select
                           required
                           value={paymentData.paymentMethod}
                           onChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.target.value as PaymentMethod })}
                           className="input-field cursor-pointer"
                         >
-                          {Object.values(PaymentMethod).map(method => (
-                            <option key={method} value={method}>{method}</option>
-                          ))}
+                          <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
+                          <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
                         </select>
                       </div>
 
@@ -666,6 +665,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="BANCO DEL TESORO" />
                               <option value="BNC" />
                               <option value="EFECTIVO" />
+                              <option value="GARANTÍA" />
+                              <option value="DONACIÓN" />
                             </>
                           ) : (
                             <>
@@ -679,7 +680,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="EFECTIVO" />
                               <option value="GARANTÍA" />
                               <option value="DONACIÓN" />
-                              <option value="CUENTAS POR COBRAR (CXC)" />
                             </>
                           )}
                         </datalist>
@@ -974,16 +974,15 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="label">Método de Pago</label>
+                      <label className="label">Moneda</label>
                       <select
                         required
                         value={editingPayment.paymentMethod || PaymentMethod.BS_CASH}
                         onChange={(e) => setEditingPayment({ ...editingPayment, paymentMethod: e.target.value as PaymentMethod })}
                         className="input-field cursor-pointer font-bold text-emerald-700 bg-emerald-50/50"
                       >
-                        {Object.values(PaymentMethod).map(method => (
-                          <option key={method} value={method}>{method}</option>
-                        ))}
+                        <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
+                        <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
                       </select>
                     </div>
                   </div>
