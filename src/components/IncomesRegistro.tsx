@@ -447,8 +447,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         const seller = sellers.find(s => s.id === sId);
                         if (seller) {
                           const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
-                          // If seller changes, reset rubro or keep if exists? Let's reset rubro for safety
-                          const commission = seller.commissionPercentage / 100;
+                          // If seller changes, reset rubro to ensure commission updates to 0 or new rubro
+                          const commission = 0;
                           const finalUsd = baseUsd * (1 - commission);
                           const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
                           setCxcData({
@@ -468,7 +468,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     >
                       <option value="">Seleccione Vendedor...</option>
                       {sellers.map(s => (
-                        <option key={s.id} value={s.id}>{s.name} ({s.commissionPercentage}%)</option>
+                        <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
                   </div>
@@ -492,7 +492,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       const rName = e.target.value;
                       const seller = sellers.find(s => s.id === cxcData.sellerId);
                       const rubro = seller?.rubros?.find(r => r.name === rName);
-                      const commission = rubro ? (rubro.commissionPercentage / 100) : (seller ? (seller.commissionPercentage / 100) : 0);
+                      const commission = rubro ? (rubro.commissionPercentage / 100) : 0;
                       
                       const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
                       const finalUsd = baseUsd * (1 - commission);
@@ -508,7 +508,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     className="input-field pl-10 cursor-pointer disabled:bg-slate-50 disabled:text-slate-400"
                     disabled={!cxcData.sellerId}
                   >
-                    <option value="">Comisión Base del Vendedor</option>
+                    <option value="">Sin Comisión / Ninguno</option>
                     {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.map(r => (
                       <option key={r.name} value={r.name}>{r.name} ({r.commissionPercentage}%)</option>
                     ))}
@@ -533,7 +533,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         const usd = parseFloat(e.target.value) || 0;
                         const seller = sellers.find(s => s.id === cxcData.sellerId);
                         const rubro = seller?.rubros?.find(r => r.name === cxcData.rubroName);
-                        const commission = rubro ? (rubro.commissionPercentage / 100) : (seller ? (seller.commissionPercentage / 100) : 0);
+                        const commission = rubro ? (rubro.commissionPercentage / 100) : 0;
                         
                         const finalUsd = usd * (1 - commission);
                         const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
@@ -559,7 +559,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                         <Percent size={10} /> {(() => {
                           const seller = sellers.find(s => s.id === cxcData.sellerId);
                           const rubro = seller?.rubros?.find(r => r.name === cxcData.rubroName);
-                          return rubro ? rubro.commissionPercentage : (seller?.commissionPercentage || 0);
+                          return rubro ? rubro.commissionPercentage : 0;
                         })()}% Comis.
                       </span>
                     )}
