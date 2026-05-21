@@ -73,8 +73,8 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .forEach(t => {
        const dest = (t.destinationBank || '').toUpperCase();
        
-       // 1. SALES VOLUME: Sum all sales within period (Cash, Bank, and Credit)
-       if (t.type === TransactionType.SALE) {
+       // 1. SALES VOLUME: Sum all sales within period (Cash and Bank; excluding Credit/CXC)
+       if (t.type === TransactionType.SALE && !t.isCXC && t.paymentMethod !== PaymentMethod.CXC) {
           totalVentas += t.amountUsd;
        }
 
@@ -183,7 +183,6 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     { label: 'TOTAL INGRESO BOLIVARES EFECTIVO', value: totalBsEfectivo, icon: Banknote, color: 'text-teal-600', bg: 'bg-teal-50' },
     { label: 'TOTAL INGRESO DOLARES BANCO', value: totalUsdBanco, icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'TOTAL INGRESO DOLARES EFECTIVO', value: totalUsdEfectivo, icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: isFiltered ? 'VENTAS BRUTAS CXC (PERIODO)' : 'TOTAL VENTAS A CRÉDITO (CXC BRUTO)', value: displayCXCValue, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
   if (loading) {
