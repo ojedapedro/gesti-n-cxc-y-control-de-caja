@@ -81,6 +81,12 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
 
       transactions?.forEach(t => {
         if (t.type !== TransactionType.SALE && t.type !== TransactionType.INCOME) return;
+
+        const destComp = (t.destinationBank || '').trim().toUpperCase();
+        const isCashDest = destComp.includes('EFECTIVO') || destComp.includes('CAJA') || destComp === '';
+        const isBankDest = destComp.length > 0 && !isCashDest && !destComp.includes('CXC') && !destComp.includes('COBRAR');
+
+        if (isBankDest) return; // Skip bank/destination options in Cash flow control!
         
         let cashUsdAmount = 0;
         let cashBsAmount = 0;

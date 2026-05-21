@@ -72,7 +72,6 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .filter(t => filterByDate(t.date))
     .forEach(t => {
        const dest = (t.destinationBank || '').toUpperCase();
-       const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
        
        // 1. SALES VOLUME: Sum all sales within period (Cash, Bank, and Credit)
        if (t.type === TransactionType.SALE) {
@@ -92,25 +91,35 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        if (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) {
           if (t.paymentMethod === PaymentMethod.CXC) return;
 
-          // Handle BS explicitly typed as Bs Equivalents
-          if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
-             const eqUsd = t.amountBs / t.exchangeRate;
-             const isBsCash = isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares Efectivo';
-             if (isBsCash) totalBsEfectivo += eqUsd;
-             else totalBsBanco += eqUsd;
-          } else if (t.paymentMethod === 'Transferencia Bs / Pago Móvil' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') {
-             if (isCashByName || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Bs') totalBsEfectivo += t.amountUsd; 
-             else totalBsBanco += t.amountUsd;
-          }
-          
-          // Handle USD
-          const usdAmount = t.amountUsdCash && t.amountUsdCash > 0 ? t.amountUsdCash : 
-                            (t.amountBs && t.exchangeRate ? Math.max(0, t.amountUsd - (t.amountBs / t.exchangeRate)) : t.amountUsd);
+          const destClean = (t.destinationBank || '').trim().toUpperCase();
+          const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA') || destClean === '';
+          const isBankDest = destClean.length > 0 && !isCashDest && !destClean.includes('CXC') && !destClean.includes('COBRAR');
 
-          if (usdAmount > 0.001) {
-             const isUsdCash = isCashByName || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo';
-             if (isUsdCash) totalUsdEfectivo += usdAmount;
-             else totalUsdBanco += usdAmount;
+          // Determine if it is a Bolívares (BS) transaction or USD ($) transaction
+          const isBs = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                       t.paymentMethod === 'Bs' || 
+                       t.paymentMethod === 'Bolivares' || 
+                       t.paymentMethod === 'Bs Efectivo' || 
+                       (t.currency && t.currency.toUpperCase().includes('BOLÍVARES')) || 
+                       (t.amountBs && t.amountBs > 0);
+
+          if (isBs) {
+             const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * (t.exchangeRate || 1));
+             const eqUsd = t.exchangeRate && t.exchangeRate > 0 ? amountBsVal / t.exchangeRate : t.amountUsd;
+
+             if (isBankDest) {
+                totalBsBanco += eqUsd;
+             } else {
+                totalBsEfectivo += eqUsd;
+             }
+          } else {
+             // USD Transaction
+             const usdAmount = t.amountUsd;
+             if (isBankDest) {
+                totalUsdBanco += usdAmount;
+             } else {
+                totalUsdEfectivo += usdAmount;
+             }
           }
        }
     });
