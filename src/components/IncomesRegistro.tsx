@@ -210,7 +210,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         invoiceNumber: cxcData.invoiceNumber,
         sellerName: cxcData.sellerName,
         sellerId: cxcData.sellerId,
-        rubroName: cxcData.rubroName,
+        rubroName: cxcData.rubroName.split('|')[0],
         type: 'charge'
       });
 
@@ -480,7 +480,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <span>Rubro / Categoría de Venta</span>
                   {cxcData.rubroName && (
                     <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-black uppercase">
-                      {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.find(r => r.name === cxcData.rubroName)?.commissionPercentage}% Comis.
+                      {cxcData.rubroName.includes('|') ? cxcData.rubroName.split('|')[1] : '0'}% Comis.
                     </span>
                   )}
                 </label>
@@ -489,10 +489,9 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <select 
                     value={cxcData.rubroName}
                     onChange={(e) => {
-                      const rName = e.target.value;
-                      const seller = sellers.find(s => s.id === cxcData.sellerId);
-                      const rubro = seller?.rubros?.find(r => r.name === rName);
-                      const commission = rubro ? (rubro.commissionPercentage / 100) : 0;
+                      const rValue = e.target.value;
+                      const [rName, rComm] = rValue.split('|');
+                      const commission = rComm ? (parseFloat(rComm) / 100) : 0;
                       
                       const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
                       const finalUsd = baseUsd * (1 - commission);
@@ -500,7 +499,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       
                       setCxcData({
                         ...cxcData,
-                        rubroName: rName,
+                        rubroName: rValue,
                         amountUsd: finalUsd.toFixed(2),
                         amountBs: finalBs.toFixed(2)
                       });
@@ -509,9 +508,14 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     disabled={!cxcData.sellerId}
                   >
                     <option value="">Sin Comisión / Ninguno</option>
-                    {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.map(r => (
-                      <option key={r.name} value={r.name}>{r.name} ({r.commissionPercentage}%)</option>
-                    ))}
+                    {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.map((r, index) => {
+                      const optVal = `${r.name}|${r.commissionPercentage}`;
+                      return (
+                        <option key={`${r.name}-${r.commissionPercentage}-${index}`} value={optVal}>
+                          {r.name} ({r.commissionPercentage}%)
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
                 {!cxcData.sellerId && <p className="text-[10px] text-amber-600 font-bold mt-1">Seleccione un vendedor para ver sus rubros.</p>}
@@ -531,9 +535,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       value={cxcData.grossAmountUsd}
                       onChange={(e) => {
                         const usd = parseFloat(e.target.value) || 0;
-                        const seller = sellers.find(s => s.id === cxcData.sellerId);
-                        const rubro = seller?.rubros?.find(r => r.name === cxcData.rubroName);
-                        const commission = rubro ? (rubro.commissionPercentage / 100) : 0;
+                        const [rName, rComm] = cxcData.rubroName.split('|');
+                        const commission = rComm ? (parseFloat(rComm) / 100) : 0;
                         
                         const finalUsd = usd * (1 - commission);
                         const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
@@ -557,9 +560,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     {cxcData.sellerId && (
                       <span className="text-[10px] bg-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1">
                         <Percent size={10} /> {(() => {
-                          const seller = sellers.find(s => s.id === cxcData.sellerId);
-                          const rubro = seller?.rubros?.find(r => r.name === cxcData.rubroName);
-                          return rubro ? rubro.commissionPercentage : 0;
+                          const rComm = cxcData.rubroName.includes('|') ? cxcData.rubroName.split('|')[1] : '0';
+                          return rComm;
                         })()}% Comis.
                       </span>
                     )}
