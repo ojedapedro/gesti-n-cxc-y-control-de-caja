@@ -220,13 +220,19 @@ export const dbService = {
         date: data.date,
         clientName: clientName,
         concept: `VENTA A CRÉDITO CUENTAS POR COBRAR (CXC) (Item: ${data.item || 'N/A'}): ${data.concept || ''}`,
-        amountUsd: data.amountUsd,
+        amountUsd: data.amountUsd, // Net amount remains amountUsd of transaction
         amountBs: data.amountBs,
         exchangeRate: data.exchangeRate,
         paymentMethod: PaymentMethod.CXC,
         type: TransactionType.SALE,
         isCXC: true,
-        amountCXC: data.amountUsd
+        amountCXC: data.amountUsd, // Net amount goes to accounts receivable
+        totalDailySale: data.grossAmountUsd || data.amountUsd, // Gross amount goes to Daily Sale
+        grossAmountUsd: data.grossAmountUsd || data.amountUsd,
+        commissionAmountUsd: data.commissionAmountUsd || 0,
+        sellerName: data.sellerName || '',
+        sellerId: data.sellerId || '',
+        rubroName: data.rubroName || ''
       });
 
       return accountId;

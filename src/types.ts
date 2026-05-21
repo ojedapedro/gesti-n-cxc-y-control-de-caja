@@ -32,6 +32,11 @@ export interface Transaction {
   amountZelle?: number;
   amountCXC?: number;
   totalDailySale?: number;
+  sellerId?: string;
+  sellerName?: string;
+  rubroName?: string;
+  grossAmountUsd?: number;
+  commissionAmountUsd?: number;
   createdAt: any; // Server Timestamp
 }
 
