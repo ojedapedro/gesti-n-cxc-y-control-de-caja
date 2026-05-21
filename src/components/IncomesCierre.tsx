@@ -52,101 +52,49 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
 
   dailyTransactions.forEach(t => {
      const rate = t.exchangeRate || exchangeRate || 1;
-     const dest = (t.destinationBank || '').trim().toUpperCase();
+     const destClean = (t.destinationBank || '').trim().toUpperCase();
      
-     // Keyword classification
-     const isCXCWord = dest.includes('CXC') || dest.includes('COBRAR');
-     const isCashWord = (dest.includes('EFECTIVO') || dest.includes('CAJA')) && !isCXCWord;
-     const isBankWord = dest.length > 0 && !isCashWord && !isCXCWord;
+     // Determine if it is a credit sale (Cuentas por Cobrar CXC)
+     const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || destClean.includes('CXC') || destClean.includes('COBRAR');
+     const isCashDest = (destClean.includes('EFECTIVO') || destClean.includes('CAJA') || destClean === '') && !isCXCField;
+     const isBankDest = destClean.length > 0 && !isCashDest && !isCXCField;
 
-     // explicit breakdown fields
-     const tBs = t.amountBs || 0;
-     const tUsdCash = t.amountUsdCash || 0;
-     const tZelle = t.amountZelle || 0;
-     const tCxc = t.amountCXC || 0;
+     // Calculate amount USD
+     const amtUsd = t.amountUsd || 0;
 
-     // 1. Handle explicit breakdown fields if present
-     if (tBs > 0 || tUsdCash > 0 || tZelle > 0 || tCxc > 0) {
-        // BS classification
-        if (tBs > 0) {
-           let isBsCash = false;
-           if (isBankWord || isCXCWord) isBsCash = false;
-           else if (isCashWord) isBsCash = true;
-           else {
-              // Default to cash only if method is explicit cash
-              isBsCash = (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'Efectivo Bs');
-           }
-
-           if (isBsCash) {
-              incomesBs += tBs;
-              incomesBsUsd += (tBs / rate);
-           } else {
-              totalBsInBanks += tBs;
-              totalBsInBanksUsd += (tBs / rate);
-           }
-        }
-        
-        // USD components
-        // Note: We check keywords even for explicit fields to prevent misclassification
-        if (isCXCWord) {
-            totalCxc += (tUsdCash + tZelle + tCxc);
-        } else if (isBankWord) {
-            totalUsdInBanks += (tUsdCash + tZelle);
-            totalCxc += tCxc; // tCxc shouldn't be here but if it is, we count it as CXC
-        } else {
-            incomesUsd += tUsdCash;
-            totalUsdInBanks += tZelle;
-            totalCxc += tCxc;
-        }
-        
-        // Add to total sales (USD equivalent)
-        totalSalesUsd += (tUsdCash + tZelle + tCxc + (tBs / rate));
+     if (isCXCField) {
+        totalCxc += amtUsd;
+        totalSalesUsd += amtUsd;
      } else {
-        // 2. Fallback: classify based on amountUsd and paymentMethod (Legacy records)
-        const amt = t.amountUsd || 0;
-        
-        const isCXCMethod = t.isCXC || t.paymentMethod === PaymentMethod.CXC || t.paymentMethod === 'CXC' || isCXCWord;
-        const isBankMethod = t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE || t.paymentMethod === 'Zelle' || t.paymentMethod === 'Binance' || isBankWord;
+        // Determine currency: is BS?
+        const isBs = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                     t.paymentMethod === 'Bs' || 
+                     t.paymentMethod === 'Bolivares' || 
+                     t.paymentMethod === 'Bs Efectivo' || 
+                     (t.currency && t.currency.toUpperCase().includes('BOLÍVARES')) || 
+                     (t.amountBs && t.amountBs > 0);
 
-        if (isCXCMethod) {
-           totalCxc += amt;
-        } else if (isBankMethod) {
-           totalUsdInBanks += amt;
-        } else {
-           // Distinguish BS vs USD method
-           const isBsMethod = t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs' || t.paymentMethod === 'Bolivares' || t.paymentMethod === 'Bs Efectivo' || t.paymentMethod === 'BS (Bolívares)';
-           const isUsdMethod = t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === '$' || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === 'USD' || t.paymentMethod === 'Dólares ($)';
+        if (isBs) {
+           const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (amtUsd * rate);
+           const eqUsd = rate > 0 ? (amountBsVal / rate) : amtUsd;
 
-           if (isBsMethod) {
-              const amountBs = amt * rate;
-              let isBsCash = false;
-              if (isBankWord || isCXCWord) isBsCash = false;
-              else if (isCashWord) isBsCash = true;
-              else isBsCash = (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bs Efectivo');
-
-              if (isBsCash) {
-                 incomesBs += amountBs;
-                 incomesBsUsd += amt;
-              } else {
-                 totalBsInBanks += amountBs;
-                 totalBsInBanksUsd += amt;
-              }
-           } else if (isUsdMethod) {
-              let isUsdCash = false;
-              if (isBankWord || isCXCWord) isUsdCash = false;
-              else if (isCashWord) isUsdCash = true;
-              else isUsdCash = (t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === '$ Efectivo' || t.paymentMethod === 'Dolares Efectivo');
-
-              if (isUsdCash) incomesUsd += amt;
-              else totalUsdInBanks += amt;
+           if (isBankDest) {
+              totalBsInBanks += amountBsVal;
+              totalBsInBanksUsd += eqUsd;
            } else {
-              // Catch-all
-              if (isBankWord) totalUsdInBanks += amt;
-              else if (isCXCWord) totalCxc += amt;
-              else incomesUsd += amt;
+              incomesBs += amountBsVal;
+              incomesBsUsd += eqUsd;
            }
+           totalSalesUsd += eqUsd;
+        } else {
+           // USD ($)
+           if (isBankDest) {
+              totalUsdInBanks += amtUsd;
+           } else {
+              incomesUsd += amtUsd;
+           }
+           totalSalesUsd += amtUsd;
         }
-        totalSalesUsd += amt;
      }
   });
 
