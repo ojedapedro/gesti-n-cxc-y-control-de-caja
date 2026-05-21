@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/db';
-import { type CXCAccount, type CXCPayment, PaymentMethod } from '../types';
-import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search, Download, FileText, CreditCard, Landmark, Edit, X } from 'lucide-react';
+import { type CXCAccount, type CXCPayment, PaymentMethod, type Seller } from '../types';
+import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search, Download, FileText, CreditCard, Landmark, Edit, X, Percent } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -28,6 +28,53 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const [lastEdited, setLastEdited] = useState<'usd' | 'bs' | null>(null);
 
   const [fetchingRate, setFetchingRate] = useState(false);
+
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [showCXCModal, setShowCXCModal] = useState(false);
+  const [cxcData, setCxcData] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    clientName: '',
+    concept: '',
+    amountUsd: '',
+    grossAmountUsd: '',
+    amountBs: '',
+    invoiceNumber: '',
+    sellerName: '',
+    sellerId: '',
+    rubroName: '',
+    exchangeRate: exchangeRate?.toString() || '0',
+    item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+  });
+
+  // Fetch historical rate when cxcData date changes
+  useEffect(() => {
+    const fetchCxcRate = async (dateStr: string) => {
+      if (!dateStr || !showCXCModal) return;
+      setFetchingRate(true);
+      const historicalRate = await dbService.getExchangeRateForDate(dateStr);
+      if (historicalRate) {
+        setCxcData(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
+      } else if (exchangeRate !== undefined) {
+        setCxcData(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+      }
+      setFetchingRate(false);
+    };
+    fetchCxcRate(cxcData.date);
+  }, [cxcData.date, showCXCModal, exchangeRate]);
+
+  // Sync sellers
+  useEffect(() => {
+    const unsub = dbService.subscribeToSellers(setSellers);
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (cxcData.exchangeRate && cxcData.amountUsd) {
+      const usd = parseFloat(cxcData.amountUsd) || 0;
+      const bs = usd * parseFloat(cxcData.exchangeRate);
+      setCxcData(prev => ({ ...prev, amountBs: bs.toFixed(2) }));
+    }
+  }, [cxcData.exchangeRate]);
 
   // Fetch historical rate when date changes
   useEffect(() => {
@@ -228,6 +275,55 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     }
   }, [selectedAccount]);
 
+  const handleSubmitCXC = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cxcData.clientName.trim() || !cxcData.amountUsd || !cxcData.concept.trim() || !cxcData.sellerName.trim() || !cxcData.invoiceNumber.trim()) return;
+
+    try {
+      const gross = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
+      const net = parseFloat(cxcData.amountUsd) || 0;
+      const commissionAmount = gross - net;
+
+      await dbService.addCXCCharge(cxcData.clientName.trim().toUpperCase(), {
+        date: cxcData.date,
+        amountUsd: net,
+        grossAmountUsd: gross,
+        commissionAmountUsd: commissionAmount,
+        amountBs: parseFloat(cxcData.amountBs) || 0,
+        exchangeRate: parseFloat(cxcData.exchangeRate) || parseFloat(exchangeRate?.toString() || '1'),
+        concept: cxcData.concept,
+        item: cxcData.item,
+        invoiceNumber: cxcData.invoiceNumber,
+        sellerName: cxcData.sellerName,
+        sellerId: cxcData.sellerId,
+        rubroName: cxcData.rubroName.split('|')[0],
+        type: 'charge'
+      });
+
+      setShowCXCModal(false);
+      setCxcData({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        clientName: '',
+        concept: '',
+        amountUsd: '',
+        grossAmountUsd: '',
+        amountBs: '',
+        invoiceNumber: '',
+        sellerName: '',
+        sellerId: '',
+        rubroName: '',
+        exchangeRate: exchangeRate?.toString() || '1',
+        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+      });
+
+      if (selectedAccount && selectedAccount.clientName === cxcData.clientName.trim().toUpperCase()) {
+        dbService.getCXCPayments(selectedAccount.id).then(pays => setPayments(pays || []));
+      }
+    } catch (error) {
+      console.error("Error saving Cuentas por Cobrar (CXC):", error);
+    }
+  };
+
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAccount?.id) return;
@@ -385,13 +481,38 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
           <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Libro de Cuentas por Cobrar (CXC)</h2>
           <p className="text-sm font-medium text-slate-500 mt-1">Gestiona y consulta los saldos de los clientes.</p>
         </div>
-        <button
-          onClick={handleDownloadBook}
-          className="btn-primary"
-        >
-          <FileText size={16} />
-          <span>Generar PDF del Libro</span>
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => {
+              setCxcData({
+                date: format(new Date(), 'yyyy-MM-dd'),
+                clientName: '',
+                concept: '',
+                amountUsd: '',
+                grossAmountUsd: '',
+                amountBs: '',
+                invoiceNumber: '',
+                sellerName: '',
+                sellerId: '',
+                rubroName: '',
+                exchangeRate: exchangeRate?.toString() || '1',
+                item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+              });
+              setShowCXCModal(true);
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition-colors text-sm"
+          >
+            <Plus size={16} />
+            <span>Registrar Nuevo Cargo (CXC)</span>
+          </button>
+          <button
+            onClick={handleDownloadBook}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-705 font-medium py-2 px-4 rounded-xl transition-all text-sm border border-slate-200"
+          >
+            <FileText size={16} />
+            <span>Generar PDF del Libro</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
@@ -606,6 +727,28 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     <span className="hidden sm:inline">Descargar PDF</span>
                   </button>
                   <button
+                    onClick={() => {
+                      setCxcData({
+                        date: format(new Date(), 'yyyy-MM-dd'),
+                        clientName: selectedAccount.clientName.toUpperCase(),
+                        concept: '',
+                        amountUsd: '',
+                        grossAmountUsd: '',
+                        amountBs: '',
+                        invoiceNumber: '',
+                        sellerName: '',
+                        sellerId: '',
+                        rubroName: '',
+                        exchangeRate: exchangeRate?.toString() || '1',
+                        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+                      });
+                      setShowCXCModal(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition-colors animate-fade-in"
+                  >
+                    <Plus size={16} /> Registrar Cargo
+                  </button>
+                  <button
                     onClick={() => setShowPaymentForm(!showPaymentForm)}
                     className="btn-primary text-sm px-3 py-1.5"
                   >
@@ -667,6 +810,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="EFECTIVO" />
                               <option value="GARANTÍA" />
                               <option value="DONACIÓN" />
+                              <option value="CUENTAS POR COBRAR (CXC)" />
                             </>
                           ) : (
                             <>
@@ -680,6 +824,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="EFECTIVO" />
                               <option value="GARANTÍA" />
                               <option value="DONACIÓN" />
+                              <option value="CUENTAS POR COBRAR (CXC)" />
                             </>
                           )}
                         </datalist>
@@ -1094,6 +1239,238 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                 </button>
                 <button type="submit" className="btn-primary">
                   Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showCXCModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col animate-scale-up">
+            <div className="p-4 border-b border-slate-100 bg-blue-50/50 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <FileText className="text-blue-600" size={20} />
+                Registrar Cargo / Venta a Crédito (CXC)
+              </h3>
+              <button 
+                onClick={() => setShowCXCModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl leading-none"
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmitCXC} className="p-6 space-y-4 overflow-y-auto max-h-[80vh] custom-scrollbar">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Fecha</label>
+                  <input 
+                    type="date" 
+                    required
+                    value={cxcData.date}
+                    onChange={(e) => setCxcData({...cxcData, date: e.target.value})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Item (Autogenerado)</label>
+                  <input 
+                    type="text" 
+                    readOnly
+                    value={cxcData.item}
+                    className="input-field bg-slate-50 text-slate-500 font-mono" 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label">Cliente (Nombre y Apellido)</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    required
+                    value={cxcData.clientName}
+                    onChange={(e) => setCxcData({...cxcData, clientName: e.target.value})}
+                    className="input-field pl-10 uppercase font-medium" 
+                    placeholder="Escriba el nombre exacto del cliente"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label">Concepto</label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    required
+                    value={cxcData.concept}
+                    onChange={(e) => setCxcData({...cxcData, concept: e.target.value})}
+                    className="input-field pl-10" 
+                    placeholder="Detalle de la venta/ingreso a crédito"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Número de Factura</label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      required
+                      value={cxcData.invoiceNumber}
+                      onChange={(e) => setCxcData({...cxcData, invoiceNumber: e.target.value})}
+                      className="input-field pl-10" 
+                      placeholder="Ej: FAC-00123"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label">Vendedor / Perfil</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <select 
+                      required
+                      value={cxcData.sellerId}
+                      onChange={(e) => {
+                        const sId = e.target.value;
+                        const seller = sellers.find(s => s.id === sId);
+                        if (seller) {
+                          const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
+                          const commission = 0;
+                          const finalUsd = baseUsd * (1 - commission);
+                          const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
+                          setCxcData({
+                            ...cxcData, 
+                            sellerId: sId, 
+                            sellerName: seller.name,
+                            rubroName: '', 
+                            grossAmountUsd: baseUsd.toString(),
+                            amountUsd: finalUsd.toFixed(2),
+                            amountBs: finalBs.toFixed(2)
+                          });
+                        } else {
+                          setCxcData({...cxcData, sellerId: sId, sellerName: '', rubroName: ''});
+                        }
+                      }}
+                      className="input-field pl-10 cursor-pointer text-sm"
+                    >
+                      <option value="">Seleccione Vendedor...</option>
+                      {sellers.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label flex items-center justify-between">
+                  <span>Rubro / Categoría de Venta</span>
+                  {cxcData.rubroName && (
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-black uppercase">
+                      {cxcData.rubroName.includes('|') ? cxcData.rubroName.split('|')[1] : '0'}% Comis.
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <select 
+                    value={cxcData.rubroName}
+                    onChange={(e) => {
+                      const rValue = e.target.value;
+                      const [rName, rComm] = rValue.split('|');
+                      const commission = rComm ? (parseFloat(rComm) / 100) : 0;
+                      
+                      const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
+                      const finalUsd = baseUsd * (1 - commission);
+                      const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
+                      
+                      setCxcData({
+                        ...cxcData,
+                        rubroName: rValue,
+                        amountUsd: finalUsd.toFixed(2),
+                        amountBs: finalBs.toFixed(2)
+                      });
+                    }}
+                    className="input-field pl-10 cursor-pointer disabled:bg-slate-50 disabled:text-slate-400 text-sm"
+                    disabled={!cxcData.sellerId}
+                  >
+                    <option value="">Sin Comisión / Ninguno</option>
+                    {sellers.find(s => s.id === cxcData.sellerId)?.rubros?.map((r, index) => {
+                      const optVal = `${r.name}|${r.commissionPercentage}`;
+                      return (
+                        <option key={`${r.name}-${r.commissionPercentage}-${index}`} value={optVal}>
+                          {r.name} ({r.commissionPercentage}%)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                {!cxcData.sellerId && <p className="text-[10px] text-amber-600 font-bold mt-1">Seleccione un vendedor para ver sus rubros.</p>}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Monto Bruto (USD)</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      min="0.01"
+                      required
+                      placeholder="0.00"
+                      value={cxcData.grossAmountUsd}
+                      onChange={(e) => {
+                        const usd = parseFloat(e.target.value) || 0;
+                        const [rName, rComm] = cxcData.rubroName.split('|');
+                        const commission = rComm ? (parseFloat(rComm) / 100) : 0;
+                        
+                        const finalUsd = usd * (1 - commission);
+                        const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
+                        setCxcData({
+                          ...cxcData, 
+                          grossAmountUsd: e.target.value,
+                          amountUsd: finalUsd.toFixed(2), 
+                          amountBs: finalBs.toFixed(2)
+                        });
+                      }}
+                      className="input-field pl-10 font-bold" 
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">Monto antes de comisión.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label text-blue-600 font-bold">Monto Neto CXC (USD)</label>
+                  <div className="input-field bg-blue-50 text-blue-700 font-bold border-dashed flex items-center justify-between h-[38px] px-3">
+                    <span>{formatCurrency(parseFloat(cxcData.amountUsd) || 0)}</span>
+                    {cxcData.sellerId && (
+                      <span className="text-[10px] bg-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <Percent size={10} /> {(() => {
+                          const rComm = cxcData.rubroName.includes('|') ? cxcData.rubroName.split('|')[1] : '0';
+                          return rComm;
+                        })()}% Comis.
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400">Monto neto a registrar.</p>
+                </div>
+              </div>
+              
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
+                <button type="button" onClick={() => setShowCXCModal(false)} className="px-5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 font-medium transition-colors text-sm">
+                  Cancelar
+                </button>
+                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-xl transition-all shadow-sm text-sm">
+                  Registrar Cargo
                 </button>
               </div>
             </form>

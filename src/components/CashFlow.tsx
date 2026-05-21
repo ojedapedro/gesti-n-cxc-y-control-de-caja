@@ -86,7 +86,9 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         const isCashDest = destComp.includes('EFECTIVO') || destComp.includes('CAJA') || destComp === '';
         const isBankDest = destComp.length > 0 && !isCashDest && !destComp.includes('CXC') && !destComp.includes('COBRAR');
 
-        if (isBankDest) return; // Skip bank/destination options in Cash flow control!
+        const isBank = isBankDest || t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE;
+
+        if (isBank) return; // Skip bank/destination options in Cash flow control!
         
         let cashUsdAmount = 0;
         let cashBsAmount = 0;

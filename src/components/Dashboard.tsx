@@ -95,6 +95,8 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
           const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA') || destClean === '';
           const isBankDest = destClean.length > 0 && !isCashDest && !destClean.includes('CXC') && !destClean.includes('COBRAR');
 
+          const isBank = isBankDest || t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE;
+
           // Determine if it is a Bolívares (BS) transaction or USD ($) transaction
           const isBs = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
                        t.paymentMethod === 'Bs' || 
@@ -107,7 +109,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
              const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * (t.exchangeRate || 1));
              const eqUsd = t.exchangeRate && t.exchangeRate > 0 ? amountBsVal / t.exchangeRate : t.amountUsd;
 
-             if (isBankDest) {
+             if (isBank) {
                 totalBsBanco += eqUsd;
              } else {
                 totalBsEfectivo += eqUsd;
@@ -115,7 +117,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
           } else {
              // USD Transaction
              const usdAmount = t.amountUsd;
-             if (isBankDest) {
+             if (isBank) {
                 totalUsdBanco += usdAmount;
              } else {
                 totalUsdEfectivo += usdAmount;

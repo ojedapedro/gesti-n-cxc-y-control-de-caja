@@ -59,12 +59,15 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
      const isCashDest = (destClean.includes('EFECTIVO') || destClean.includes('CAJA') || destClean === '') && !isCXCField;
      const isBankDest = destClean.length > 0 && !isCashDest && !isCXCField;
 
+     const isBank = isBankDest || t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE;
+
      // Calculate amount USD
      const amtUsd = t.amountUsd || 0;
 
      if (isCXCField) {
-        totalCxc += amtUsd;
-        totalSalesUsd += amtUsd;
+        const grossCxc = t.grossAmountUsd || t.totalDailySale || amtUsd;
+        totalCxc += grossCxc;
+        totalSalesUsd += grossCxc;
      } else {
         // Determine currency: is BS?
         const isBs = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
@@ -78,7 +81,7 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
            const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (amtUsd * rate);
            const eqUsd = rate > 0 ? (amountBsVal / rate) : amtUsd;
 
-           if (isBankDest) {
+           if (isBank) {
               totalBsInBanks += amountBsVal;
               totalBsInBanksUsd += eqUsd;
            } else {
@@ -88,7 +91,7 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
            totalSalesUsd += eqUsd;
         } else {
            // USD ($)
-           if (isBankDest) {
+           if (isBank) {
               totalUsdInBanks += amtUsd;
            } else {
               incomesUsd += amtUsd;
