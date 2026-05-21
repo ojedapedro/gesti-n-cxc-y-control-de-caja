@@ -24,8 +24,7 @@ export default function Sellers() {
   const [formData, setFormData] = useState({
     id: '',
     name: '',
-    region: '',
-    commissionPercentage: ''
+    region: ''
   });
 
   useEffect(() => {
@@ -38,8 +37,7 @@ export default function Sellers() {
     setFormData({
       id: seller.id,
       name: seller.name,
-      region: seller.region || '',
-      commissionPercentage: (seller.commissionPercentage || 0).toString()
+      region: seller.region || ''
     });
     setRubros(seller.rubros?.map(r => ({ 
       name: r.name, 
@@ -60,7 +58,7 @@ export default function Sellers() {
       id: formData.id.trim(),
       name: formData.name.trim().toUpperCase(),
       region: formData.region.trim().toUpperCase(),
-      commissionPercentage: parseFloat(formData.commissionPercentage) || 0,
+      commissionPercentage: 0,
       rubros: rubros
         .filter(r => r.name.trim() !== '')
         .map(r => ({
@@ -73,7 +71,7 @@ export default function Sellers() {
     await dbService.addOrUpdateSeller(seller);
     setShowForm(false);
     setEditingSeller(null);
-    setFormData({ id: '', name: '', region: '', commissionPercentage: '' });
+    setFormData({ id: '', name: '', region: '' });
     setRubros([]);
   };
 
@@ -92,7 +90,7 @@ export default function Sellers() {
                 <button 
           onClick={() => {
             setEditingSeller(null);
-            setFormData({ id: '', name: '', region: '', commissionPercentage: '' });
+            setFormData({ id: '', name: '', region: '' });
             setRubros([]);
             setShowForm(true);
           }}
@@ -160,18 +158,12 @@ export default function Sellers() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mt-6">
+              <div className="mt-6">
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
                     <MapPin size={10} /> Región
                   </p>
                   <p className="text-xs font-bold text-slate-700 truncate">{seller.region || 'N/A'}</p>
-                </div>
-                <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
-                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                    <Percent size={10} /> Comisión Base
-                  </p>
-                  <p className="text-sm font-black text-blue-700">{(seller.commissionPercentage || 0)}%</p>
                 </div>
               </div>
 
@@ -253,23 +245,6 @@ export default function Sellers() {
                   onChange={(e) => setFormData({...formData, region: e.target.value.toUpperCase()})}
                   className="input-field uppercase" 
                 />
-              </div>
-
-              <div className="space-y-1">
-                <label className="label">Porcentaje de Comisión (%)</label>
-                <div className="relative">
-                  <Percent className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    required
-                    placeholder="0.00"
-                    value={formData.commissionPercentage}
-                    onChange={(e) => setFormData({...formData, commissionPercentage: e.target.value})}
-                    className="input-field pl-10" 
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400 font-medium">Este porcentaje se aplicará al monto de CXC si no se especifica un rubro.</p>
               </div>
 
               <div className="space-y-3 pt-2">
