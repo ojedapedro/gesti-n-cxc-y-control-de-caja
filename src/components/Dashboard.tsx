@@ -60,11 +60,16 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     return true;
   };
 
-  let totalBsBanco = 0;
-  let totalBsEfectivo = 0;
-  let totalUsdBanco = 0;
-  let totalUsdEfectivo = 0;
-  let totalVentas = 0;
+  let totalBsBancoUsd = 0;
+  let totalBsBancoBs = 0;
+  let totalBsEfectivoUsd = 0;
+  let totalBsEfectivoBs = 0;
+  let totalUsdBancoUsd = 0;
+  let totalUsdBancoBs = 0;
+  let totalUsdEfectivoUsd = 0;
+  let totalUsdEfectivoBs = 0;
+  let totalVentasUsd = 0;
+  let totalVentasBs = 0;
   let periodCxcCharges = 0;
   let periodCxcPayments = 0;
   
@@ -72,10 +77,24 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .filter(t => filterByDate(t.date))
     .forEach(t => {
        const dest = (t.destinationBank || '').toUpperCase();
+       const rate = t.exchangeRate || exchangeRate || 1;
        
        // 1. SALES VOLUME: Sum all sales within period (Cash and Bank; excluding Credit/CXC)
        if (t.type === TransactionType.SALE && !t.isCXC && t.paymentMethod !== PaymentMethod.CXC) {
-          totalVentas += t.amountUsd;
+          totalVentasUsd += t.amountUsd;
+          
+          const isBs = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                       t.paymentMethod === 'Bs' || 
+                       t.paymentMethod === 'Bolivares' || 
+                       t.paymentMethod === 'Bs Efectivo' || 
+                       (t.currency && t.currency.toUpperCase().includes('BOLÍVARES')) || 
+                       (t.amountBs && t.amountBs > 0);
+          if (isBs) {
+             const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * rate);
+             totalVentasBs += amountBsVal;
+          } else {
+             totalVentasBs += t.amountUsd * rate;
+          }
        }
 
        // Track CXC movements for the period
@@ -106,21 +125,25 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
                        (t.amountBs && t.amountBs > 0);
 
           if (isBs) {
-             const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * (t.exchangeRate || 1));
-             const eqUsd = t.exchangeRate && t.exchangeRate > 0 ? amountBsVal / t.exchangeRate : t.amountUsd;
+             const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * rate);
+             const eqUsd = rate > 0 ? amountBsVal / rate : t.amountUsd;
 
              if (isBank) {
-                totalBsBanco += eqUsd;
+                totalBsBancoUsd += eqUsd;
+                totalBsBancoBs += amountBsVal;
              } else {
-                totalBsEfectivo += eqUsd;
+                totalBsEfectivoUsd += eqUsd;
+                totalBsEfectivoBs += amountBsVal;
              }
           } else {
              // USD Transaction
              const usdAmount = t.amountUsd;
              if (isBank) {
-                totalUsdBanco += usdAmount;
+                totalUsdBancoUsd += usdAmount;
+                totalUsdBancoBs += usdAmount * rate;
              } else {
-                totalUsdEfectivo += usdAmount;
+                totalUsdEfectivoUsd += usdAmount;
+                totalUsdEfectivoBs += usdAmount * rate;
              }
           }
        }
@@ -145,7 +168,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .filter(e => filterByDate(e.date))
     .reduce((sum, e) => sum + e.amountUsd, 0);
 
-  const cashBalance = (totalUsdEfectivo + totalBsEfectivo) - periodWithdrawals - periodExpenses;
+  const cashBalance = (totalUsdEfectivoUsd + totalBsEfectivoUsd) - periodWithdrawals - periodExpenses;
 
   // Chart data Preparation
   const getLast6MonthsData = () => {
@@ -178,11 +201,11 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
   const chartData = getLast6MonthsData();
 
   const stats = [
-    { label: 'TOTAL VENTAS', value: totalVentas, icon: TrendingUp, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { label: 'TOTAL INGRESO BOLIVARES BANCO', value: totalBsBanco, icon: CreditCard, color: 'text-sky-600', bg: 'bg-sky-50' },
-    { label: 'TOTAL INGRESO BOLIVARES EFECTIVO', value: totalBsEfectivo, icon: Banknote, color: 'text-teal-600', bg: 'bg-teal-50' },
-    { label: 'TOTAL INGRESO DOLARES BANCO', value: totalUsdBanco, icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'TOTAL INGRESO DOLARES EFECTIVO', value: totalUsdEfectivo, icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'TOTAL VENTAS', value: totalVentasUsd, valueBs: totalVentasBs, icon: TrendingUp, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { label: 'TOTAL INGRESO BOLIVARES BANCO', value: totalBsBancoUsd, valueBs: totalBsBancoBs, icon: CreditCard, color: 'text-sky-600', bg: 'bg-sky-50' },
+    { label: 'TOTAL INGRESO BOLIVARES EFECTIVO', value: totalBsEfectivoUsd, valueBs: totalBsEfectivoBs, icon: Banknote, color: 'text-teal-600', bg: 'bg-teal-50' },
+    { label: 'TOTAL INGRESO DOLARES BANCO', value: totalUsdBancoUsd, valueBs: totalUsdBancoBs, icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'TOTAL INGRESO DOLARES EFECTIVO', value: totalUsdEfectivoUsd, valueBs: totalUsdEfectivoBs, icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
   ];
 
   if (loading) {
@@ -242,7 +265,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
               <div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
                 <h3 className={`text-3xl font-black mt-2 tracking-tight ${stat.color}`}>{formatCurrency(stat.value)}</h3>
-                <p className={`text-xs mt-1 font-bold ${stat.color} opacity-70`}>Bs. {new Intl.NumberFormat('es-VE').format(stat.value * exchangeRate)}</p>
+                <p className={`text-xs mt-1 font-bold ${stat.color} opacity-70`}>Bs. {new Intl.NumberFormat('es-VE').format(stat.valueBs)}</p>
               </div>
               <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color}`}>
                 <stat.icon size={22} strokeWidth={2.5} />
