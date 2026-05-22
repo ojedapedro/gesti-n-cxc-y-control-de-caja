@@ -272,9 +272,15 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     acc.usdCash += t.amountUsdCash || 0;
     acc.zelle += t.amountZelle || 0;
     acc.cxc += t.amountCXC || 0;
-    acc.ventaDiaria += t.totalDailySale || t.amountUsd || 0;
+    
+    const valueUsd = t.totalDailySale || t.amountUsd || 0;
+    acc.ventaDiaria += valueUsd;
+    
+    const rate = t.exchangeRate || exchangeRate || 1;
+    acc.ventaDiariaBs += valueUsd * rate;
+    
     return acc;
-  }, { bs: 0, usdConv: 0, usdCash: 0, zelle: 0, cxc: 0, ventaDiaria: 0 });
+  }, { bs: 0, usdConv: 0, usdCash: 0, zelle: 0, cxc: 0, ventaDiaria: 0, ventaDiariaBs: 0 });
 
   return (
     <div className="space-y-6">
@@ -561,7 +567,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <td className="p-3 text-right text-slate-900 bg-slate-200 border-r border-slate-300">
                   {formatCurrency(totals.ventaDiaria)}
                   <span className="block text-[9px] text-slate-500 font-bold mt-0.5 whitespace-nowrap">
-                    Bs. {new Intl.NumberFormat('es-VE').format(totals.ventaDiaria * (exchangeRate || 1))}
+                    Bs. {new Intl.NumberFormat('es-VE').format(totals.ventaDiariaBs)}
                   </span>
                 </td>
                 <td className="p-3 bg-slate-100"></td>
@@ -593,7 +599,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <td className="p-3 text-right font-black text-slate-900 bg-slate-50 border-r border-slate-100">
                         {formatCurrency(t.totalDailySale || t.amountUsd)}
                         <span className="block text-[9px] text-slate-400 font-bold mt-0.5 whitespace-nowrap">
-                          Bs. {new Intl.NumberFormat('es-VE').format((t.totalDailySale || t.amountUsd) * (exchangeRate || 1))}
+                          Bs. {new Intl.NumberFormat('es-VE').format((t.totalDailySale || t.amountUsd) * (t.exchangeRate || exchangeRate || 1))}
                         </span>
                       </td>
                       <td className="p-3 text-center">
