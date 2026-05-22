@@ -158,13 +158,13 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
 
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(14);
-      doc.text(formatCurrency(selectedReceipt.amountUsd), 130, 53);
-      
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      const bsAmount = selectedReceipt.amountUsd * (selectedReceipt.exchangeRate || exchangeRate || 1);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Bs. ${new Intl.NumberFormat('es-VE').format(bsAmount)}`, 130, 60);
+      const isBs = selectedReceipt.paymentMethod === PaymentMethod.BS_CASH || selectedReceipt.paymentMethod === PaymentMethod.BS;
+      if (isBs) {
+        const bsVal = selectedReceipt.amountBs || (selectedReceipt.amountUsd * (selectedReceipt.exchangeRate || 1));
+        doc.text(`Bs. ${new Intl.NumberFormat('es-VE').format(bsVal)}`, 130, 53);
+      } else {
+        doc.text(formatCurrency(selectedReceipt.amountUsd), 130, 53);
+      }
 
       // Concepto
       doc.setLineDashPattern([], 0);
@@ -401,7 +401,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                     <th className="table-header">Fecha</th>
                     <th className="table-header">Recibe</th>
                     <th className="table-header text-center whitespace-nowrap">Moneda O.</th>
-                    <th className="table-header text-right bg-amber-50/50">Monto Eq. USD</th>
+                    <th className="table-header text-right bg-amber-50/50">Monto</th>
                     <th className="table-header"></th>
                   </tr>
                 </thead>
@@ -433,8 +433,11 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                          )}
                       </td>
                       <td className="table-cell text-right font-bold text-amber-700 bg-amber-50/10">
-                        {formatCurrency(r.amountUsd)}
-                        <span className="block text-[10px] text-slate-400 font-normal mt-0.5">Bs. {new Intl.NumberFormat('es-VE').format(r.amountUsd * (r.exchangeRate || exchangeRate || 1))}</span>
+                        {isBs ? (
+                          <span>Bs. {new Intl.NumberFormat('es-VE').format(r.amountBs || (r.amountUsd * (r.exchangeRate || 1)))}</span>
+                        ) : (
+                          <span>{formatCurrency(r.amountUsd)}</span>
+                        )}
                       </td>
                       <td className="table-cell text-right">
                         <ChevronRight size={16} className="text-slate-300 ml-auto" />
@@ -489,10 +492,23 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                   </div>
                   <div className="p-3 bg-slate-50">
                     <p className="text-[10px] font-bold uppercase text-slate-400">Por la cantidad de</p>
-                    <p className="text-xl font-black">{formatCurrency(selectedReceipt.amountUsd)}</p>
-                    <p className="text-[11px] font-bold text-slate-500 uppercase">
-                      Bs. {new Intl.NumberFormat('es-VE').format(selectedReceipt.amountUsd * (selectedReceipt.exchangeRate || exchangeRate || 1))}
-                    </p>
+                    {(() => {
+                      const isBs = selectedReceipt.paymentMethod === PaymentMethod.BS_CASH || selectedReceipt.paymentMethod === PaymentMethod.BS;
+                      if (isBs) {
+                        const bsVal = selectedReceipt.amountBs || (selectedReceipt.amountUsd * (selectedReceipt.exchangeRate || 1));
+                        return (
+                          <p className="text-xl font-black">
+                            Bs. {new Intl.NumberFormat('es-VE').format(bsVal)}
+                          </p>
+                        );
+                      } else {
+                        return (
+                          <p className="text-xl font-black">
+                            {formatCurrency(selectedReceipt.amountUsd)}
+                          </p>
+                        );
+                      }
+                    })()}
                   </div>
                 </div>
 

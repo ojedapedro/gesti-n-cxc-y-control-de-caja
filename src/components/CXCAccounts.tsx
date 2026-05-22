@@ -483,29 +483,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button
-            onClick={() => {
-              setCxcData({
-                date: format(new Date(), 'yyyy-MM-dd'),
-                clientName: '',
-                concept: '',
-                amountUsd: '',
-                grossAmountUsd: '',
-                amountBs: '',
-                invoiceNumber: '',
-                sellerName: '',
-                sellerId: '',
-                rubroName: '',
-                exchangeRate: exchangeRate?.toString() || '1',
-                item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
-              });
-              setShowCXCModal(true);
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition-colors text-sm"
-          >
-            <Plus size={16} />
-            <span>Registrar Nuevo Cargo (CXC)</span>
-          </button>
-          <button
             onClick={handleDownloadBook}
             className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-705 font-medium py-2 px-4 rounded-xl transition-all text-sm border border-slate-200"
           >

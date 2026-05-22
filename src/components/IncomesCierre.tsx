@@ -7,7 +7,8 @@ import { es } from 'date-fns/locale';
 import { Calendar, Lock, Unlock, AlertTriangle, Search, Save, CheckCircle, Activity, DollarSign } from 'lucide-react';
 
 export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number }) {
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [closures, setClosures] = useState<CashClosure[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -31,13 +32,14 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
     };
   }, []);
 
-  const currentClosure = closures.find(c => c.date === selectedDate);
-  const isClosed = currentClosure?.isClosed || false;
+  const isPeriodMode = startDate !== endDate;
+  const currentClosure = closures.find(c => c.date === startDate);
+  const isClosed = !isPeriodMode && (currentClosure?.isClosed || false);
 
-  // Compute daily totals
-  const dailyTransactions = transactions.filter(t => t.date === selectedDate && t.type !== TransactionType.WITHDRAWAL);
-  const dailyExpenses = expenses.filter(e => e.date === selectedDate);
-  const dailyReceipts = receipts.filter(r => r.date === selectedDate);
+  // Compute period totals
+  const dailyTransactions = transactions.filter(t => t.date >= startDate && t.date <= endDate && t.type !== TransactionType.WITHDRAWAL);
+  const dailyExpenses = expenses.filter(e => e.date >= startDate && e.date <= endDate);
+  const dailyReceipts = receipts.filter(r => r.date >= startDate && r.date <= endDate);
 
   let incomesUsd = 0; // Efectivo en Mano USD
   let incomesBs = 0;  // Efectivo en Mano BS
@@ -101,13 +103,20 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
      }
   });
 
-  // Expected balances
-  const previousClosure = closures.find(c => c.date < selectedDate && c.isClosed);
+  // Expected balances based on the startDate
+  const previousClosure = closures
+    .filter(c => c.date < startDate && c.isClosed)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
   const initialUsd = previousClosure?.actualBalanceUsd || 0;
   const initialBs = previousClosure?.actualBalanceBs || 0;
 
   const expectedUsd = initialUsd + incomesUsd;
   const expectedBs = initialBs + incomesBs;
+
+  // Filter closures recorded in the selected period for history display
+  const periodClosures = closures
+    .filter(c => c.date >= startDate && c.date <= endDate)
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   // When physical inputs change
   const actUsd = parseFloat(actualUsd) || 0;
@@ -121,7 +130,7 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
     setIsClosing(true);
     try {
       const data: Omit<CashClosure, 'id' | 'createdAt'> = {
-        date: selectedDate,
+        date: startDate,
         initialBalanceUsd: initialUsd,
         initialBalanceBs: initialBs,
         incomesUsd,
@@ -181,7 +190,7 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
         setActualBs('0');
         setObservations('');
      }
-  }, [currentClosure, selectedDate]);
+  }, [currentClosure, startDate, endDate]);
 
 
   const getDayName = (dateStr: string) => {
@@ -203,32 +212,72 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
           <p className="text-sm font-medium text-slate-500 mt-1">Cuadre diario de efectivo e impresión de histórico.</p>
         </div>
         
-        <div className="flex items-center gap-3">
-            <div className="flex bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm">
-                <Calendar size={16} className="text-slate-400 shrink-0 ml-2 mt-auto mb-auto mr-2" />
-                <div className="flex flex-col">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Fecha de Cierre</label>
-                  <input 
-                    type="date" 
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="bg-transparent text-sm font-medium text-slate-900 outline-none cursor-pointer"
-                  />
-                </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto">
+          <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
+            <Calendar size={16} className="text-slate-400 shrink-0" />
+            <div className="flex flex-col w-full">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Desde</label>
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-full sm:w-28 cursor-pointer"
+              />
             </div>
+          </div>
+          <div className="hidden sm:block w-px h-8 bg-slate-200 mx-1"></div>
+          <div className="w-full h-px sm:hidden bg-slate-200 my-1"></div>
+          <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
+            <div className="flex flex-col w-full">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Hasta</label>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent text-sm font-medium text-slate-900 outline-none w-full sm:w-28 cursor-pointer"
+              />
+            </div>
+          </div>
+          <div className="hidden sm:block w-px h-8 bg-slate-200 mx-1"></div>
+          <div className="w-full h-px sm:hidden bg-slate-200 my-1"></div>
+          <button
+            onClick={() => {
+              const today = format(new Date(), 'yyyy-MM-dd');
+              setStartDate(today);
+              setEndDate(today);
+            }}
+            className="px-3 py-1 bg-white hover:bg-slate-100 text-slate-600 font-bold text-xs rounded-lg border border-slate-200 transition-colors shadow-sm"
+          >
+            Hoy
+          </button>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
          <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
             <div>
-               <h3 className="text-lg font-black text-slate-900 capitalize">{getDayName(selectedDate)}</h3>
-               <div className="flex items-center gap-2 mt-1">
-                 <div className={`w-2 h-2 rounded-full ${isClosed ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
-                 <span className={`text-xs font-bold uppercase tracking-widest ${isClosed ? 'text-rose-600' : 'text-emerald-600'}`}>
-                   {isClosed ? 'Caja Cerrada' : 'Caja Abierta'}
-                 </span>
-               </div>
+               {isPeriodMode ? (
+                  <h3 className="text-lg font-black text-slate-900">
+                     Periodo: {format(new Date(startDate + 'T12:00:00'), 'dd/MM/yyyy')} al {format(new Date(endDate + 'T12:00:00'), 'dd/MM/yyyy')}
+                  </h3>
+               ) : (
+                  <h3 className="text-lg font-black text-slate-900 capitalize">{getDayName(startDate)}</h3>
+               )}
+               {isPeriodMode ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span className="text-xs font-bold uppercase tracking-widest text-blue-600">
+                      Vista consolidada de {periodClosures.length} cierre{periodClosures.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+               ) : (
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className={`w-2 h-2 rounded-full ${isClosed ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
+                    <span className={`text-xs font-bold uppercase tracking-widest ${isClosed ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {isClosed ? 'Caja Cerrada' : 'Caja Abierta'}
+                    </span>
+                  </div>
+               )}
             </div>
          </div>
 
@@ -346,11 +395,82 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                 </div>
             </div>
 
-            {/* Cuadre Físico */}
-            <div>
-               <h4 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2"><CheckCircle size={16} /> Verificación Física (Conteo)</h4>
-               
-               <div className="space-y-4">
+            {/* Cuadre Físico u Historial de Cierres según isPeriodMode */}
+            {isPeriodMode ? (
+               <div>
+                  <h4 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+                     <CheckCircle size={16} /> Historial de Cierres ({periodClosures.length})
+                  </h4>
+                  <div className="space-y-4">
+                     <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-xs font-medium leading-relaxed">
+                        ℹ️ <strong>Vista de Periodo:</strong> El registro y cuadre de caja físico se realiza de manera individual por día. Para registrar un cierre físico, por favor seleccione una fecha única (Desde y Hasta iguales).
+                     </div>
+                     
+                     <div className="max-h-[350px] overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white shadow-sm custom-scrollbar">
+                        {periodClosures.length === 0 ? (
+                           <div className="p-8 text-center text-slate-400 text-sm">
+                              No se encontraron cierres registrados en este rango de fecha.
+                           </div>
+                        ) : (
+                           periodClosures.map((c) => {
+                              const hasDiscrepancy = (c.differenceUsd || 0) !== 0 || (c.differenceBs || 0) !== 0;
+                              return (
+                                 <div key={c.id} className="p-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                       <p className="text-sm font-black text-slate-800">
+                                          {format(new Date(c.date + 'T12:00:00'), 'dd/MM/yyyy')} 
+                                          <span className="text-xs text-slate-500 font-medium ml-2 font-mono uppercase">
+                                             ({format(new Date(c.date + 'T12:00:00'), 'E', { locale: es })})
+                                          </span>
+                                       </p>
+                                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                          <span className="text-slate-500 font-bold">Físico:</span>
+                                          <span className="text-slate-800 font-semibold">{formatCurrency(c.actualBalanceUsd)}</span>
+                                          <span className="text-slate-300">|</span>
+                                          <span className="text-slate-800 font-semibold">{formatBs(c.actualBalanceBs)}</span>
+                                       </div>
+                                       {c.observations && (
+                                          <p className="text-[10px] text-slate-400 italic truncate max-w-[200px]" title={c.observations}>
+                                             "{c.observations}"
+                                          </p>
+                                       )}
+                                    </div>
+                                    
+                                    <div className="text-right flex flex-col items-end gap-1.5">
+                                       <div className="flex items-center gap-1.5">
+                                          {hasDiscrepancy ? (
+                                             <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                <AlertTriangle size={10} /> Discrepancia
+                                             </span>
+                                          ) : (
+                                             <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                                                Cuadrado
+                                             </span>
+                                          )}
+                                          <span className="text-[10px] bg-green-100 text-green-800 font-bold px-1.5 py-0.5 rounded-full">Cerrado</span>
+                                       </div>
+                                       <button
+                                          onClick={() => {
+                                             setStartDate(c.date);
+                                             setEndDate(c.date);
+                                          }}
+                                          className="text-[11px] text-blue-600 hover:text-blue-700 font-black flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-md transition-colors"
+                                       >
+                                          <Search size={10} /> Ver Detalles
+                                       </button>
+                                    </div>
+                                 </div>
+                              );
+                           })
+                        )}
+                     </div>
+                  </div>
+               </div>
+            ) : (
+               <div>
+                  <h4 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2"><CheckCircle size={16} /> Verificación Física (Conteo)</h4>
+                  
+                  <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-xs font-bold text-slate-600 uppercase mb-2 block">Efectivo Físico USD ($)</label>
@@ -424,6 +544,7 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
                   )}
                </div>
             </div>
+            )}
          </div>
       </div>
     </div>
