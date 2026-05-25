@@ -14,6 +14,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedDestination, setSelectedDestination] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState('');
   const [fetchingRate, setFetchingRate] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -258,11 +260,30 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     }
   };
 
+  // Unique options for filtrations
+  const uniqueCurrencies = Array.from(
+    new Set(
+      transactions
+        .filter(t => t.type === TransactionType.SALE && !t.isCXC && t.paymentMethod !== PaymentMethod.CXC && t.currency)
+        .map(t => t.currency)
+    )
+  ).sort();
+
+  const uniqueDestinations = Array.from(
+    new Set(
+      transactions
+        .filter(t => t.type === TransactionType.SALE && !t.isCXC && t.paymentMethod !== PaymentMethod.CXC && t.destinationBank && (t.destinationBank || '').trim().length > 0)
+        .map(t => (t.destinationBank || '').trim().toUpperCase())
+    )
+  ).sort();
+
   const filteredTransactions = transactions.filter(t => {
     if (t.type !== TransactionType.SALE) return false;
     if (t.isCXC || t.paymentMethod === PaymentMethod.CXC) return false;
     if (startDate && t.date < startDate) return false;
     if (endDate && t.date > endDate) return false;
+    if (selectedCurrency && t.currency !== selectedCurrency) return false;
+    if (selectedDestination && (t.destinationBank || '').trim().toUpperCase() !== selectedDestination.toUpperCase()) return false;
     return true;
   });
 
@@ -320,6 +341,49 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
             {(startDate || endDate) && (
               <button 
                 onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="mt-2 sm:mt-0 sm:ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors w-full sm:w-auto text-center border border-transparent sm:border-slate-200 bg-white sm:bg-transparent shadow-sm sm:shadow-none"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto">
+            <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
+              <div className="flex flex-col w-full">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Moneda</label>
+                <select
+                  value={selectedCurrency}
+                  onChange={(e) => setSelectedCurrency(e.target.value)}
+                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-full sm:w-32 cursor-pointer border-none p-0 focus:ring-0 leading-tight"
+                >
+                  <option value="">TODAS</option>
+                  {uniqueCurrencies.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="hidden sm:block w-px h-8 bg-slate-200 mx-1"></div>
+            <div className="w-full h-px sm:hidden bg-slate-200 my-1"></div>
+            <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
+              <div className="flex flex-col w-full">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Destino</label>
+                <select
+                  value={selectedDestination}
+                  onChange={(e) => setSelectedDestination(e.target.value)}
+                  className="bg-transparent text-sm font-medium text-slate-900 outline-none w-full sm:w-36 cursor-pointer border-none p-0 focus:ring-0 leading-tight"
+                >
+                  <option value="">TODOS</option>
+                  {uniqueDestinations.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {(selectedCurrency || selectedDestination) && (
+              <button 
+                onClick={() => { setSelectedCurrency(''); setSelectedDestination(''); }}
                 className="mt-2 sm:mt-0 sm:ml-2 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors w-full sm:w-auto text-center border border-transparent sm:border-slate-200 bg-white sm:bg-transparent shadow-sm sm:shadow-none"
               >
                 Limpiar

@@ -13,6 +13,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const [selectedAccount, setSelectedAccount] = useState<CXCAccount | null>(null);
   const [payments, setPayments] = useState<CXCPayment[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterSeller, setFilterSeller] = useState('');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<CXCPayment | null>(null);
   const [paymentData, setPaymentData] = useState({
@@ -272,6 +275,10 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   useEffect(() => {
     if (selectedAccount?.id) {
       dbService.getCXCPayments(selectedAccount.id).then(pays => setPayments(pays || []));
+      // Clear filters on client change to prevent confusion
+      setFilterStartDate('');
+      setFilterEndDate('');
+      setFilterSeller('');
     }
   }, [selectedAccount]);
 
@@ -427,13 +434,26 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     doc.text(`ID Cliente: ${selectedAccount.id}`, 14, 36);
     doc.text(`Saldo Total Pendiente: ${formatCurrency(selectedAccount.totalBalance)}`, 14, 42);
 
+    let startYTable = 50;
+    if (filterStartDate || filterEndDate || filterSeller) {
+      let filterDetails = 'Filtros aplicados: ';
+      if (filterStartDate) filterDetails += `Desde: ${filterStartDate} `;
+      if (filterEndDate) filterDetails += `Hasta: ${filterEndDate} `;
+      if (filterSeller) filterDetails += `Vendedor: ${filterSeller}`;
+      doc.setFontSize(9);
+      doc.setTextColor(115, 115, 115);
+      doc.text(filterDetails, 14, 46);
+      startYTable = 52;
+      doc.setTextColor(0, 0, 0); // Reset color
+    }
+
     const tableColumn = ["Fecha", "Concepto", "Vendedor", "Factura", "Monto Bruto", "Comisión", "Monto Neto", "Abono"];
     const tableRows: any[] = [];
 
     let totalPagos = 0;
     let totalCargos = 0;
 
-    payments.forEach(payment => {
+    filteredPayments.forEach(payment => {
       const isCharge = payment.type === 'charge';
       
       const rowData = [
@@ -463,7 +483,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     ]);
 
     autoTable(doc, {
-      startY: 50,
+      startY: startYTable,
       head: [tableColumn],
       body: tableRows,
       theme: 'grid',
@@ -473,6 +493,31 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
     doc.save(`Estado_Cuenta_${selectedAccount.clientName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
+
+  // Merge sellers from database with those in payments so everything is covered
+  const filterSellerOptions = Array.from(
+    new Set([
+      ...sellers.map(s => s.name.trim().toUpperCase()),
+      ...payments.filter(p => p.type === 'charge' && p.sellerName).map(p => p.sellerName!.trim().toUpperCase())
+    ])
+  ).sort();
+
+  const computedPayments = [...payments].reverse().map((p, index, arr) => {
+    // Calculate running balance from oldest to newest
+    let runningBalanceUsd = 0;
+    for (let i = 0; i <= index; i++) {
+      if (arr[i].type === 'charge') runningBalanceUsd += arr[i].amountUsd;
+      else runningBalanceUsd -= arr[i].amountUsd;
+    }
+    return { ...p, _runningBalance: runningBalanceUsd };
+  }).reverse();
+
+  const filteredPayments = computedPayments.filter(p => {
+    if (filterStartDate && p.date < filterStartDate) return false;
+    if (filterEndDate && p.date > filterEndDate) return false;
+    if (filterSeller && (p.sellerName || '').trim().toUpperCase() !== filterSeller.toUpperCase()) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -734,6 +779,79 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                 </div>
               </div>
 
+              {/* Filtros de Busqueda en Cuenta */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-50 border border-slate-200/80 p-3 rounded-2xl shadow-sm">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                  
+                  {/* Rango de Fechas */}
+                  <div className="flex flex-col sm:flex-row items-center gap-2 flex-1 max-w-xl">
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl flex-1 w-full">
+                      <Calendar className="text-slate-400 shrink-0" size={15} />
+                      <div className="flex flex-col w-full">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-0.5">Desde</label>
+                        <input 
+                          type="date" 
+                          value={filterStartDate}
+                          onChange={(e) => setFilterStartDate(e.target.value)}
+                          className="bg-transparent text-xs font-semibold text-slate-800 outline-none w-full cursor-pointer p-0 border-none focus:ring-0 leading-tight"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="hidden sm:block text-slate-400 font-bold text-sm">al</div>
+
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl flex-1 w-full">
+                      <Calendar className="text-slate-400 shrink-0" size={15} />
+                      <div className="flex flex-col w-full">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-0.5">Hasta</label>
+                        <input 
+                          type="date" 
+                          value={filterEndDate}
+                          onChange={(e) => setFilterEndDate(e.target.value)}
+                          className="bg-transparent text-xs font-semibold text-slate-800 outline-none w-full cursor-pointer p-0 border-none focus:ring-0 leading-tight"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="hidden md:block w-px h-8 bg-slate-200"></div>
+
+                  {/* Vendedor */}
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl w-full sm:w-60 shrink-0">
+                    <User className="text-slate-400 shrink-0" size={15} />
+                    <div className="flex flex-col w-full">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-0.5">Vendedor</label>
+                      <select
+                        value={filterSeller}
+                        onChange={(e) => setFilterSeller(e.target.value)}
+                        className="bg-transparent text-xs font-semibold text-slate-800 outline-none w-full cursor-pointer p-0 border-none focus:ring-0 leading-none"
+                      >
+                        <option value="">TODOS</option>
+                        {filterSellerOptions.map(sellerName => (
+                          <option key={sellerName} value={sellerName}>{sellerName}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Limpiar Filtros */}
+                {(filterStartDate || filterEndDate || filterSeller) && (
+                  <button
+                    onClick={() => {
+                      setFilterStartDate('');
+                      setFilterEndDate('');
+                      setFilterSeller('');
+                    }}
+                    className="text-xs font-black text-slate-500 hover:text-slate-900 px-4 py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 shadow-sm shrink-0"
+                  >
+                    <X size={14} />
+                    <span>Limpiar Filtros</span>
+                  </button>
+                )}
+              </div>
+
               {showPaymentForm && (
                 <div className="card p-6 bg-emerald-50/30 border-emerald-100">
                   <form onSubmit={handleAddPayment} className="space-y-6">
@@ -901,15 +1019,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     </tr>
                   </thead>
                   <tbody>
-                    {[...payments].reverse().map((p, index, arr) => {
-                      // Calculate running balance from oldest to newest
-                      let runningBalanceUsd = 0;
-                      for (let i = 0; i <= index; i++) {
-                        if (arr[i].type === 'charge') runningBalanceUsd += arr[i].amountUsd;
-                        else runningBalanceUsd -= arr[i].amountUsd;
-                      }
-                      return { ...p, _runningBalance: runningBalanceUsd };
-                    }).reverse().map((p) => {
+                    {filteredPayments.map((p) => {
                       const isCharge = p.type === 'charge';
                       return (
                         <tr key={p.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
@@ -969,9 +1079,13 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         </tr>
                       );
                     })}
-                    {payments.length === 0 && (
+                    {filteredPayments.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="table-cell text-center py-10 text-slate-400 italic">No hay movimientos registrados para este cliente.</td>
+                        <td colSpan={10} className="table-cell text-center py-10 text-slate-400 italic">
+                          {payments.length === 0 
+                            ? "No hay movimientos registrados para este cliente." 
+                            : "No se encontraron movimientos con los filtros aplicados."}
+                        </td>
                       </tr>
                     )}
                   </tbody>

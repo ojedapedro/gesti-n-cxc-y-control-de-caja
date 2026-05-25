@@ -20,7 +20,9 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
-  Cell
+  Cell,
+  PieChart,
+  Pie
 } from 'recharts';
 import { dbService } from '../services/db';
 import { TransactionType, PaymentMethod, type Transaction, type Expense, type CXCAccount } from '../types';
@@ -200,6 +202,38 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
 
   const chartData = getLast6MonthsData();
 
+  // PieChart CXC balance distribution calculations
+  const totalCxcBalance = cxcAccounts.reduce((sum, acc) => sum + (acc.totalBalance || 0), 0);
+  const PIE_COLORS = ['#0f172a', '#2563eb', '#0d9488', '#e11d48', '#ea580c', '#64748b'];
+
+  const processedCxcChartData = (() => {
+    const activeAccounts = cxcAccounts
+      .filter(acc => (acc.totalBalance || 0) > 0)
+      .sort((a, b) => b.totalBalance - a.totalBalance);
+
+    if (activeAccounts.length <= 5) {
+      return activeAccounts.map(acc => ({
+        name: acc.clientName,
+        value: acc.totalBalance,
+        percentage: totalCxcBalance > 0 ? (acc.totalBalance / totalCxcBalance) * 100 : 0
+      }));
+    }
+
+    const top4 = activeAccounts.slice(0, 4).map(acc => ({
+      name: acc.clientName,
+      value: acc.totalBalance,
+      percentage: totalCxcBalance > 0 ? (acc.totalBalance / totalCxcBalance) * 100 : 0
+    }));
+
+    const othersValue = activeAccounts.slice(4).reduce((sum, acc) => sum + acc.totalBalance, 0);
+    const othersPercentage = totalCxcBalance > 0 ? (othersValue / totalCxcBalance) * 100 : 0;
+
+    return [
+      ...top4,
+      { name: 'Otros Clientes', value: othersValue, percentage: othersPercentage }
+    ];
+  })();
+
   const stats = [
     { label: 'TOTAL VENTAS', value: totalVentasUsd, valueBs: totalVentasBs, icon: TrendingUp, color: 'text-violet-600', bg: 'bg-violet-50' },
     { label: 'TOTAL INGRESO BOLIVARES BANCO', value: totalBsBancoUsd, valueBs: totalBsBancoBs, icon: CreditCard, color: 'text-sky-600', bg: 'bg-sky-50' },
@@ -343,6 +377,70 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
             )}
           </div>
         </div>
+      </div>
+
+      {/* Distribución de Cuentas por Cobrar */}
+      <div className="card p-6 border-slate-200/60">
+        <h3 className="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-4">
+          Distribución de Cuentas por Cobrar por Cliente
+        </h3>
+        {totalCxcBalance > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center mt-4">
+            <div className="h-64 w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={processedCxcChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={85}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {processedCxcChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value: any) => [formatCurrency(Number(value)), 'Saldo Pendiente']}
+                    contentStyle={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="space-y-4">
+              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Participación en la Deuda Total</h4>
+              <div className="grid grid-cols-1 gap-3">
+                {processedCxcChartData.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200/50 hover:bg-slate-100/70 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}></div>
+                      <span className="text-xs font-bold text-slate-800">{item.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-black text-slate-900 block">{formatCurrency(item.value)}</span>
+                      <span className="text-[10px] font-bold text-slate-500 block">{item.percentage.toFixed(1)}% del total</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="pt-4 border-t border-slate-150 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500">Deuda Total Consolidada</span>
+                <div className="text-right">
+                  <span className="text-sm font-black text-slate-900 block">{formatCurrency(totalCxcBalance)}</span>
+                  <span className="text-[11px] font-bold text-slate-500 block text-slate-400">Bs. {new Intl.NumberFormat('es-VE').format(totalCxcBalance * exchangeRate)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500 text-center py-12 flex flex-col items-center justify-center gap-2">
+            <Users className="text-slate-300 animate-pulse" size={36} />
+            <span>No hay saldos pendientes para graficar.</span>
+          </p>
+        )}
       </div>
     </div>
   );
