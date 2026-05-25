@@ -20,8 +20,9 @@ import Expenses from './components/Expenses';
 import Receipts from './components/Receipts';
 import Settings from './components/Settings';
 import Sellers from './components/Sellers';
+import Reports from './components/Reports';
 
-type View = 'dashboard' | 'incomes' | 'cxc' | 'expenses' | 'settings' | 'sellers';
+type View = 'dashboard' | 'incomes' | 'cxc' | 'expenses' | 'settings' | 'sellers' | 'reports';
 
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './lib/firebase';
@@ -75,6 +76,7 @@ export default function App() {
     { id: 'cxc', label: 'Ingreso Cuentas por Cobrar (CXC)', icon: Contact },
     { id: 'sellers', label: 'Registro Vendedores', icon: PlusCircle },
     { id: 'expenses', label: 'Caja y Egresos Efectivo', icon: Activity },
+    { id: 'reports', label: 'Módulo de Reportes', icon: FileText },
     { id: 'settings', label: 'Configuración', icon: SettingsIcon },
   ];
 
@@ -175,6 +177,7 @@ export default function App() {
         {activeView === 'cxc' && <div key="cxc"><CXCAccounts exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'expenses' && <div key="expenses"><Expenses exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'sellers' && <div key="sellers"><Sellers /></div>}
+        {activeView === 'reports' && <div key="reports"><Reports exchangeRate={globalSettings?.exchangeRate} /></div>}
         {activeView === 'settings' && <div key="settings"><Settings /></div>}
       </main>
     </div>

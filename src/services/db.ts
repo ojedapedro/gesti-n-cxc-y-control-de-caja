@@ -698,5 +698,18 @@ export const dbService = {
         callback(null);
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, 'settings'));
+  },
+
+  subscribeToAllPayments(callback: (data: CXCPayment[]) => void) {
+    const q = query(collectionGroup(db, 'payments'));
+    return onSnapshot(q, (snapshot) => {
+      const payments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CXCPayment));
+      payments.sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        return dateB.localeCompare(dateA);
+      });
+      callback(payments);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'collectionGroup:payments'));
   }
 };
