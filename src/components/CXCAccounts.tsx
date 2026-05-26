@@ -219,6 +219,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const [globalStats, setGlobalStats] = useState({ 
     totalCharges: 0, 
     totalPayments: 0, 
+    totalPaymentsUsd: 0,
+    totalPaymentsBs: 0,
+    totalPaymentsBsUsd: 0,
     balance: 0,
     totalGrossCharges: 0,
     totalCommissions: 0,
@@ -537,7 +540,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
         <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
             <Landmark size={60} className="text-slate-900" />
@@ -569,9 +572,18 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
             <CheckCircle size={60} className="text-emerald-600" />
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Abonos</p>
-          <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalPayments)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPayments * exchangeRate)}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en USD ($)</p>
+          <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalPaymentsUsd)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPaymentsUsd * exchangeRate)}</p>
+        </div>
+
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <CheckCircle size={60} className="text-teal-600" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en Bs</p>
+          <p className="text-2xl font-black text-teal-600 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPaymentsBs)}</p>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(globalStats.totalPaymentsBsUsd)}</p>
         </div>
 
         <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
@@ -592,7 +604,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
           <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalDonation * exchangeRate)}</p>
         </div>
 
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden col-span-1 md:col-span-2 lg:col-span-1">
+        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
             <CircleDollarSign size={60} className="text-blue-600" />
           </div>

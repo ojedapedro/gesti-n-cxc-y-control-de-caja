@@ -111,6 +111,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        // We ignore credit sales (CXC charges) for the inflow counters as they represent debt, not received money.
        if (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) {
           if (t.paymentMethod === PaymentMethod.CXC) return;
+          if (t.type === TransactionType.INCOME && (t.concept?.includes('ABONO CUENTAS POR COBRAR') || t.concept?.includes('(CXC)'))) return;
 
           const destClean = (t.destinationBank || '').trim().toUpperCase();
           const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA') || destClean === '';
@@ -180,7 +181,15 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
       const interval = { start: startOfMonth(monthDate), end: endOfMonth(monthDate) };
       
       const income = transactions
-        .filter(t => (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) && isWithinInterval(new Date(t.date), interval))
+        .filter(t => {
+          if (t.type === TransactionType.INCOME && (t.concept?.includes('ABONO CUENTAS POR COBRAR') || t.concept?.includes('(CXC)'))) {
+            return false;
+          }
+          if (t.paymentMethod === PaymentMethod.CXC) {
+            return false;
+          }
+          return (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) && isWithinInterval(new Date(t.date), interval);
+        })
         .reduce((sum, t) => sum + t.amountUsd, 0);
         
       const withdrawal = transactions

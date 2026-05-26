@@ -302,6 +302,9 @@ export const dbService = {
   subscribeToGlobalCXCStats(callback: (stats: { 
     totalCharges: number, 
     totalPayments: number, 
+    totalPaymentsUsd: number,
+    totalPaymentsBs: number,
+    totalPaymentsBsUsd: number,
     balance: number, 
     totalGrossCharges: number, 
     totalCommissions: number,
@@ -320,6 +323,9 @@ export const dbService = {
     return onSnapshot(q, (snapshot) => {
       let totalCharges = 0;
       let totalPayments = 0;
+      let totalPaymentsUsd = 0;
+      let totalPaymentsBs = 0;
+      let totalPaymentsBsUsd = 0;
       let totalGrossCharges = 0;
       let totalCommissions = 0;
       let totalWarranty = 0;
@@ -337,6 +343,17 @@ export const dbService = {
           totalCommissions += commAmt;
         } else {
           totalPayments += amt;
+
+          const isBs = data.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                       data.paymentMethod === 'Bs' || 
+                       data.paymentMethod === PaymentMethod.BS || 
+                       data.paymentMethod === PaymentMethod.BS_CASH;
+          if (isBs) {
+            totalPaymentsBs += Number(data.amountBs) || (amt * (Number(data.exchangeRate) || 1));
+            totalPaymentsBsUsd += amt;
+          } else {
+            totalPaymentsUsd += amt;
+          }
           
           // Check for Warranty or Donation in payment method, destination bank, or concept
           const dest = normalizeText(data.destinationBank);
@@ -386,6 +403,9 @@ export const dbService = {
       callback({ 
         totalCharges, 
         totalPayments, 
+        totalPaymentsUsd,
+        totalPaymentsBs,
+        totalPaymentsBsUsd,
         balance: totalCharges - totalPayments,
         totalGrossCharges,
         totalCommissions,
@@ -409,6 +429,9 @@ export const dbService = {
       const snapshot = await getDocs(q);
       let totalCharges = 0;
       let totalPayments = 0;
+      let totalPaymentsUsd = 0;
+      let totalPaymentsBs = 0;
+      let totalPaymentsBsUsd = 0;
       let totalGrossCharges = 0;
       let totalCommissions = 0;
       let totalWarranty = 0;
@@ -425,6 +448,17 @@ export const dbService = {
           totalCommissions += commAmt;
         } else {
           totalPayments += amt;
+
+          const isBs = data.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                       data.paymentMethod === 'Bs' || 
+                       data.paymentMethod === PaymentMethod.BS || 
+                       data.paymentMethod === PaymentMethod.BS_CASH;
+          if (isBs) {
+            totalPaymentsBs += Number(data.amountBs) || (amt * (Number(data.exchangeRate) || 1));
+            totalPaymentsBsUsd += amt;
+          } else {
+            totalPaymentsUsd += amt;
+          }
           
           const dest = normalizeText(data.destinationBank);
           const pMethod = normalizeText(data.paymentMethod);
@@ -473,6 +507,9 @@ export const dbService = {
       return { 
         totalCharges, 
         totalPayments, 
+        totalPaymentsUsd,
+        totalPaymentsBs,
+        totalPaymentsBsUsd,
         balance: totalCharges - totalPayments,
         totalGrossCharges,
         totalCommissions,
@@ -481,7 +518,18 @@ export const dbService = {
       };
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'collectionGroup:payments');
-      return { totalCharges: 0, totalPayments: 0, balance: 0, totalGrossCharges: 0, totalCommissions: 0, totalWarranty: 0, totalDonation: 0 };
+      return { 
+        totalCharges: 0, 
+        totalPayments: 0, 
+        totalPaymentsUsd: 0,
+        totalPaymentsBs: 0,
+        totalPaymentsBsUsd: 0,
+        balance: 0, 
+        totalGrossCharges: 0, 
+        totalCommissions: 0, 
+        totalWarranty: 0, 
+        totalDonation: 0 
+      };
     }
   },
 
