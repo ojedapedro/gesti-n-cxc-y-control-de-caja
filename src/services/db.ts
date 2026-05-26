@@ -344,28 +344,21 @@ export const dbService = {
         } else {
           totalPayments += amt;
 
-          const isBs = data.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
-                       data.paymentMethod === 'Bs' || 
-                       data.paymentMethod === PaymentMethod.BS || 
-                       data.paymentMethod === PaymentMethod.BS_CASH;
-          if (isBs) {
-            totalPaymentsBs += Number(data.amountBs) || (amt * (Number(data.exchangeRate) || 1));
-            totalPaymentsBsUsd += amt;
-          } else {
-            totalPaymentsUsd += amt;
-          }
-          
           // Check for Warranty or Donation in payment method, destination bank, or concept
           const dest = normalizeText(data.destinationBank);
           const pMethod = normalizeText(data.paymentMethod);
           const concept = normalizeText(data.concept);
           
+          let isWarranty = false;
+          let isDonation = false;
+
           if (
             dest.includes('GARANT') || 
             pMethod.includes('GARANT') || 
             concept.includes('GARANT')
           ) {
             totalWarranty += amt;
+            isWarranty = true;
           }
           if (
             dest.includes('DONAC') || 
@@ -397,6 +390,20 @@ export const dbService = {
             concept.includes('BONIF')
           ) {
             totalDonation += amt;
+            isDonation = true;
+          }
+
+          if (!isWarranty && !isDonation) {
+            const isBs = data.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                         data.paymentMethod === 'Bs' || 
+                         data.paymentMethod === PaymentMethod.BS || 
+                         data.paymentMethod === PaymentMethod.BS_CASH;
+            if (isBs) {
+              totalPaymentsBs += Number(data.amountBs) || (amt * (Number(data.exchangeRate) || 1));
+              totalPaymentsBsUsd += amt;
+            } else {
+              totalPaymentsUsd += amt;
+            }
           }
         }
       });
@@ -449,27 +456,20 @@ export const dbService = {
         } else {
           totalPayments += amt;
 
-          const isBs = data.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
-                       data.paymentMethod === 'Bs' || 
-                       data.paymentMethod === PaymentMethod.BS || 
-                       data.paymentMethod === PaymentMethod.BS_CASH;
-          if (isBs) {
-            totalPaymentsBs += Number(data.amountBs) || (amt * (Number(data.exchangeRate) || 1));
-            totalPaymentsBsUsd += amt;
-          } else {
-            totalPaymentsUsd += amt;
-          }
-          
           const dest = normalizeText(data.destinationBank);
           const pMethod = normalizeText(data.paymentMethod);
           const concept = normalizeText(data.concept);
           
+          let isWarranty = false;
+          let isDonation = false;
+
           if (
             dest.includes('GARANT') || 
             pMethod.includes('GARANT') || 
             concept.includes('GARANT')
           ) {
             totalWarranty += amt;
+            isWarranty = true;
           }
           if (
             dest.includes('DONAC') || 
@@ -501,6 +501,20 @@ export const dbService = {
             concept.includes('BONIF')
           ) {
             totalDonation += amt;
+            isDonation = true;
+          }
+
+          if (!isWarranty && !isDonation) {
+            const isBs = data.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                         data.paymentMethod === 'Bs' || 
+                         data.paymentMethod === PaymentMethod.BS || 
+                         data.paymentMethod === PaymentMethod.BS_CASH;
+            if (isBs) {
+              totalPaymentsBs += Number(data.amountBs) || (amt * (Number(data.exchangeRate) || 1));
+              totalPaymentsBsUsd += amt;
+            } else {
+              totalPaymentsUsd += amt;
+            }
           }
         }
       });

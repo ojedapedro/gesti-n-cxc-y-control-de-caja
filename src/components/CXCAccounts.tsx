@@ -540,77 +540,103 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <Landmark size={60} className="text-slate-900" />
+      {/* Sección 1: Gestión de Cartera y Saldo Pendiente */}
+      <div className="space-y-3">
+        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+          <Landmark size={14} className="text-slate-400" /> Cartera de Cuentas por Cobrar (Saldos)
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <Landmark size={60} className="text-slate-900" />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Monto Bruto CXC</p>
+            <p className="text-2xl font-black text-slate-800 tracking-tighter relative z-10">{formatCurrency(globalStats.totalGrossCharges)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalGrossCharges * exchangeRate)}</p>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Monto Bruto CXC</p>
-          <p className="text-2xl font-black text-slate-800 tracking-tighter relative z-10">{formatCurrency(globalStats.totalGrossCharges)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalGrossCharges * exchangeRate)}</p>
-        </div>
 
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden text-rose-600">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <Tag size={60} className="text-rose-600" />
+          <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden text-rose-650">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <Tag size={60} className="text-rose-600" />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Comisiones CXC</p>
+            <p className="text-2xl font-black text-rose-600 tracking-tighter relative z-10">-{formatCurrency(globalStats.totalCommissions)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalCommissions * exchangeRate)}</p>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Comisiones CXC</p>
-          <p className="text-2xl font-black text-rose-600 tracking-tighter relative z-10">-{formatCurrency(globalStats.totalCommissions)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalCommissions * exchangeRate)}</p>
-        </div>
 
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <AlertTriangle size={60} className="text-amber-600" />
+          <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <AlertTriangle size={60} className="text-amber-600" />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total CXC (Neto)</p>
+            <p className="text-2xl font-black text-amber-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalCharges)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalCharges * exchangeRate)}</p>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total CXC (Neto)</p>
-          <p className="text-2xl font-black text-amber-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalCharges)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalCharges * exchangeRate)}</p>
-        </div>
 
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <CheckCircle size={60} className="text-emerald-600" />
+          <div className="card p-5 bg-slate-900 border-slate-850 text-white shadow-md relative overflow-hidden ring-2 ring-slate-950">
+            <div className="absolute top-0 right-0 p-4 opacity-15 pointer-events-none">
+              <CircleDollarSign size={60} className="text-indigo-400" />
+            </div>
+            <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1 relative z-10">Saldo Pendiente Global</p>
+            <p className="text-3xl font-black text-indigo-400 tracking-tighter relative z-10">{formatCurrency(globalStats.balance)}</p>
+            <p className="text-[11px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.balance * exchangeRate)}</p>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en USD ($)</p>
-          <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalPaymentsUsd)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPaymentsUsd * exchangeRate)}</p>
         </div>
+      </div>
 
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <CheckCircle size={60} className="text-teal-600" />
+      {/* Sección 2: Abonos Recibidos y Ajustes */}
+      <div className="space-y-3 pt-2">
+        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+          <CheckCircle size={14} className="text-slate-400" /> Flujos de Abonos y Ajustes Recibidos
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <CheckCircle size={60} className="text-emerald-600" />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en USD ($)</p>
+            <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalPaymentsUsd)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPaymentsUsd * exchangeRate)}</p>
+            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[9px] font-bold text-emerald-650 uppercase tracking-wider bg-emerald-50 px-1.5 py-0.5 rounded">Afecta Caja Activa</span>
+            </div>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en Bs</p>
-          <p className="text-2xl font-black text-teal-600 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPaymentsBs)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(globalStats.totalPaymentsBsUsd)}</p>
-        </div>
 
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <History size={60} className="text-purple-600" />
+          <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <CheckCircle size={60} className="text-teal-600" />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en Bs</p>
+            <p className="text-2xl font-black text-teal-650 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPaymentsBs)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(globalStats.totalPaymentsBsUsd)}</p>
+            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[9px] font-bold text-teal-600 uppercase tracking-wider bg-teal-50 px-1.5 py-0.5 rounded">Afecta Caja Activa</span>
+            </div>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Garantías Aplicadas</p>
-          <p className="text-2xl font-black text-purple-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalWarranty)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalWarranty * exchangeRate)}</p>
-        </div>
 
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <Tag size={60} className="text-pink-600" />
+          <div className="card p-5 bg-slate-50/60 border-slate-200/80 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <History size={60} className="text-purple-600" />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Garantías Aplicadas</p>
+            <p className="text-2xl font-black text-purple-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalWarranty)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalWarranty * exchangeRate)}</p>
+            <div className="mt-2.5 pt-2 border-t border-slate-200/50 flex items-center justify-between">
+              <span className="text-[9px] font-black text-purple-705 uppercase tracking-wider bg-purple-50 px-1.5 py-0.5 rounded">Garantía / Ajuste Contable</span>
+            </div>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Donaciones/Excenciones</p>
-          <p className="text-2xl font-black text-pink-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalDonation)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalDonation * exchangeRate)}</p>
-        </div>
 
-        <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <CircleDollarSign size={60} className="text-blue-600" />
+          <div className="card p-5 bg-slate-50/60 border-slate-200/80 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <Tag size={60} className="text-pink-600" />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Donaciones/Exenciones</p>
+            <p className="text-2xl font-black text-pink-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalDonation)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalDonation * exchangeRate)}</p>
+            <div className="mt-2.5 pt-2 border-t border-slate-200/50 flex items-center justify-between">
+              <span className="text-[9px] font-black text-pink-700 uppercase tracking-wider bg-pink-50 px-1.5 py-0.5 rounded">Exención / No afecta Caja</span>
+            </div>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Saldo Pendiente Global</p>
-          <p className="text-2xl font-black text-blue-600 tracking-tighter relative z-10">{formatCurrency(globalStats.balance)}</p>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.balance * exchangeRate)}</p>
         </div>
       </div>
 
