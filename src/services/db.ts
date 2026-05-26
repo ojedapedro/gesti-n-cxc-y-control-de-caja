@@ -275,10 +275,6 @@ export const dbService = {
 
       // Record as income in the main ledger ONLY if it's a payment
       if (data.type !== 'charge') {
-        let isUsdCash = data.paymentMethod === PaymentMethod.USD_CASH;
-        let isZelle = data.paymentMethod === PaymentMethod.ZELLE || data.paymentMethod === PaymentMethod.BINANCE;
-        let isCXCCuentas = data.destinationBank === 'CUENTAS POR COBRAR (CXC)' || (data.paymentMethod as string) === 'CUENTAS POR COBRAR (CXC)';
-
         const normalizeText = (str: string): string => {
           if (!str) return '';
           return str
@@ -302,35 +298,20 @@ export const dbService = {
                            dest.includes('ANULA') || pMethod.includes('ANULA') || concept.includes('ANULA') ||
                            dest.includes('BONIF') || pMethod.includes('BONIF') || concept.includes('BONIF');
 
-        const labelText = isWarranty ? 'GARANTÍA' : isDonation ? 'DONACIÓN/EXENCIÓN' : 'CXC';
+        if (!isWarranty && !isDonation) {
+          let isUsdCash = data.paymentMethod === PaymentMethod.USD_CASH;
+          let isZelle = data.paymentMethod === PaymentMethod.ZELLE || data.paymentMethod === PaymentMethod.BINANCE;
 
-        await this.addTransaction({
-          date: data.date,
-          clientName: accountSnap.exists() ? accountSnap.data().clientName : 'Desconocido',
-          concept: `ABONO CUENTAS POR COBRAR (${labelText}): ${data.concept || ''}`,
-          amountUsd: data.amountUsd,
-          amountBs: data.amountBs,
-          exchangeRate: data.exchangeRate,
-          paymentMethod: data.paymentMethod || PaymentMethod.USD_CASH,
-          destinationBank: data.destinationBank,
-          type: TransactionType.INCOME,
-          isCXC: false,
-          amountUsdCash: isUsdCash ? data.amountUsd : 0,
-          amountZelle: isZelle ? data.amountUsd : 0
-        });
-
-        // Safe accounting adjustment: insert an offsetting withdrawal to liquidate the entry for non-cash references
-        if (isWarranty || isDonation) {
           await this.addTransaction({
             date: data.date,
             clientName: accountSnap.exists() ? accountSnap.data().clientName : 'Desconocido',
-            concept: `AJUSTE CONTABLE LIQUIDACIÓN DE ${labelText}: ${data.concept || ''}`,
+            concept: `ABONO CUENTAS POR COBRAR: ${data.concept || ''}`,
             amountUsd: data.amountUsd,
             amountBs: data.amountBs,
             exchangeRate: data.exchangeRate,
             paymentMethod: data.paymentMethod || PaymentMethod.USD_CASH,
             destinationBank: data.destinationBank,
-            type: TransactionType.WITHDRAWAL, // Offsetting record
+            type: TransactionType.INCOME,
             isCXC: false,
             amountUsdCash: isUsdCash ? data.amountUsd : 0,
             amountZelle: isZelle ? data.amountUsd : 0
@@ -456,7 +437,7 @@ export const dbService = {
         totalPaymentsUsd,
         totalPaymentsBs,
         totalPaymentsBsUsd,
-        balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd),
+        balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd) - totalWarranty - totalDonation,
         totalGrossCharges,
         totalCommissions,
         totalWarranty,
@@ -567,7 +548,7 @@ export const dbService = {
         totalPaymentsUsd,
         totalPaymentsBs,
         totalPaymentsBsUsd,
-        balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd),
+        balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd) - totalWarranty - totalDonation,
         totalGrossCharges,
         totalCommissions,
         totalWarranty,
