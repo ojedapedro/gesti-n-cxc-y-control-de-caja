@@ -157,13 +157,26 @@ export default function IncomesCierre({
       t.paymentMethod === PaymentMethod.BINANCE;
 
     // Determine currency: is BS?
-    const isBs =
+    const isBsMethod =
       t.paymentMethod === "Transferencia Bs / Pago Móvil" ||
       t.paymentMethod === "Bs" ||
       t.paymentMethod === "Bolivares" ||
       t.paymentMethod === "Bs Efectivo" ||
-      (t.currency && t.currency.toUpperCase().includes("BOLÍVARES")) ||
-      (t.amountBs && t.amountBs > 0);
+      (t.currency && t.currency.toUpperCase().includes("BOLÍVARES"));
+
+    const isUsdMethod =
+      t.paymentMethod === "$" ||
+      t.paymentMethod === "Zelle" ||
+      t.paymentMethod === "Binance" ||
+      t.paymentMethod === PaymentMethod.USD_CASH ||
+      t.paymentMethod === PaymentMethod.ZELLE ||
+      t.paymentMethod === PaymentMethod.BINANCE ||
+      (t.currency &&
+        (t.currency.toUpperCase().includes("DÓLARES") ||
+          t.currency.toUpperCase().includes("DOLAR") ||
+          t.currency.toUpperCase().includes("$")));
+
+    const isBs = isBsMethod || (!isUsdMethod && t.amountBs && t.amountBs > 0);
 
     if (isBs) {
       const amountBsVal =

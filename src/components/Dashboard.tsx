@@ -85,12 +85,22 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        if (t.type === TransactionType.SALE && !t.isCXC && t.paymentMethod !== PaymentMethod.CXC) {
           totalVentasUsd += t.amountUsd;
           
-          const isBs = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
-                       t.paymentMethod === 'Bs' || 
-                       t.paymentMethod === 'Bolivares' || 
-                       t.paymentMethod === 'Bs Efectivo' || 
-                       (t.currency && t.currency.toUpperCase().includes('BOLÍVARES')) || 
-                       (t.amountBs && t.amountBs > 0);
+          const isBsMethod = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                             t.paymentMethod === 'Bs' || 
+                             t.paymentMethod === 'Bolivares' || 
+                             t.paymentMethod === 'Bs Efectivo' || 
+                             (t.currency && t.currency.toUpperCase().includes('BOLÍVARES'));
+
+          const isUsdMethod = t.paymentMethod === '$' || 
+                              t.paymentMethod === 'Zelle' || 
+                              t.paymentMethod === 'Binance' ||
+                              t.paymentMethod === PaymentMethod.USD_CASH ||
+                              t.paymentMethod === PaymentMethod.ZELLE ||
+                              t.paymentMethod === PaymentMethod.BINANCE ||
+                              (t.currency && (t.currency.toUpperCase().includes('DÓLARES') || t.currency.toUpperCase().includes('DOLAR') || t.currency.toUpperCase().includes('$')));
+
+          const isBs = isBsMethod || (!isUsdMethod && t.amountBs && t.amountBs > 0);
+
           if (isBs) {
              const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * rate);
              totalVentasBs += amountBsVal;
@@ -104,7 +114,19 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
           periodCxcCharges += t.amountUsd;
        }
        if (t.type === TransactionType.INCOME && t.concept?.includes('ABONO CUENTAS POR COBRAR')) {
-          periodCxcPayments += t.amountUsd;
+          const conceptUpper = (t.concept || '').toUpperCase();
+          const destUpper = (t.destinationBank || '').toUpperCase();
+          const pMethodUpper = (t.paymentMethod || '').toUpperCase();
+          const isWarranty = conceptUpper.includes('GARANT') || destUpper.includes('GARANT') || pMethodUpper.includes('GARANT');
+          const isDonation = conceptUpper.includes('DONAC') || destUpper.includes('DONAC') || pMethodUpper.includes('DONAC') ||
+                             conceptUpper.includes('EXENC') || destUpper.includes('EXENC') || pMethodUpper.includes('EXENC') ||
+                             conceptUpper.includes('EXCENC') || destUpper.includes('EXCENC') || pMethodUpper.includes('EXCENC') ||
+                             conceptUpper.includes('EXENT') || destUpper.includes('EXENT') || pMethodUpper.includes('EXENT') ||
+                             conceptUpper.includes('EXCENT') || destUpper.includes('EXCENT') || pMethodUpper.includes('EXCENT');
+          
+          if (!isWarranty && !isDonation) {
+             periodCxcPayments += t.amountUsd;
+          }
        }
 
        // 2. CASH FLOW: Sum actual money entering (Cash Sales + All Incomes/Payments)
@@ -120,12 +142,21 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
           const isBank = isBankDest || t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE;
 
           // Determine if it is a Bolívares (BS) transaction or USD ($) transaction
-          const isBs = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
-                       t.paymentMethod === 'Bs' || 
-                       t.paymentMethod === 'Bolivares' || 
-                       t.paymentMethod === 'Bs Efectivo' || 
-                       (t.currency && t.currency.toUpperCase().includes('BOLÍVARES')) || 
-                       (t.amountBs && t.amountBs > 0);
+          const isBsMethod = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                             t.paymentMethod === 'Bs' || 
+                             t.paymentMethod === 'Bolivares' || 
+                             t.paymentMethod === 'Bs Efectivo' || 
+                             (t.currency && t.currency.toUpperCase().includes('BOLÍVARES'));
+
+          const isUsdMethod = t.paymentMethod === '$' || 
+                              t.paymentMethod === 'Zelle' || 
+                              t.paymentMethod === 'Binance' ||
+                              t.paymentMethod === PaymentMethod.USD_CASH ||
+                              t.paymentMethod === PaymentMethod.ZELLE ||
+                              t.paymentMethod === PaymentMethod.BINANCE ||
+                              (t.currency && (t.currency.toUpperCase().includes('DÓLARES') || t.currency.toUpperCase().includes('DOLAR') || t.currency.toUpperCase().includes('$')));
+
+          const isBs = isBsMethod || (!isUsdMethod && t.amountBs && t.amountBs > 0);
 
           if (isBs) {
              const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * rate);
