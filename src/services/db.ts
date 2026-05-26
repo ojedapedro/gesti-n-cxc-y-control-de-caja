@@ -626,6 +626,126 @@ export const dbService = {
     }
   },
 
+  async renameCXCAccount(accountId: string, newClientName: string) {
+    const cleanNewName = newClientName.trim().toUpperCase();
+    try {
+      const accountRef = doc(db, CXC_ACCOUNTS_PATH, accountId);
+      const accountSnap = await getDoc(accountRef);
+      if (!accountSnap.exists()) throw new Error('La cuenta no existe');
+      
+      const oldClientName = accountSnap.data().clientName;
+
+      // Update account document
+      await updateDoc(accountRef, {
+        clientName: cleanNewName,
+        lastUpdated: serverTimestamp()
+      });
+
+      // Update transactions in main collection referencing the old name
+      if (oldClientName) {
+        const txCollection = collection(db, 'transactions');
+        const q = query(txCollection, where('clientName', '==', oldClientName));
+        const txSnapshot = await getDocs(q);
+        
+        for (const txDoc of txSnapshot.docs) {
+          const data = txDoc.data();
+          let updatedConcept = data.concept || '';
+          
+          if (updatedConcept.includes(oldClientName)) {
+            const regex = new RegExp(oldClientName, 'g');
+            updatedConcept = updatedConcept.replace(regex, cleanNewName);
+          }
+          
+          await updateDoc(doc(db, 'transactions', txDoc.id), {
+            clientName: cleanNewName,
+            concept: updatedConcept
+          });
+        }
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${CXC_ACCOUNTS_PATH}/${accountId}`);
+      throw error;
+    }
+  },
+
+  async reassignCXCCharge(oldAccountId: string, chargeId: string, newClientName: string) {
+    const cleanNewName = newClientName.trim().toUpperCase();
+    try {
+      // 1. Get the charge details
+      const oldChargeRef = doc(db, CXC_ACCOUNTS_PATH, oldAccountId, 'payments', chargeId);
+      const chargeSnap = await getDoc(oldChargeRef);
+      if (!chargeSnap.exists()) throw new Error('El cargo no existe');
+      
+      const chargeData = chargeSnap.data() as CXCPayment;
+      const chargeAmount = chargeData.amountUsd || 0;
+      const itemCode = chargeData.item;
+
+      // 2. Find or create the target account for the new client
+      const q = query(collection(db, CXC_ACCOUNTS_PATH), where('clientName', '==', cleanNewName));
+      const targetSnap = await getDocs(q);
+      
+      let newAccountId;
+      if (targetSnap.empty) {
+        // Create new account
+        const docRef = await addDoc(collection(db, CXC_ACCOUNTS_PATH), {
+          clientName: cleanNewName,
+          totalBalance: chargeAmount,
+          lastUpdated: serverTimestamp(),
+        });
+        newAccountId = docRef.id;
+      } else {
+        // Update existing target account balance
+        const targetDoc = targetSnap.docs[0];
+        newAccountId = targetDoc.id;
+        const currentTargetBalance = targetDoc.data().totalBalance || 0;
+        await updateDoc(doc(db, CXC_ACCOUNTS_PATH, newAccountId), {
+          totalBalance: currentTargetBalance + chargeAmount,
+          lastUpdated: serverTimestamp(),
+        });
+      }
+
+      // 3. Deduct the charge amount from the old account balance
+      const oldAccRef = doc(db, CXC_ACCOUNTS_PATH, oldAccountId);
+      const oldAccSnap = await getDoc(oldAccRef);
+      if (oldAccSnap.exists()) {
+        const oldBalance = oldAccSnap.data().totalBalance || 0;
+        await updateDoc(oldAccRef, {
+          totalBalance: Math.max(0, oldBalance - chargeAmount),
+          lastUpdated: serverTimestamp()
+        });
+      }
+
+      // 4. Copy the charge document into the new account subcollection of the target owner (using the same ID)
+      const newChargeRef = doc(db, CXC_ACCOUNTS_PATH, newAccountId, 'payments', chargeId);
+      await setDoc(newChargeRef, {
+        ...chargeData,
+        clientId: newAccountId,
+        createdAt: serverTimestamp()
+      });
+
+      // 5. Delete the old charge document
+      await deleteDoc(oldChargeRef);
+
+      // 6. Find and update the corresponding transaction in the main transactions collection
+      if (itemCode) {
+        const txCollection = collection(db, 'transactions');
+        const txSnapshot = await getDocs(txCollection);
+        for (const txDoc of txSnapshot.docs) {
+          const concept = txDoc.data().concept || '';
+          if (concept.includes(itemCode)) {
+            await updateDoc(doc(db, 'transactions', txDoc.id), {
+              clientName: cleanNewName
+            });
+          }
+        }
+      }
+      return newAccountId;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${CXC_ACCOUNTS_PATH}/${oldAccountId}/payments/${chargeId}`);
+      throw error;
+    }
+  },
+
   // Receipts
   async addReceipt(data: Omit<Receipt, 'id' | 'createdAt'>) {
     try {

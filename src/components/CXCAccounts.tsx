@@ -13,11 +13,27 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const [selectedAccount, setSelectedAccount] = useState<CXCAccount | null>(null);
   const [payments, setPayments] = useState<CXCPayment[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<'client' | 'item'>('client');
+  const [allPayments, setAllPayments] = useState<CXCPayment[]>([]);
+  const [highlightedPaymentId, setHighlightedPaymentId] = useState<string | null>(null);
+
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterSeller, setFilterSeller] = useState('');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<CXCPayment | null>(null);
+
+  const [editClientName, setEditClientName] = useState('');
+  const [editAccountActionType, setEditAccountActionType] = useState<'rename' | 'reassign'>('rename');
+
+  useEffect(() => {
+    if (editingPayment && selectedAccount) {
+      setEditClientName(selectedAccount.clientName);
+      setEditAccountActionType('rename');
+    } else {
+      setEditClientName('');
+    }
+  }, [editingPayment, selectedAccount]);
   const [paymentData, setPaymentData] = useState({
     amountUsd: '',
     amountBs: '',
@@ -209,11 +225,37 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       updates.exchangeRate = (editingPayment.exchangeRate !== undefined && editingPayment.exchangeRate !== null && editingPayment.exchangeRate !== '') ? parseFloat(editingPayment.exchangeRate as any) : 1;
     }
 
-    await dbService.updateCXCPayment(selectedAccount.id, editingPayment.id, updates);
+    try {
+      const rawNewName = editClientName.trim().toUpperCase();
+      const oldName = selectedAccount.clientName.toUpperCase();
+      let targetAccountId = selectedAccount.id;
 
-    const pays = await dbService.getCXCPayments(selectedAccount.id);
-    setPayments(pays || []);
-    setEditingPayment(null);
+      if (isCharge && rawNewName && rawNewName !== oldName) {
+        if (editAccountActionType === 'rename') {
+          // Action A: Rename the entire account
+          await dbService.renameCXCAccount(selectedAccount.id, rawNewName);
+          setSelectedAccount(prev => prev ? { ...prev, clientName: rawNewName } : null);
+        } else {
+          // Action B: Move this charge only to another account
+          const newAccountId = await dbService.reassignCXCCharge(selectedAccount.id, editingPayment.id, rawNewName);
+          targetAccountId = newAccountId || selectedAccount.id;
+          
+          const refreshedAccounts = await dbService.getCXCAccounts();
+          const targetAccountDoc = refreshedAccounts?.find(a => a.id === targetAccountId);
+          if (targetAccountDoc) {
+            setSelectedAccount(targetAccountDoc);
+          }
+        }
+      }
+
+      await dbService.updateCXCPayment(targetAccountId, editingPayment.id, updates);
+
+      const pays = await dbService.getCXCPayments(targetAccountId);
+      setPayments(pays || []);
+      setEditingPayment(null);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const [globalStats, setGlobalStats] = useState({ 
@@ -234,9 +276,11 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   useEffect(() => {
     const unsubStats = dbService.subscribeToGlobalCXCStats(setGlobalStats);
     const unsubAccounts = dbService.subscribeToCXCAccounts(setAccounts);
+    const unsubAllPayments = dbService.subscribeToAllPayments(setAllPayments);
     return () => {
       unsubStats();
       unsubAccounts();
+      unsubAllPayments();
     };
   }, []);
 
@@ -274,6 +318,14 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
   const filteredAccounts = accounts.filter(acc =>
     acc.clientName.toLowerCase().includes(searchQuery.toLowerCase())
   ).sort((a, b) => b.totalBalance - a.totalBalance);
+
+  const matchedCharges = allPayments.filter(p => {
+    if (!searchQuery.trim() || searchMode !== 'item') return false;
+    const inv = (p.invoiceNumber || '').toLowerCase();
+    const itemCode = (p.item || '').toLowerCase();
+    const queryStr = searchQuery.trim().toLowerCase();
+    return inv.includes(queryStr) || itemCode.includes(queryStr);
+  });
 
   useEffect(() => {
     if (selectedAccount?.id) {
@@ -645,80 +697,194 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         <div className="lg:col-span-1 card flex flex-col h-full border-slate-200/60 shadow-sm">
           <div className="p-5 border-b border-slate-100 bg-white">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[13px] font-black text-slate-900 uppercase tracking-widest">Clientes CXC</h2>
+              <h2 className="text-[13px] font-black text-slate-900 uppercase tracking-widest leading-none">Clientes CXC</h2>
               <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest">
-                {filteredAccounts.length} Total
+                {searchMode === 'client' ? `${filteredAccounts.length} Total` : `${matchedCharges.length} Encontrados`}
               </span>
             </div>
+
+            {/* Alternador de Modo de Búsqueda */}
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-4 text-[11px] font-bold gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchMode('client');
+                  setSearchQuery('');
+                  setHighlightedPaymentId(null);
+                }}
+                className={`flex-1 py-1.5 rounded-lg text-center transition-all outline-none ${
+                  searchMode === 'client'
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Por Cliente
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchMode('item');
+                  setSearchQuery('');
+                }}
+                className={`flex-1 py-1.5 rounded-lg text-center transition-all outline-none ${
+                  searchMode === 'item'
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Por Factura o Ítem
+              </button>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
               <input
                 type="text"
-                placeholder="Buscar cliente..."
+                placeholder={searchMode === 'client' ? "Buscar cliente..." : "Buscar N° factura o código..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition-all uppercase"
               />
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100 custom-scrollbar">
-            {filteredAccounts.map((acc) => {
-              const urgency = getUrgencyStyles(acc.totalBalance);
-              const isSelected = selectedAccount?.id === acc.id;
+            {searchMode === 'item' ? (
+              <>
+                {matchedCharges.map((p) => {
+                  const associatedAccount = accounts.find(a => a.id === p.clientId);
+                  const clientDisplay = associatedAccount ? associatedAccount.clientName : 'DESCONOCIDO';
+                  const isSelected = selectedAccount?.id === p.clientId && highlightedPaymentId === p.id;
 
-              return (
-                <button
-                  key={acc.id}
-                  onClick={() => setSelectedAccount(acc)}
-                  className={`w-full text-left p-4 transition-all group relative overflow-hidden ${isSelected ? 'bg-blue-50/30' : 'hover:bg-slate-50'
-                    }`}
-                >
-                  {isSelected && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-full" />
-                  )}
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        if (associatedAccount) {
+                          setSelectedAccount(associatedAccount);
+                          setHighlightedPaymentId(p.id);
+                          setTimeout(() => {
+                            setHighlightedPaymentId(null);
+                          }, 8000);
+                        }
+                      }}
+                      className={`w-full text-left p-4 transition-all group relative overflow-hidden ${
+                        isSelected ? 'bg-amber-50/45' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      {isSelected && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r-full" />
+                      )}
 
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black uppercase transition-all shadow-sm ${isSelected ? 'bg-blue-600 text-white rotate-3' : 'bg-slate-100 text-slate-400 group-hover:bg-white group-hover:shadow group-hover:-rotate-3'
-                      }`}>
-                      {acc.clientName.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-bold truncate text-sm tracking-tight ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
-                        {acc.clientName}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1 ${urgency.bg}`}>
-                          {urgency.icon}
-                          {urgency.label}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right pl-2">
-                      <p className={`text-sm font-black tracking-tighter ${acc.totalBalance > 200 ? 'text-rose-600' :
-                        acc.totalBalance > 50 ? 'text-orange-600' :
-                          acc.totalBalance > 0 ? 'text-amber-600' :
-                            'text-emerald-600'
+                      <div className="flex items-start gap-3">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black uppercase transition-all shadow-sm shrink-0 ${
+                          isSelected ? 'bg-amber-500 text-white rotate-3' : 'bg-amber-50 text-amber-500'
                         }`}>
-                        {formatCurrency(acc.totalBalance)}
-                      </p>
-                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">
-                        Bs. {new Intl.NumberFormat('es-VE').format(acc.totalBalance * exchangeRate)}
-                      </p>
-                      <ChevronRight size={14} className={`ml-auto mt-1 transition-transform ${isSelected ? 'text-blue-400 translate-x-1' : 'text-slate-300'
-                        }`} />
+                          F
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-bold truncate text-sm tracking-tight text-slate-800`}>
+                            Fac N°: <span className="text-blue-600 font-extrabold">{p.invoiceNumber || 'S/N'}</span>
+                          </p>
+                          <p className="text-[10px] font-mono font-bold text-slate-400 truncate mt-0.5">
+                            {p.item || 'S/I'}
+                          </p>
+                          <p className="text-xs font-semibold text-slate-500 truncate mt-1">
+                            Cuenta: <span className="text-slate-700 font-bold">{clientDisplay}</span>
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 italic truncate">
+                            {p.concept || 'Venta a Crédito'}
+                          </p>
+                        </div>
+                        <div className="text-right pl-2 shrink-0">
+                          <p className="text-xs font-black text-rose-600">
+                            {formatCurrency(p.amountUsd)}
+                          </p>
+                          <p className="text-[9px] text-slate-400 font-bold mt-1">
+                            {p.date}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+                {matchedCharges.length === 0 && searchQuery.trim() !== '' && (
+                  <div className="p-12 text-center">
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Search className="text-slate-300" size={24} />
                     </div>
+                    <p className="text-slate-400 text-sm italic">No se encontraron cargos con esa factura o ítem.</p>
                   </div>
-                </button>
-              );
-            })}
-            {filteredAccounts.length === 0 && (
-              <div className="p-12 text-center">
-                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Search className="text-slate-300" size={24} />
-                </div>
-                <p className="text-slate-400 text-sm italic">No se encontraron clientes.</p>
-              </div>
+                )}
+                {searchQuery.trim() === '' && (
+                  <div className="p-8 text-center text-slate-400 text-xs italic">
+                    Escriba un número de factura o código de ítem (ej: CXC-...) para buscar.
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {filteredAccounts.map((acc) => {
+                  const urgency = getUrgencyStyles(acc.totalBalance);
+                  const isSelected = selectedAccount?.id === acc.id;
+
+                  return (
+                    <button
+                      key={acc.id}
+                      onClick={() => {
+                        setSelectedAccount(acc);
+                        setHighlightedPaymentId(null);
+                      }}
+                      className={`w-full text-left p-4 transition-all group relative overflow-hidden ${isSelected ? 'bg-blue-50/30' : 'hover:bg-slate-50'
+                        }`}
+                    >
+                      {isSelected && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-full" />
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black uppercase transition-all shadow-sm ${isSelected ? 'bg-blue-600 text-white rotate-3' : 'bg-slate-100 text-slate-400 group-hover:bg-white group-hover:shadow group-hover:-rotate-3'
+                          }`}>
+                          {acc.clientName.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-bold truncate text-sm tracking-tight ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
+                            {acc.clientName}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1 ${urgency.bg}`}>
+                              {urgency.icon}
+                              {urgency.label}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right pl-2">
+                          <p className={`text-sm font-black tracking-tighter ${acc.totalBalance > 200 ? 'text-rose-600' :
+                            acc.totalBalance > 50 ? 'text-orange-600' :
+                              acc.totalBalance > 0 ? 'text-amber-600' :
+                                'text-emerald-600'
+                            }`}>
+                            {formatCurrency(acc.totalBalance)}
+                          </p>
+                          <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                            Bs. {new Intl.NumberFormat('es-VE').format(acc.totalBalance * exchangeRate)}
+                          </p>
+                          <ChevronRight size={14} className={`ml-auto mt-1 transition-transform ${isSelected ? 'text-blue-400 translate-x-1' : 'text-slate-300'
+                            }`} />
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+                {filteredAccounts.length === 0 && (
+                  <div className="p-12 text-center">
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Search className="text-slate-300" size={24} />
+                    </div>
+                    <p className="text-slate-400 text-sm italic">No se encontraron clientes.</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1059,8 +1225,14 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                   <tbody>
                     {filteredPayments.map((p) => {
                       const isCharge = p.type === 'charge';
+                      const isHighlighted = highlightedPaymentId === p.id;
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50 border-b border-slate-100 last:border-0">
+                        <tr 
+                          key={p.id} 
+                          className={`hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors ${
+                            isHighlighted ? 'bg-amber-100 hover:bg-amber-105 border-2 border-amber-400 font-semibold' : ''
+                          }`}
+                        >
                           <td className="table-cell">{p.date}</td>
                           <td className="table-cell text-slate-600">{p.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago')}</td>
                           <td className="table-cell">
@@ -1231,6 +1403,59 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         className="input-field"
                       />
                     </div>
+                  </div>
+
+                  {/* Account Name Modification / Reassignment */}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/60 space-y-3">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Cuenta / Nombre de Cliente</span>
+                    
+                    <div className="space-y-1">
+                      <label className="label text-slate-600 font-bold">Modificar Nombre de la Cuenta</label>
+                      <input
+                        type="text"
+                        value={editClientName}
+                        onChange={(e) => setEditClientName(e.target.value)}
+                        className="input-field uppercase bg-white font-semibold text-slate-800"
+                        placeholder="Nombre completo del cliente"
+                      />
+                    </div>
+
+                    {editClientName.trim().toUpperCase() !== selectedAccount?.clientName.toUpperCase() && (
+                      <div className="space-y-2 pt-1 animate-fade-in bg-white p-3 rounded-lg border border-blue-100">
+                        <span className="text-[10px] font-black text-blue-600 block uppercase tracking-wider">¿Cómo deseas aplicar este cambio?</span>
+                        <div className="flex flex-col gap-2">
+                          <label className="flex items-start gap-2.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="accountAction"
+                              value="rename"
+                              checked={editAccountActionType === 'rename'}
+                              onChange={() => setEditAccountActionType('rename')}
+                              className="mt-1"
+                            />
+                            <div className="text-xs">
+                              <span className="font-bold text-slate-800 block">Renombrar toda la cuenta</span>
+                              <span className="text-slate-500">Cambia el nombre completo de la cuenta "{selectedAccount?.clientName}" a "{editClientName.toUpperCase()}" en todos sus cargos.</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-start gap-2.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="accountAction"
+                              value="reassign"
+                              checked={editAccountActionType === 'reassign'}
+                              onChange={() => setEditAccountActionType('reassign')}
+                              className="mt-1"
+                            />
+                            <div className="text-xs">
+                              <span className="font-bold text-slate-800 block">Mover solo este cargo a otra cuenta</span>
+                              <span className="text-slate-500">Mueve únicamente este cargo con Factura N° {editingPayment.invoiceNumber || 'S/N'} al cliente "{editClientName.toUpperCase()}" (se crea la cuenta si no existe).</span>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
