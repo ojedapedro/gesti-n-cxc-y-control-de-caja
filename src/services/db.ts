@@ -279,10 +279,35 @@ export const dbService = {
         let isZelle = data.paymentMethod === PaymentMethod.ZELLE || data.paymentMethod === PaymentMethod.BINANCE;
         let isCXCCuentas = data.destinationBank === 'CUENTAS POR COBRAR (CXC)' || (data.paymentMethod as string) === 'CUENTAS POR COBRAR (CXC)';
 
+        const normalizeText = (str: string): string => {
+          if (!str) return '';
+          return str
+            .toUpperCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+        };
+
+        const dest = normalizeText(data.destinationBank || '');
+        const pMethod = normalizeText(data.paymentMethod || '');
+        const concept = normalizeText(data.concept || '');
+        
+        const isWarranty = dest.includes('GARANT') || pMethod.includes('GARANT') || concept.includes('GARANT');
+        const isDonation = dest.includes('DONAC') || pMethod.includes('DONAC') || concept.includes('DONAC') ||
+                           dest.includes('EXENC') || pMethod.includes('EXENC') || concept.includes('EXENC') ||
+                           dest.includes('EXCENC') || pMethod.includes('EXCENC') || concept.includes('EXCENC') ||
+                           dest.includes('EXENT') || pMethod.includes('EXENT') || concept.includes('EXENT') ||
+                           dest.includes('EXCENT') || pMethod.includes('EXCENT') || concept.includes('EXCENT') ||
+                           dest.includes('CORTES') || pMethod.includes('CORTES') || concept.includes('CORTES') ||
+                           dest.includes('DESCUENT') || pMethod.includes('DESCUENT') || concept.includes('DESCUENT') ||
+                           dest.includes('ANULA') || pMethod.includes('ANULA') || concept.includes('ANULA') ||
+                           dest.includes('BONIF') || pMethod.includes('BONIF') || concept.includes('BONIF');
+
+        const labelText = isWarranty ? 'GARANTÍA' : isDonation ? 'DONACIÓN/EXENCIÓN' : 'CXC';
+
         await this.addTransaction({
           date: data.date,
           clientName: accountSnap.exists() ? accountSnap.data().clientName : 'Desconocido',
-          concept: `ABONO CUENTAS POR COBRAR (CXC): ${data.concept || ''}`,
+          concept: `ABONO CUENTAS POR COBRAR (${labelText}): ${data.concept || ''}`,
           amountUsd: data.amountUsd,
           amountBs: data.amountBs,
           exchangeRate: data.exchangeRate,
@@ -293,6 +318,24 @@ export const dbService = {
           amountUsdCash: isUsdCash ? data.amountUsd : 0,
           amountZelle: isZelle ? data.amountUsd : 0
         });
+
+        // Safe accounting adjustment: insert an offsetting withdrawal to liquidate the entry for non-cash references
+        if (isWarranty || isDonation) {
+          await this.addTransaction({
+            date: data.date,
+            clientName: accountSnap.exists() ? accountSnap.data().clientName : 'Desconocido',
+            concept: `AJUSTE CONTABLE LIQUIDACIÓN DE ${labelText}: ${data.concept || ''}`,
+            amountUsd: data.amountUsd,
+            amountBs: data.amountBs,
+            exchangeRate: data.exchangeRate,
+            paymentMethod: data.paymentMethod || PaymentMethod.USD_CASH,
+            destinationBank: data.destinationBank,
+            type: TransactionType.WITHDRAWAL, // Offsetting record
+            isCXC: false,
+            amountUsdCash: isUsdCash ? data.amountUsd : 0,
+            amountZelle: isZelle ? data.amountUsd : 0
+          });
+        }
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
@@ -409,11 +452,11 @@ export const dbService = {
       });
       callback({ 
         totalCharges, 
-        totalPayments, 
+        totalPayments: totalPaymentsUsd + totalPaymentsBsUsd, 
         totalPaymentsUsd,
         totalPaymentsBs,
         totalPaymentsBsUsd,
-        balance: totalCharges - totalPayments,
+        balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd),
         totalGrossCharges,
         totalCommissions,
         totalWarranty,
@@ -520,11 +563,11 @@ export const dbService = {
       });
       return { 
         totalCharges, 
-        totalPayments, 
+        totalPayments: totalPaymentsUsd + totalPaymentsBsUsd, 
         totalPaymentsUsd,
         totalPaymentsBs,
         totalPaymentsBsUsd,
-        balance: totalCharges - totalPayments,
+        balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd),
         totalGrossCharges,
         totalCommissions,
         totalWarranty,

@@ -55,6 +55,24 @@ export default function IncomesCierre({ exchangeRate }: { exchangeRate?: number 
   dailyTransactions.forEach(t => {
      const rate = t.exchangeRate || exchangeRate || 1;
      const destClean = (t.destinationBank || '').trim().toUpperCase();
+     const conceptUpper = (t.concept || '').toUpperCase();
+     const pMethodUpper = (t.paymentMethod || '').toUpperCase();
+     
+     // Skip warranties, donations, exemptions, etc. so they do not impact the cash reconciliation
+     const isWarranty = destClean.includes('GARANT') || pMethodUpper.includes('GARANT') || conceptUpper.includes('GARANT');
+     const isDonation = destClean.includes('DONAC') || pMethodUpper.includes('DONAC') || conceptUpper.includes('DONAC') ||
+                        destClean.includes('EXENC') || pMethodUpper.includes('EXENC') || conceptUpper.includes('EXENC') ||
+                        destClean.includes('EXCENC') || pMethodUpper.includes('EXCENC') || conceptUpper.includes('EXCENC') ||
+                        destClean.includes('EXENT') || pMethodUpper.includes('EXENT') || conceptUpper.includes('EXENT') ||
+                        destClean.includes('EXCENT') || pMethodUpper.includes('EXCENT') || conceptUpper.includes('EXCENT') ||
+                        destClean.includes('CORTES') || pMethodUpper.includes('CORTES') || conceptUpper.includes('CORTES') ||
+                        destClean.includes('DESCUENT') || pMethodUpper.includes('DESCUENT') || conceptUpper.includes('DESCUENT') ||
+                        destClean.includes('ANULA') || pMethodUpper.includes('ANULA') || conceptUpper.includes('ANULA') ||
+                        destClean.includes('BONIF') || pMethodUpper.includes('BONIF') || conceptUpper.includes('BONIF');
+
+     if (isWarranty || isDonation) {
+        return; // Do not sum to physical cash or bank balances
+     }
      
      // Determine if it is a credit sale (Cuentas por Cobrar CXC)
      const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || destClean.includes('CXC') || destClean.includes('COBRAR');
