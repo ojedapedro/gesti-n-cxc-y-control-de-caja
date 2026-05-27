@@ -53,6 +53,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
   const [selectedBank, setSelectedBank] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState('');
   const [selectedEgresoType, setSelectedEgresoType] = useState('all'); // 'all' | 'expense' | 'vale'
+  const [selectedCategoryOrRecipient, setSelectedCategoryOrRecipient] = useState('');
 
   // Subscriptions
   useEffect(() => {
@@ -108,6 +109,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
     setSelectedBank('');
     setSelectedCurrency('');
     setSelectedEgresoType('all');
+    setSelectedCategoryOrRecipient('');
   }, [activeReport]);
 
   const uniqueSellersFromDBAndPayments = useMemo(() => {
@@ -192,16 +194,39 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
   const abonosSummary = useMemo(() => {
     let totalUsd = 0;
     let totalBs = 0;
+    let totalWarranty = 0;
+    let totalDonation = 0;
     abonosData.forEach(p => {
-      // If payment is USD cash/Zelle/Binance
-      const isUsd = p.paymentMethod === PaymentMethod.USD_CASH || p.paymentMethod === PaymentMethod.ZELLE || p.paymentMethod === PaymentMethod.BINANCE;
-      if (isUsd) {
-        totalUsd += p.amountUsd;
+      const dest = (p.destinationBank || '').toUpperCase();
+      const pMethod = (p.paymentMethod || '').toUpperCase();
+      const concept = (p.concept || '').toUpperCase();
+      
+      const isWarranty = dest.includes('GARANT') || pMethod.includes('GARANT') || concept.includes('GARANT');
+      const isDonation = dest.includes('DONAC') || pMethod.includes('DONAC') || concept.includes('DONAC') ||
+                         dest.includes('EXENC') || pMethod.includes('EXENC') || concept.includes('EXENC') ||
+                         dest.includes('EXCENC') || pMethod.includes('EXCENC') || concept.includes('EXCENC') ||
+                         dest.includes('EXENT') || pMethod.includes('EXENT') || concept.includes('EXENT') ||
+                         dest.includes('EXCENT') || pMethod.includes('EXCENT') || concept.includes('EXCENT') ||
+                         dest.includes('CORTES') || pMethod.includes('CORTES') || concept.includes('CORTES') ||
+                         dest.includes('DESCUENT') || pMethod.includes('DESCUENT') || concept.includes('DESCUENT') ||
+                         dest.includes('ANULA') || pMethod.includes('ANULA') || concept.includes('ANULA') ||
+                         dest.includes('BONIF') || pMethod.includes('BONIF') || concept.includes('BONIF');
+
+      if (isWarranty) {
+        totalWarranty += p.amountUsd;
+      } else if (isDonation) {
+        totalDonation += p.amountUsd;
       } else {
-        totalBs += p.amountBs || (p.amountUsd * (p.exchangeRate || exchangeRate));
+        // If payment is USD cash/Zelle/Binance
+        const isUsd = p.paymentMethod === PaymentMethod.USD_CASH || p.paymentMethod === PaymentMethod.ZELLE || p.paymentMethod === PaymentMethod.BINANCE;
+        if (isUsd) {
+          totalUsd += p.amountUsd;
+        } else {
+          totalBs += p.amountBs || (p.amountUsd * (p.exchangeRate || exchangeRate));
+        }
       }
     });
-    return { totalUsd, totalBs };
+    return { totalUsd, totalBs, totalWarranty, totalDonation };
   }, [abonosData, exchangeRate]);
 
   // ==========================================
@@ -222,6 +247,13 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
     // 1. Process main transactions
     transactions.forEach(t => {
       if (!t.destinationBank) return;
+
+      // Exclude CXC payment entries which are processed via allPayments below to prevent double counting
+      const conceptUpper = (t.concept || '').toUpperCase();
+      if (conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)')) {
+        return;
+      }
+
       const bankClean = t.destinationBank.trim().toUpperCase();
       if (bankClean.includes('EFECTIVO') || bankClean.includes('CAJA CHICA') || bankClean.trim() === '') return;
       
@@ -242,6 +274,22 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       if (p.type === 'charge' || !p.destinationBank) return;
       const bankClean = p.destinationBank.trim().toUpperCase();
       if (bankClean.includes('EFECTIVO') || bankClean.includes('CAJA CHICA') || bankClean.trim() === '') return;
+
+      const pMethodUpper = (p.paymentMethod || '').trim().toUpperCase();
+      const conceptUpper = (p.concept || '').trim().toUpperCase();
+      
+      const isWarranty = bankClean.includes('GARANT') || pMethodUpper.includes('GARANT') || conceptUpper.includes('GARANT');
+      const isDonation = bankClean.includes('DONAC') || pMethodUpper.includes('DONAC') || conceptUpper.includes('DONAC') ||
+                         bankClean.includes('EXENC') || pMethodUpper.includes('EXENC') || conceptUpper.includes('EXENC') ||
+                         bankClean.includes('EXCENC') || pMethodUpper.includes('EXCENC') || conceptUpper.includes('EXCENC') ||
+                         bankClean.includes('EXENT') || pMethodUpper.includes('EXENT') || conceptUpper.includes('EXENT') ||
+                         bankClean.includes('EXCENT') || pMethodUpper.includes('EXCENT') || conceptUpper.includes('EXCENT') ||
+                         bankClean.includes('CORTES') || pMethodUpper.includes('CORTES') || conceptUpper.includes('CORTES') ||
+                         bankClean.includes('DESCUENT') || pMethodUpper.includes('DESCUENT') || conceptUpper.includes('DESCUENT') ||
+                         bankClean.includes('ANULA') || pMethodUpper.includes('ANULA') || conceptUpper.includes('ANULA') ||
+                         bankClean.includes('BONIF') || pMethodUpper.includes('BONIF') || conceptUpper.includes('BONIF');
+
+      if (isWarranty || isDonation) return;
 
       const isBs = p.paymentMethod === PaymentMethod.BS || p.paymentMethod === PaymentMethod.BS_CASH;
       const cName = clientMap.get(p.clientId) || 'Cliente';
@@ -278,6 +326,17 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
     });
     return { totalUsd, totalBs };
   }, [bankReconciliationData]);
+
+  const uniqueCategoriesAndRecipients = useMemo(() => {
+    const values = new Set<string>();
+    expenses.forEach(e => {
+      if (e.category) values.add(e.category.trim().toUpperCase());
+    });
+    receipts.forEach(r => {
+      if (r.recipient) values.add(r.recipient.trim().toUpperCase());
+    });
+    return Array.from(values).sort();
+  }, [expenses, receipts]);
 
 
   // ==========================================
@@ -325,13 +384,14 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       });
     }
 
-    // Apply generic dates filters
+    // Apply generic dates and category/recipient filters
     return list.filter(item => {
       if (startDate && item.date < startDate) return false;
       if (endDate && item.date > endDate) return false;
+      if (selectedCategoryOrRecipient && item.categoryOrRecipient.trim().toUpperCase() !== selectedCategoryOrRecipient.toUpperCase()) return false;
       return true;
     }).sort((a, b) => b.date.localeCompare(a.date));
-  }, [expenses, receipts, startDate, endDate, selectedEgresoType, exchangeRate]);
+  }, [expenses, receipts, startDate, endDate, selectedEgresoType, selectedCategoryOrRecipient, exchangeRate]);
 
   const egresosValesSummary = useMemo(() => {
     let totalUsd = 0;
@@ -482,7 +542,10 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
     if (activeReport === 'egresos_vales' && selectedEgresoType !== 'all') {
       filterText += `Tipo: ${selectedEgresoType === 'expense' ? 'Gasto' : 'Vale/Retiro'} `;
     }
-    if (!startDate && !endDate && !selectedClient && !selectedSeller && !selectedBank && !selectedCurrency && selectedEgresoType === 'all') {
+    if (activeReport === 'egresos_vales' && selectedCategoryOrRecipient) {
+      filterText += `Categoría/Beneficiario: ${selectedCategoryOrRecipient} `;
+    }
+    if (!startDate && !endDate && !selectedClient && !selectedSeller && !selectedBank && !selectedCurrency && selectedEgresoType === 'all' && !selectedCategoryOrRecipient) {
       filterText += 'Ninguno (Datos completos)';
     }
 
@@ -684,37 +747,57 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
           )}
 
           {activeReport === 'egresos_vales' && (
-            <div className="flex flex-col md:col-span-2">
-              <label className="label">Clasificación de Egreso</label>
-              <div className="relative">
-                <Activity className="absolute left-3 top-3.5 text-slate-400" size={16} />
-                <select
-                  value={selectedEgresoType}
-                  onChange={(e) => setSelectedEgresoType(e.target.value)}
-                  className="input-field pl-10 cursor-pointer"
-                >
-                  <option value="all">TODOS</option>
-                  <option value="expense">EGRESOS GENERALES (Caja y Egresos Efectivo)</option>
-                  <option value="vale">VALES DE CAJA / RETIROS (Vales)</option>
-                </select>
+            <>
+              <div className="flex flex-col">
+                <label className="label">Clasificación de Egreso</label>
+                <div className="relative">
+                  <Activity className="absolute left-3 top-3.5 text-slate-400" size={16} />
+                  <select
+                    value={selectedEgresoType}
+                    onChange={(e) => setSelectedEgresoType(e.target.value)}
+                    className="input-field pl-10 cursor-pointer"
+                  >
+                    <option value="all">TODOS</option>
+                    <option value="expense">EGRESOS GENERALES (Caja y Egresos Efectivo)</option>
+                    <option value="vale">VALES DE CAJA / RETIROS (Vales)</option>
+                  </select>
+                </div>
               </div>
-            </div>
+
+              <div className="flex flex-col">
+                <label className="label">Categoría / Beneficiario</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3.5 text-slate-400" size={16} />
+                  <select
+                    value={selectedCategoryOrRecipient}
+                    onChange={(e) => setSelectedCategoryOrRecipient(e.target.value)}
+                    className="input-field pl-10 cursor-pointer uppercase"
+                  >
+                    <option value="">TODOS</option>
+                    {uniqueCategoriesAndRecipients.map(item => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
         {/* Clear Filters Button Action */}
-        {(startDate || endDate || selectedClient || selectedSeller || selectedBank || selectedCurrency || selectedEgresoType !== 'all') && (
+        {(startDate || endDate || selectedClient || selectedSeller || selectedBank || selectedCurrency || selectedEgresoType !== 'all' || selectedCategoryOrRecipient) && (
           <div className="mt-4 flex justify-end">
             <button
-              onClick={() => {
-                setStartDate('');
-                setEndDate('');
-                setSelectedClient('');
-                setSelectedSeller('');
-                setSelectedBank('');
-                setSelectedCurrency('');
-                setSelectedEgresoType('all');
-              }}
+               onClick={() => {
+                 setStartDate('');
+                 setEndDate('');
+                 setSelectedClient('');
+                 setSelectedSeller('');
+                 setSelectedBank('');
+                 setSelectedCurrency('');
+                 setSelectedEgresoType('all');
+                 setSelectedCategoryOrRecipient('');
+               }}
               className="text-xs font-bold text-slate-500 hover:text-red-600 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <X size={15} /> Limpiar Filtros
@@ -847,14 +930,22 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
 
             {/* Table Sum-up Footer */}
             {abonosData.length > 0 && (
-              <div className="bg-slate-50 p-5 border-t border-slate-100 flex flex-col md:flex-row justify-end gap-4 text-right">
-                <div className="p-3 bg-white rounded-xl border border-slate-150 min-w-[200px]">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Consolidado USD ($ Cash / Digital)</span>
+              <div className="bg-slate-50 p-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-3 bg-white rounded-xl border border-slate-150 text-right">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Consolidado USD ($ Cash/Zelle)</span>
                   <span className="text-xl font-black text-emerald-600">{formatCurrency(abonosSummary.totalUsd)}</span>
                 </div>
-                <div className="p-3 bg-white rounded-xl border border-slate-150 min-w-[200px]">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Consolidado BS (Digital / Cash)</span>
+                <div className="p-3 bg-white rounded-xl border border-slate-150 text-right">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Consolidado BS (Pago Móvil/Bs)</span>
                   <span className="text-xl font-black text-sky-600">{formatBs(abonosSummary.totalBs)}</span>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-slate-150 text-right">
+                  <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block">Garantías Aplicadas (Ref)</span>
+                  <span className="text-xl font-black text-purple-600">{formatCurrency(abonosSummary.totalWarranty)}</span>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-slate-150 text-right">
+                  <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest block">Donaciones/Exenciones (Ref)</span>
+                  <span className="text-xl font-black text-pink-600">{formatCurrency(abonosSummary.totalDonation)}</span>
                 </div>
               </div>
             )}
