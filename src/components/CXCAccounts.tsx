@@ -42,6 +42,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     concept: 'ABONO',
     paymentMethod: PaymentMethod.BS_CASH,
     destinationBank: '',
+    sellerId: '',
+    sellerName: '',
   });
 
   const [lastEdited, setLastEdited] = useState<'usd' | 'bs' | null>(null);
@@ -214,11 +216,12 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       concept: editingPayment.concept || '',
       type: editingPayment.type || 'payment',
       paymentMethod: editingPayment.paymentMethod || PaymentMethod.BS_CASH,
+      sellerName: editingPayment.sellerName || '',
+      sellerId: editingPayment.sellerId || '',
     };
 
     if (updates.type === 'charge') {
       updates.invoiceNumber = editingPayment.invoiceNumber || '';
-      updates.sellerName = editingPayment.sellerName || '';
     } else {
       updates.destinationBank = editingPayment.destinationBank || '';
       updates.amountBs = (editingPayment.amountBs !== undefined && editingPayment.amountBs !== null && editingPayment.amountBs !== '') ? parseFloat(editingPayment.amountBs as any) : null;
@@ -403,6 +406,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       concept: paymentData.concept,
       paymentMethod: paymentData.paymentMethod,
       destinationBank: paymentData.destinationBank,
+      sellerId: paymentData.sellerId || '',
+      sellerName: paymentData.sellerName || '',
     });
 
     // Refresh payments list
@@ -418,6 +423,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       concept: 'ABONO',
       paymentMethod: PaymentMethod.BS_CASH,
       destinationBank: '',
+      sellerId: '',
+      sellerName: '',
     });
     setLastEdited(null);
   };
@@ -1189,6 +1196,34 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           className="input-field"
                         />
                       </div>
+
+                      <div className="space-y-1">
+                        <label className="label flex items-center justify-between">
+                          <span>Vendedor / Cobrador</span>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">Opcional</span>
+                        </label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                          <select 
+                            value={paymentData.sellerId}
+                            onChange={(e) => {
+                              const sId = e.target.value;
+                              const seller = sellers.find(s => s.id === sId);
+                              setPaymentData({
+                                ...paymentData,
+                                sellerId: sId,
+                                sellerName: seller ? seller.name : ''
+                              });
+                            }}
+                            className="input-field pl-10 cursor-pointer text-sm"
+                          >
+                            <option value="">Seleccione Vendedor...</option>
+                            {sellers.map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-emerald-100">
@@ -1579,6 +1614,31 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       onChange={(e) => setEditingPayment({ ...editingPayment, concept: e.target.value })}
                       className="input-field"
                     />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="label">Vendedor / Cobrador</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                      <select 
+                        value={editingPayment.sellerId || ''}
+                        onChange={(e) => {
+                          const sId = e.target.value;
+                          const seller = sellers.find(s => s.id === sId);
+                          setEditingPayment({
+                            ...editingPayment,
+                            sellerId: sId,
+                            sellerName: seller ? seller.name : ''
+                          });
+                        }}
+                        className="input-field pl-10 cursor-pointer text-sm"
+                      >
+                        <option value="">Seleccione Vendedor...</option>
+                        {sellers.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </>
               )}

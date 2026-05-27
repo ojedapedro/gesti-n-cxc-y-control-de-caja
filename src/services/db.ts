@@ -314,7 +314,9 @@ export const dbService = {
             type: TransactionType.INCOME,
             isCXC: false,
             amountUsdCash: isUsdCash ? data.amountUsd : 0,
-            amountZelle: isZelle ? data.amountUsd : 0
+            amountZelle: isZelle ? data.amountUsd : 0,
+            sellerId: data.sellerId,
+            sellerName: data.sellerName,
           });
         }
       }
