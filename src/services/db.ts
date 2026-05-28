@@ -853,7 +853,7 @@ export const dbService = {
       await this.addTransaction({
         date: data.date,
         clientName: data.recipient,
-        concept: `RETIRO: ${data.concept}`,
+        concept: `RETIRO: ${data.concept} (${res.id})`,
         amountUsd: data.amountUsd,
         paymentMethod: PaymentMethod.USD_CASH,
         type: TransactionType.WITHDRAWAL,
@@ -863,6 +863,62 @@ export const dbService = {
       return res;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, RECEIPTS_PATH);
+    }
+  },
+
+  async updateReceipt(receiptId: string, updates: Partial<Receipt>, editReason: string) {
+    try {
+      const receiptRef = doc(db, RECEIPTS_PATH, receiptId);
+      const receiptSnap = await getDoc(receiptRef);
+      if (!receiptSnap.exists()) {
+        throw new Error('El recibo no existe');
+      }
+      const oldData = receiptSnap.data() as Receipt;
+
+      await updateDoc(receiptRef, {
+        ...updates,
+        editReason: editReason,
+        lastUpdated: serverTimestamp()
+      });
+
+      // Find and update corresponding transaction in transactions collection
+      const txCollection = collection(db, 'transactions');
+      const txSnapshot = await getDocs(txCollection);
+      
+      let targetTxDoc = txSnapshot.docs.find(doc => {
+        const concept = doc.data().concept || '';
+        return concept.includes(`(${receiptId})`);
+      });
+
+      if (!targetTxDoc) {
+        // Fallback matching
+        targetTxDoc = txSnapshot.docs.find(doc => {
+          const d = doc.data();
+          return d.type === TransactionType.WITHDRAWAL &&
+                 d.date === oldData.date &&
+                 d.amountUsd === oldData.amountUsd &&
+                 (d.concept || '').includes(oldData.concept);
+        });
+      }
+
+      if (targetTxDoc) {
+        const updatedAmountUsd = updates.amountUsd !== undefined ? updates.amountUsd : oldData.amountUsd;
+        const updatedRecipient = updates.recipient !== undefined ? updates.recipient : oldData.recipient;
+        const updatedDate = updates.date !== undefined ? updates.date : oldData.date;
+        const updatedBaseConcept = updates.concept !== undefined ? updates.concept : oldData.concept;
+
+        await updateDoc(doc(db, 'transactions', targetTxDoc.id), {
+          amountUsd: updatedAmountUsd,
+          amountBs: updates.amountBs !== undefined ? updates.amountBs : (oldData.amountBs || null),
+          exchangeRate: updates.exchangeRate !== undefined ? updates.exchangeRate : (oldData.exchangeRate || 1),
+          date: updatedDate,
+          clientName: updatedRecipient,
+          concept: `RETIRO: ${updatedBaseConcept} (${receiptId})`,
+          paymentMethod: PaymentMethod.USD_CASH
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, RECEIPTS_PATH);
     }
   },
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/db';
 import { PaymentMethod, type Receipt } from '../types';
-import { Plus, Printer, FileText, User, DollarSign, Calendar, Tag, Download } from 'lucide-react';
+import { Plus, Printer, FileText, User, DollarSign, Calendar, Tag, Download, Edit, X } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -12,6 +12,18 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+
+  // States for editing receipts (Vales y Retiros) with justification
+  const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null);
+  const [editReason, setEditReason] = useState('');
+  const [editForm, setEditForm] = useState({
+    recipient: '',
+    amount: '',
+    paymentMethod: PaymentMethod.USD_CASH as string,
+    exchangeRate: exchangeRate?.toString() || '0',
+    concept: '',
+    date: '',
+  });
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -28,8 +40,17 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    dbService.getReceipts().then(res => setReceipts(res || []));
-  }, []);
+    const unsubscribe = dbService.subscribeToReceipts((res) => {
+      setReceipts(res || []);
+      if (selectedReceipt) {
+        const matching = res.find(r => r.id === selectedReceipt.id);
+        if (matching) {
+          setSelectedReceipt(matching);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [selectedReceipt?.id]);
 
   const [fetchingRate, setFetchingRate] = useState(false);
 
@@ -51,6 +72,69 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
       fetchRate(formData.date);
     }
   }, [formData.date, showForm, exchangeRate]);
+
+  // Fetch historical rate when edit form date changes
+  useEffect(() => {
+    const fetchRateEdit = async (dateStr: string) => {
+      if (!dateStr) return;
+      const historicalRate = await dbService.getExchangeRateForDate(dateStr);
+      if (historicalRate) {
+        setEditForm(prev => ({ ...prev, exchangeRate: historicalRate.toString() }));
+      } else if (exchangeRate !== undefined) {
+        setEditForm(prev => ({ ...prev, exchangeRate: exchangeRate.toString() }));
+      }
+    };
+
+    if (editingReceipt && editForm.date) {
+      fetchRateEdit(editForm.date);
+    }
+  }, [editForm.date, editingReceipt, exchangeRate]);
+
+  const startEdit = (receipt: Receipt) => {
+    const isBs = receipt.paymentMethod === PaymentMethod.BS_CASH || receipt.paymentMethod === PaymentMethod.BS;
+    const initialAmount = isBs ? (receipt.amountBs || (receipt.amountUsd * (receipt.exchangeRate || 1))) : receipt.amountUsd;
+    
+    setEditingReceipt(receipt);
+    setEditReason('');
+    setEditForm({
+      recipient: receipt.recipient || '',
+      amount: initialAmount.toString() || '0',
+      paymentMethod: receipt.paymentMethod || PaymentMethod.USD_CASH,
+      exchangeRate: (receipt.exchangeRate || 1).toString(),
+      concept: receipt.concept || '',
+      date: receipt.date || format(new Date(), 'yyyy-MM-dd')
+    });
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingReceipt || !editingReceipt.id) return;
+    if (!editReason.trim()) {
+      alert('Por favor introduce la justificación del cambio');
+      return;
+    }
+
+    const isBs = editForm.paymentMethod === PaymentMethod.BS || editForm.paymentMethod === PaymentMethod.BS_CASH;
+    const inputAmt = parseFloat(editForm.amount) || 0;
+    const amountUsdConv = isBs ? inputAmt / (parseFloat(editForm.exchangeRate) || 1) : 0;
+    const amountBs = isBs ? inputAmt : 0;
+    const totalPaymentUsd = isBs ? amountUsdConv : inputAmt;
+
+    const updates: Partial<Receipt> = {
+      recipient: editForm.recipient,
+      amountUsd: totalPaymentUsd,
+      amountBs: amountBs > 0 ? amountBs : null,
+      paymentMethod: editForm.paymentMethod,
+      exchangeRate: parseFloat(editForm.exchangeRate) || 1,
+      concept: editForm.concept,
+      date: editForm.date,
+    };
+
+    await dbService.updateReceipt(editingReceipt.id, updates, editReason);
+    
+    setEditingReceipt(null);
+    setEditReason('');
+  };
 
   const inBolivares = formData.paymentMethod === PaymentMethod.BS || formData.paymentMethod === PaymentMethod.BS_CASH;
   const inputAmt = parseFloat(formData.amount) || 0;
@@ -454,17 +538,19 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
             </div>
           </div>
         </div>
-
-        {/* Receipt Preview */}
+                {/* Receipt Preview */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-800">Previsualización del Recibo</h3>
             {selectedReceipt && (
               <div className="flex items-center gap-4">
-                <button onClick={handleDownloadPDF} className="flex items-center gap-2 text-green-600 font-bold hover:underline transition-colors">
+                <button onClick={() => startEdit(selectedReceipt)} className="flex items-center gap-2 text-amber-600 font-bold hover:underline transition-colors shrink-0 cursor-pointer">
+                  <Edit size={18} /> Modificar
+                </button>
+                <button onClick={handleDownloadPDF} className="flex items-center gap-2 text-green-600 font-bold hover:underline transition-colors shrink-0 cursor-pointer">
                   <Download size={18} /> Descargar PDF
                 </button>
-                <button onClick={handlePrint} className="flex items-center gap-2 text-blue-600 font-bold hover:underline transition-colors">
+                <button onClick={handlePrint} className="flex items-center gap-2 text-blue-600 font-bold hover:underline transition-colors shrink-0 cursor-pointer">
                   <Printer size={18} /> Imprimir
                 </button>
               </div>
@@ -484,7 +570,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                     <p className="text-xs font-mono mt-1">Nº <span className="text-red-600 font-bold">{selectedReceipt.receiptNumber}</span></p>
                   </div>
                 </div>
-
+ 
                 <div className="grid grid-cols-3 gap-0 border-t border-b border-slate-900">
                   <div className="col-span-2 p-3 border-r border-slate-900">
                     <p className="text-[10px] font-bold uppercase text-slate-400">Quien Recibe</p>
@@ -511,14 +597,23 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                     })()}
                   </div>
                 </div>
-
+ 
                 <div className="space-y-4">
                   <div>
                     <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Por Concepto de</p>
                     <p className="text-sm p-3 bg-slate-50 rounded border border-slate-100 min-h-[60px]">{selectedReceipt.concept}</p>
                   </div>
+                  
+                  {selectedReceipt.editReason && (
+                    <div className="no-print">
+                      <p className="text-[10px] font-bold uppercase text-amber-500 mb-1">Justificación de la Última Modificación</p>
+                      <p className="text-xs p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded min-h-[40px] italic">
+                        {selectedReceipt.editReason}
+                      </p>
+                    </div>
+                  )}
                 </div>
-
+ 
                 <div className="grid grid-cols-2 gap-8 pt-10">
                   <div className="text-center">
                     <div className="border-t border-slate-900 pt-2">
@@ -533,7 +628,7 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
                     </div>
                   </div>
                 </div>
-
+ 
                 <div className="pt-4 flex justify-between items-end border-t border-slate-100 italic text-[10px] text-slate-400">
                    <p>Fecha de emisión: {selectedReceipt.date}</p>
                    <p>
@@ -556,6 +651,129 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
           )}
         </div>
       </div>
+
+      {editingReceipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm no-print">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <Edit className="text-amber-500" size={20} />
+                Modificar Recibo de Retiro Nº {editingReceipt.receiptNumber}
+              </h3>
+              <button
+                onClick={() => setEditingReceipt(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+                title="Cerrar"
+                type="button"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdate} className="p-6 space-y-4 overflow-y-auto max-h-[80vh] custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Recibe</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={editForm.recipient}
+                    onChange={(e) => setEditForm({...editForm, recipient: e.target.value.toUpperCase()})}
+                    className="input-field uppercase" 
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="label">Fecha</label>
+                  <input 
+                    type="date" 
+                    required
+                    value={editForm.date}
+                    onChange={(e) => setEditForm({...editForm, date: e.target.value})}
+                    className="input-field" 
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="label">Moneda (Entregada en)</label>
+                  <select
+                    required
+                    value={editForm.paymentMethod}
+                    onChange={(e) => setEditForm({...editForm, paymentMethod: e.target.value})}
+                    className="input-field cursor-pointer"
+                  >
+                    <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
+                    <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label">Tasa de Cambio</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    required
+                    value={editForm.exchangeRate}
+                    onChange={(e) => setEditForm({...editForm, exchangeRate: e.target.value})}
+                    className="input-field font-mono font-bold" 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label">Monto</label>
+                  <input 
+                    type="number"  
+                    step="0.01"
+                    required
+                    value={editForm.amount}
+                    onChange={(e) => setEditForm({...editForm, amount: e.target.value})}
+                    className="input-field font-bold text-amber-600" 
+                  />
+                </div>
+                
+                <div className="space-y-1 md:col-span-2">
+                  <label className="label">Concepto</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={editForm.concept}
+                    onChange={(e) => setEditForm({...editForm, concept: e.target.value.toUpperCase()})}
+                    className="input-field uppercase" 
+                  />
+                </div>
+
+                <div className="space-y-1 md:col-span-2">
+                  <label className="label text-amber-600 font-bold">Justificación de la modificación *</label>
+                  <textarea 
+                    required
+                    rows={2}
+                    placeholder="Indica de forma clara el por qué se realiza esta modificación..."
+                    value={editReason}
+                    onChange={(e) => setEditReason(e.target.value)}
+                    className="input-field border-amber-300 focus:ring-amber-500 focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingReceipt(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 rounded-xl transition-colors shadow-lg shadow-amber-200"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
