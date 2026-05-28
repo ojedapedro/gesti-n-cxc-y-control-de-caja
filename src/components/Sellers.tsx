@@ -267,6 +267,7 @@ export default function Sellers() {
                       <div className="flex-1 space-y-1">
                         <label className="text-[9px] font-bold text-slate-400 uppercase">Rubro (Ej: Pintura)</label>
                         <input 
+                          required
                           placeholder="NOMBRE DEL RUBRO" 
                           value={rubro.name}
                           onChange={(e) => {
@@ -281,6 +282,7 @@ export default function Sellers() {
                         <label className="text-[9px] font-bold text-slate-400 uppercase">%</label>
                         <input 
                           type="number"
+                          required
                           placeholder="%" 
                           value={rubro.commission}
                           onChange={(e) => {

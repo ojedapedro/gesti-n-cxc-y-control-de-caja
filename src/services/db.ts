@@ -207,7 +207,7 @@ export const dbService = {
 
       // 2. Add the charge to payments subcollection
       const path = `${CXC_ACCOUNTS_PATH}/${accountId}/payments`;
-      await addDoc(collection(db, path), {
+      const docAdded = await addDoc(collection(db, path), {
         ...data,
         type: 'charge',
         clientId: accountId,
@@ -219,7 +219,7 @@ export const dbService = {
       await this.addTransaction({
         date: data.date,
         clientName: clientName,
-        concept: `VENTA A CRÉDITO CUENTAS POR COBRAR (CXC) (Item: ${data.item || 'N/A'}): ${data.concept || ''}`,
+        concept: `VENTA A CRÉDITO CUENTAS POR COBRAR (CXC) (Item: ${data.item || 'N/A'}): ${data.concept || ''} (${docAdded.id})`,
         amountUsd: data.amountUsd, // Net amount remains amountUsd of transaction
         amountBs: data.amountBs,
         exchangeRate: data.exchangeRate,
@@ -252,7 +252,7 @@ export const dbService = {
   async addCXCPayment(clientId: string, data: Omit<CXCPayment, 'id' | 'clientId' | 'createdAt'>) {
     const path = `${CXC_ACCOUNTS_PATH}/${clientId}/payments`;
     try {
-      await addDoc(collection(db, path), {
+      const docAdded = await addDoc(collection(db, path), {
         ...data,
         type: data.type || 'payment', // Default to payment for backwards compatibility
         clientId,
@@ -305,7 +305,7 @@ export const dbService = {
           await this.addTransaction({
             date: data.date,
             clientName: accountSnap.exists() ? accountSnap.data().clientName : 'Desconocido',
-            concept: `ABONO CUENTAS POR COBRAR: ${data.concept || ''}`,
+            concept: `ABONO CUENTAS POR COBRAR: ${data.concept || ''} (${docAdded.id})`,
             amountUsd: data.amountUsd,
             amountBs: data.amountBs,
             exchangeRate: data.exchangeRate,
@@ -623,6 +623,98 @@ export const dbService = {
           });
         }
       }
+
+      // Synchronize changes to the main transactions collection if it's a payment
+      if (oldType !== 'charge') {
+        const txCollection = collection(db, 'transactions');
+        const txSnapshot = await getDocs(txCollection);
+        
+        // Find matching transaction by checking if concept has the paymentId,
+        // or falling back to compatibility matching.
+        let targetTxDoc = txSnapshot.docs.find(doc => {
+          const concept = doc.data().concept || '';
+          return concept.includes(`(${paymentId})`);
+        });
+
+        if (!targetTxDoc) {
+          // Fallback matching
+          targetTxDoc = txSnapshot.docs.find(doc => {
+            const d = doc.data();
+            return d.type === TransactionType.INCOME &&
+                   d.date === oldData.date &&
+                   d.amountUsd === oldAmount &&
+                   (d.concept || '').startsWith('ABONO CUENTAS POR COBRAR:');
+          });
+        }
+
+        if (targetTxDoc) {
+          const activeMethod = updates.paymentMethod !== undefined ? updates.paymentMethod : oldData.paymentMethod;
+          const isUsdCash = activeMethod === PaymentMethod.USD_CASH;
+          const isZelle = activeMethod === PaymentMethod.ZELLE || activeMethod === PaymentMethod.BINANCE;
+
+          const updatedAmountUsd = updates.amountUsd !== undefined ? updates.amountUsd : oldData.amountUsd;
+          const updatedAmountBs = updates.amountBs !== undefined ? updates.amountBs : oldData.amountBs;
+
+          await updateDoc(doc(db, 'transactions', targetTxDoc.id), {
+            amountUsd: updatedAmountUsd,
+            amountBs: updatedAmountBs !== undefined ? updatedAmountBs : null,
+            exchangeRate: updates.exchangeRate !== undefined ? updates.exchangeRate : oldData.exchangeRate,
+            paymentMethod: activeMethod || PaymentMethod.USD_CASH,
+            destinationBank: updates.destinationBank !== undefined ? updates.destinationBank : oldData.destinationBank,
+            date: updates.date !== undefined ? updates.date : oldData.date,
+            concept: `ABONO CUENTAS POR COBRAR: ${updates.concept !== undefined ? updates.concept : (oldData.concept || '')} (${paymentId})`,
+            amountUsdCash: isUsdCash ? updatedAmountUsd : 0,
+            amountZelle: isZelle ? updatedAmountUsd : 0,
+            sellerId: updates.sellerId !== undefined ? updates.sellerId : (oldData.sellerId || ''),
+            sellerName: updates.sellerName !== undefined ? updates.sellerName : (oldData.sellerName || ''),
+          });
+        }
+      } else {
+        // Synchronize changes to the main transactions collection if it is a charge (credit sale)
+        const txCollection = collection(db, 'transactions');
+        const txSnapshot = await getDocs(txCollection);
+        
+        let targetTxDoc = txSnapshot.docs.find(doc => {
+          const concept = doc.data().concept || '';
+          return concept.includes(`(${paymentId})`);
+        });
+
+        if (!targetTxDoc) {
+          // Fallback matching
+          targetTxDoc = txSnapshot.docs.find(doc => {
+            const d = doc.data();
+            return d.type === TransactionType.SALE &&
+                   d.isCXC === true &&
+                   d.date === oldData.date &&
+                   d.amountUsd === oldAmount &&
+                   (d.concept || '').includes('CUENTAS POR COBRAR');
+          });
+        }
+
+        if (targetTxDoc) {
+          const updatedAmountUsd = updates.amountUsd !== undefined ? updates.amountUsd : oldData.amountUsd;
+          const updatedGross = updates.grossAmountUsd !== undefined ? updates.grossAmountUsd : oldData.grossAmountUsd;
+          const updatedCommission = updates.commissionAmountUsd !== undefined ? updates.commissionAmountUsd : oldData.commissionAmountUsd;
+          const updatedItem = updates.item !== undefined ? updates.item : oldData.item;
+          const updatedConcept = updates.concept !== undefined ? updates.concept : oldData.concept;
+          const updatedRubro = updates.rubroName !== undefined ? updates.rubroName : oldData.rubroName;
+
+          await updateDoc(doc(db, 'transactions', targetTxDoc.id), {
+            amountUsd: updatedAmountUsd,
+            amountBs: updates.amountBs !== undefined ? updates.amountBs : (oldData.amountBs || null),
+            exchangeRate: updates.exchangeRate !== undefined ? updates.exchangeRate : oldData.exchangeRate,
+            date: updates.date !== undefined ? updates.date : oldData.date,
+            concept: `VENTA A CRÉDITO CUENTAS POR COBRAR (CXC) (Item: ${updatedItem || 'N/A'}): ${updatedConcept || ''} (${paymentId})`,
+            amountCXC: updatedAmountUsd,
+            totalDailySale: updatedGross || updatedAmountUsd,
+            grossAmountUsd: updatedGross || updatedAmountUsd,
+            commissionAmountUsd: updatedCommission || 0,
+            sellerId: updates.sellerId !== undefined ? updates.sellerId : (oldData.sellerId || ''),
+            sellerName: updates.sellerName !== undefined ? updates.sellerName : (oldData.sellerName || ''),
+            rubroName: updatedRubro || ''
+          });
+        }
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
@@ -729,16 +821,17 @@ export const dbService = {
       await deleteDoc(oldChargeRef);
 
       // 6. Find and update the corresponding transaction in the main transactions collection
-      if (itemCode) {
-        const txCollection = collection(db, 'transactions');
-        const txSnapshot = await getDocs(txCollection);
-        for (const txDoc of txSnapshot.docs) {
-          const concept = txDoc.data().concept || '';
-          if (concept.includes(itemCode)) {
-            await updateDoc(doc(db, 'transactions', txDoc.id), {
-              clientName: cleanNewName
-            });
-          }
+      const txCollection = collection(db, 'transactions');
+      const txSnapshot = await getDocs(txCollection);
+      for (const txDoc of txSnapshot.docs) {
+        const concept = txDoc.data().concept || '';
+        const matchesId = concept.includes(`(${chargeId})`);
+        const matchesItem = itemCode ? concept.includes(itemCode) : false;
+        
+        if (matchesId || matchesItem) {
+          await updateDoc(doc(db, 'transactions', txDoc.id), {
+            clientName: cleanNewName
+          });
         }
       }
       return newAccountId;

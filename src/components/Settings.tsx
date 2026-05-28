@@ -51,6 +51,7 @@ export default function Settings() {
               <label className="label">Fecha de Aplicación</label>
               <input 
                 type="date" 
+                required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="input-field"

@@ -709,6 +709,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Día / Fecha</label>
                   <input 
                     type="date" 
+                    required
                     value={editingTransaction.date || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, date: e.target.value})}
                     className="input-field" 
@@ -718,6 +719,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <div className="space-y-1">
                   <label className="label">Moneda</label>
                   <select 
+                    required
                     value={editingTransaction.currency || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, currency: e.target.value})}
                     className="input-field uppercase" 
@@ -730,6 +732,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <div className="space-y-1">
                   <label className="label">Destino</label>
                   <select 
+                    required
                     value={editingTransaction.destinationBank || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, destinationBank: e.target.value.toUpperCase()})}
                     className="input-field uppercase cursor-pointer" 
@@ -763,6 +766,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Bolívares</label>
                   <input 
                     type="number" step="0.01"
+                    required
                     value={editingTransaction.amountBs ?? ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, amountBs: parseFloat(e.target.value) || 0})}
                     className="input-field" 
@@ -772,6 +776,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Tasa</label>
                   <input 
                     type="number" step="0.01"
+                    required
                     value={editingTransaction.exchangeRate ?? ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, exchangeRate: parseFloat(e.target.value) || 0})}
                     className="input-field" 
@@ -781,6 +786,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Dolars Conv.</label>
                   <input 
                     type="number" step="0.01"
+                    required
                     value={editingTransaction.amountUsd ?? ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, amountUsd: parseFloat(e.target.value) || 0})}
                     className="input-field" 
@@ -790,6 +796,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Efectivo ($)</label>
                   <input 
                     type="number" step="0.01"
+                    required
                     value={editingTransaction.amountUsdCash ?? ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, amountUsdCash: parseFloat(e.target.value) || 0})}
                     className="input-field" 
@@ -799,6 +806,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Zelle/Binance</label>
                   <input 
                     type="number" step="0.01"
+                    required
                     value={editingTransaction.amountZelle ?? ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, amountZelle: parseFloat(e.target.value) || 0})}
                     className="input-field" 
@@ -808,6 +816,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Venta Diaria</label>
                   <input 
                     type="number" step="0.01"
+                    required
                     value={editingTransaction.totalDailySale ?? ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, totalDailySale: parseFloat(e.target.value) || 0})}
                     className="input-field" 
@@ -821,6 +830,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Concept</label>
                   <input 
                     type="text" 
+                    required
                     value={editingTransaction.concept || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, concept: e.target.value})}
                     className="input-field" 
@@ -830,6 +840,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Client Name</label>
                   <input 
                     type="text" 
+                    required
                     value={editingTransaction.clientName || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, clientName: e.target.value})}
                     className="input-field" 
@@ -838,6 +849,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <div className="space-y-1">
                   <label className="label">Forma de Pago</label>
                   <select
+                    required
                     value={editingTransaction.paymentMethod || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, paymentMethod: e.target.value as PaymentMethod})}
                     className="input-field"
@@ -850,6 +862,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <div className="space-y-1">
                   <label className="label">Type</label>
                   <select
+                    required
                     value={editingTransaction.type || ''}
                     onChange={(e) => setEditingTransaction({...editingTransaction, type: e.target.value as TransactionType})}
                     className="input-field"
@@ -1010,6 +1023,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <div className="relative">
                   <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
                   <select 
+                    required
                     value={cxcData.rubroName}
                     onChange={(e) => {
                       const rValue = e.target.value;

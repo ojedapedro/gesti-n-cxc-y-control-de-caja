@@ -83,8 +83,14 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         if (t.type !== TransactionType.SALE && t.type !== TransactionType.INCOME) return;
 
         const destComp = (t.destinationBank || '').trim().toUpperCase();
+
+        // Skip credit sale transactions (charges/CXC) from physical Cash Flow as they represent debt, not received money
+        const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || 
+                           (t.type === TransactionType.SALE && (destComp.includes('CXC') || destComp.includes('COBRAR')));
+        if (isCXCField) return;
+
         const isCashDest = destComp.includes('EFECTIVO') || destComp.includes('CAJA') || destComp === '';
-        const isBankDest = destComp.length > 0 && !isCashDest && !destComp.includes('CXC') && !destComp.includes('COBRAR');
+        const isBankDest = destComp.length > 0 && !isCashDest;
 
         const isBank = isBankDest || t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE;
 

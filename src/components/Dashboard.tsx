@@ -132,12 +132,14 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        // 2. CASH FLOW: Sum actual money entering (Cash Sales + All Incomes/Payments)
        // We ignore credit sales (CXC charges) for the inflow counters as they represent debt, not received money.
        if (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) {
-          if (t.paymentMethod === PaymentMethod.CXC) return;
-          if (t.type === TransactionType.INCOME && (t.concept?.includes('ABONO CUENTAS POR COBRAR') || t.concept?.includes('(CXC)'))) return;
-
           const destClean = (t.destinationBank || '').trim().toUpperCase();
+
+          // Skip credit sale transactions (charges/CXC) from physical Cash Flow as they represent debt, not received money
+          const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || 
+                             (t.type === TransactionType.SALE && (destClean.includes('CXC') || destClean.includes('COBRAR')));
+          if (isCXCField) return;
           const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA') || destClean === '';
-          const isBankDest = destClean.length > 0 && !isCashDest && !destClean.includes('CXC') && !destClean.includes('COBRAR');
+          const isBankDest = destClean.length > 0 && !isCashDest;
 
           const isBank = isBankDest || t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE;
 

@@ -982,7 +982,20 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     <Plus size={16} /> Registrar Cargo
                   </button>
                   <button
-                    onClick={() => setShowPaymentForm(!showPaymentForm)}
+                    onClick={() => {
+                      if (!showPaymentForm && payments && payments.length > 0) {
+                        // Find the most recent transaction of this client that has an assigned seller
+                        const lastWithSeller = payments.find(p => p.sellerId && p.sellerName);
+                        if (lastWithSeller) {
+                          setPaymentData(prev => ({
+                            ...prev,
+                            sellerId: lastWithSeller.sellerId || '',
+                            sellerName: lastWithSeller.sellerName || '',
+                          }));
+                        }
+                      }
+                      setShowPaymentForm(!showPaymentForm);
+                    }}
                     className="btn-primary text-sm px-3 py-1.5"
                   >
                     <Plus size={16} /> Registrar Pago
@@ -1082,15 +1095,18 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       </div>
 
                       <div className="space-y-1">
-                        <label className="label">Moneda</label>
+                        <label className="label">Método de Pago</label>
                         <select
                           required
                           value={paymentData.paymentMethod}
                           onChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.target.value as PaymentMethod })}
-                          className="input-field cursor-pointer"
+                          className="input-field cursor-pointer font-bold"
                         >
-                          <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
-                          <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
+                          <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH} - Dólares Efectivo</option>
+                          <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH} - Bolívares Efectivo</option>
+                          <option value={PaymentMethod.BS}>{PaymentMethod.BS}</option>
+                          <option value={PaymentMethod.ZELLE}>{PaymentMethod.ZELLE}</option>
+                          <option value={PaymentMethod.BINANCE}>{PaymentMethod.BINANCE}</option>
                         </select>
                       </div>
 
@@ -1098,6 +1114,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         <label className="label">Banco / Destino</label>
                         <input
                           type="text"
+                          required
                           placeholder="Ej: Banesco, Zelle, etc."
                           value={paymentData.destinationBank}
                           onChange={(e) => setPaymentData({ ...paymentData, destinationBank: e.target.value.toUpperCase() })}
@@ -1175,6 +1192,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           <input
                             type="number"
                             step="0.01"
+                            required
                             placeholder="0.00"
                             value={paymentData.amountBs}
                             onChange={(e) => {
@@ -1200,11 +1218,11 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       <div className="space-y-1">
                         <label className="label flex items-center justify-between">
                           <span>Vendedor / Cobrador</span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">Opcional</span>
                         </label>
                         <div className="relative">
                           <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
                           <select 
+                            required
                             value={paymentData.sellerId}
                             onChange={(e) => {
                               const sId = e.target.value;
@@ -1401,6 +1419,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     <input
                       type="number"
                       step="0.01"
+                      required
                       value={editingPayment.grossAmountUsd || editingPayment.amountUsd}
                       onChange={(e) => setEditingPayment({ ...editingPayment, grossAmountUsd: parseFloat(e.target.value) || 0 })}
                       className="input-field"
@@ -1424,6 +1443,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       <label className="label">Vendedor</label>
                       <input
                         type="text"
+                        required
                         value={editingPayment.sellerName || ''}
                         onChange={(e) => setEditingPayment({ ...editingPayment, sellerName: e.target.value.toUpperCase() })}
                         className="input-field uppercase"
@@ -1433,6 +1453,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       <label className="label">N° Factura</label>
                       <input
                         type="text"
+                        required
                         value={editingPayment.invoiceNumber || ''}
                         onChange={(e) => setEditingPayment({ ...editingPayment, invoiceNumber: e.target.value })}
                         className="input-field"
@@ -1448,6 +1469,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       <label className="label text-slate-600 font-bold">Modificar Nombre de la Cuenta</label>
                       <input
                         type="text"
+                        required
                         value={editClientName}
                         onChange={(e) => setEditClientName(e.target.value)}
                         className="input-field uppercase bg-white font-semibold text-slate-800"
@@ -1508,15 +1530,18 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="label">Moneda</label>
+                      <label className="label">Método de Pago</label>
                       <select
                         required
                         value={editingPayment.paymentMethod || PaymentMethod.BS_CASH}
                         onChange={(e) => setEditingPayment({ ...editingPayment, paymentMethod: e.target.value as PaymentMethod })}
                         className="input-field cursor-pointer font-bold text-emerald-700 bg-emerald-50/50"
                       >
-                        <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
-                        <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
+                        <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH} - Dólares Efectivo</option>
+                        <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH} - Bolívares Efectivo</option>
+                        <option value={PaymentMethod.BS}>{PaymentMethod.BS}</option>
+                        <option value={PaymentMethod.ZELLE}>{PaymentMethod.ZELLE}</option>
+                        <option value={PaymentMethod.BINANCE}>{PaymentMethod.BINANCE}</option>
                       </select>
                     </div>
                   </div>
@@ -1526,6 +1551,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       <label className="label">Banco / Destino</label>
                       <input
                         type="text"
+                        required
                         value={editingPayment.destinationBank || ''}
                         onChange={(e) => setEditingPayment({ ...editingPayment, destinationBank: e.target.value.toUpperCase() })}
                         className="input-field uppercase"
@@ -1597,6 +1623,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         <input
                           type="number"
                           step="0.01"
+                          required
                           value={editingPayment.amountBs !== undefined && editingPayment.amountBs !== null ? editingPayment.amountBs : ''}
                           onChange={(e) => handleEditBsChange(e.target.value)}
                           className="input-field pl-9 font-bold text-emerald-600 focus:ring-emerald-500"
@@ -1621,6 +1648,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     <div className="relative">
                       <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
                       <select 
+                        required
                         value={editingPayment.sellerId || ''}
                         onChange={(e) => {
                           const sId = e.target.value;
@@ -1796,6 +1824,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                 <div className="relative">
                   <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
                   <select 
+                    required
                     value={cxcData.rubroName}
                     onChange={(e) => {
                       const rValue = e.target.value;
