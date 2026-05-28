@@ -274,6 +274,127 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     totalDonation: 0
   });
 
+  const [dashStartDate, setDashStartDate] = useState('');
+  const [dashEndDate, setDashEndDate] = useState('');
+
+  const normalizeText = (str: string): string => {
+    if (!str) return '';
+    return str
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  };
+
+  const computeActiveStats = (paymentsList: CXCPayment[], sDate: string, eDate: string) => {
+    let totalCharges = 0;
+    let totalPayments = 0;
+    let totalPaymentsUsd = 0;
+    let totalPaymentsBs = 0;
+    let totalPaymentsBsUsd = 0;
+    let totalGrossCharges = 0;
+    let totalCommissions = 0;
+    let totalWarranty = 0;
+    let totalDonation = 0;
+
+    paymentsList.forEach(p => {
+      if (sDate && p.date < sDate) return;
+      if (eDate && p.date > eDate) return;
+
+      const amt = Number(p.amountUsd) || 0;
+      
+      if (p.type === 'charge') {
+        const grossAmt = Number(p.grossAmountUsd) || amt;
+        const commAmt = Number(p.commissionAmountUsd) || (grossAmt > amt ? grossAmt - amt : 0);
+        
+        totalCharges += amt;
+        totalGrossCharges += grossAmt;
+        totalCommissions += commAmt;
+      } else {
+        totalPayments += amt;
+
+        // Check for Warranty or Donation in payment method, destination bank, or concept
+        const dest = normalizeText(p.destinationBank || '');
+        const pMethod = normalizeText(p.paymentMethod || '');
+        const concept = normalizeText(p.concept || '');
+        
+        let isWarranty = false;
+        let isDonation = false;
+
+        if (
+          dest.includes('GARANT') || 
+          pMethod.includes('GARANT') || 
+          concept.includes('GARANT')
+        ) {
+          totalWarranty += amt;
+          isWarranty = true;
+        }
+        if (
+          dest.includes('DONAC') || 
+          pMethod.includes('DONAC') || 
+          concept.includes('DONAC') ||
+          dest.includes('EXENC') || 
+          pMethod.includes('EXENC') || 
+          concept.includes('EXENC') ||
+          dest.includes('EXCENC') || 
+          pMethod.includes('EXCENC') || 
+          concept.includes('EXCENC') ||
+          dest.includes('EXENT') || 
+          pMethod.includes('EXENT') || 
+          concept.includes('EXENT') ||
+          dest.includes('EXCENT') || 
+          pMethod.includes('EXCENT') || 
+          concept.includes('EXCENT') ||
+          dest.includes('CORTES') || 
+          pMethod.includes('CORTES') || 
+          concept.includes('CORTES') ||
+          dest.includes('DESCUENT') || 
+          pMethod.includes('DESCUENT') || 
+          concept.includes('DESCUENT') ||
+          dest.includes('ANULA') || 
+          pMethod.includes('ANULA') || 
+          concept.includes('ANULA') ||
+          dest.includes('BONIF') || 
+          pMethod.includes('BONIF') || 
+          concept.includes('BONIF')
+        ) {
+          totalDonation += amt;
+          isDonation = true;
+        }
+
+        if (!isWarranty && !isDonation) {
+          const pm = p.paymentMethod as any;
+          const isBs = pm === 'Transferencia Bs / Pago Móvil' || 
+                       pm === 'Bs' || 
+                       pm === PaymentMethod.BS || 
+                       pm === PaymentMethod.BS_CASH;
+          if (isBs) {
+            totalPaymentsBs += Number(p.amountBs) || (amt * (Number(p.exchangeRate) || 1));
+            totalPaymentsBsUsd += amt;
+          } else {
+            totalPaymentsUsd += amt;
+          }
+        }
+      }
+    });
+
+    return {
+      totalCharges,
+      totalPayments: totalPaymentsUsd + totalPaymentsBsUsd,
+      totalPaymentsUsd,
+      totalPaymentsBs,
+      totalPaymentsBsUsd,
+      balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd) - totalWarranty - totalDonation,
+      totalGrossCharges,
+      totalCommissions,
+      totalWarranty,
+      totalDonation
+    };
+  };
+
+  const activeGlobalStats = (dashStartDate || dashEndDate)
+    ? computeActiveStats(allPayments, dashStartDate, dashEndDate)
+    : globalStats;
+
 
 
   useEffect(() => {
@@ -599,6 +720,68 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         </div>
       </div>
 
+      {/* Filtro General para el Dashboard */}
+      <div className="bg-white border border-slate-205 p-4 rounded-2xl shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-25">
+          <div>
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar size={14} className="text-blue-600" /> Filtro de Fechas para Estadísticas del Dashboard
+            </h3>
+            <p className="text-[11px] text-slate-500">Afecta los totales mostrados en las secciones de Cartera y Flujos de CXC.</p>
+          </div>
+          {(dashStartDate || dashEndDate) && (
+            <span className="self-start sm:self-center px-2 py-1 rounded bg-amber-50 text-amber-850 border border-amber-200 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+              ⚠️ Filtros Activos (Se muestran cifras parciales)
+            </span>
+          )}
+        </div>
+        
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center gap-2 flex-1 max-w-xl">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl flex-1 w-full">
+              <Calendar className="text-slate-400 shrink-0" size={15} />
+              <div className="flex flex-col w-full">
+                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none mb-0.5">Desde</span>
+                <input 
+                  type="date" 
+                  value={dashStartDate}
+                  onChange={(e) => setDashStartDate(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-slate-800 outline-none w-full cursor-pointer p-0 border-none focus:ring-0 leading-tight"
+                />
+              </div>
+            </div>
+
+            <div className="hidden sm:block text-slate-400 font-bold text-xs shrink-0 px-1">al</div>
+
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl flex-1 w-full">
+              <Calendar className="text-slate-400 shrink-0" size={15} />
+              <div className="flex flex-col w-full">
+                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none mb-0.5">Hasta</span>
+                <input 
+                  type="date" 
+                  value={dashEndDate}
+                  onChange={(e) => setDashEndDate(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-slate-800 outline-none w-full cursor-pointer p-0 border-none focus:ring-0 leading-tight"
+                />
+              </div>
+            </div>
+          </div>
+
+          {(dashStartDate || dashEndDate) && (
+            <button
+              onClick={() => {
+                setDashStartDate('');
+                setDashEndDate('');
+              }}
+              className="text-xs font-black text-slate-500 hover:text-slate-900 px-4 py-2 text-center rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
+            >
+              <X size={14} />
+              <span>Restablecer</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Sección 1: Gestión de Cartera y Saldo Pendiente */}
       <div className="space-y-3">
         <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -610,8 +793,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               <Landmark size={60} className="text-slate-900" />
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Monto Bruto CXC</p>
-            <p className="text-2xl font-black text-slate-800 tracking-tighter relative z-10">{formatCurrency(globalStats.totalGrossCharges)}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalGrossCharges * exchangeRate)}</p>
+            <p className="text-2xl font-black text-slate-800 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalGrossCharges)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalGrossCharges * exchangeRate)}</p>
           </div>
 
           <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden text-rose-650">
@@ -619,8 +802,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               <Tag size={60} className="text-rose-600" />
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total Comisiones CXC</p>
-            <p className="text-2xl font-black text-rose-600 tracking-tighter relative z-10">-{formatCurrency(globalStats.totalCommissions)}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalCommissions * exchangeRate)}</p>
+            <p className="text-2xl font-black text-rose-600 tracking-tighter relative z-10">-{formatCurrency(activeGlobalStats.totalCommissions)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalCommissions * exchangeRate)}</p>
           </div>
 
           <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
@@ -628,8 +811,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               <AlertTriangle size={60} className="text-amber-600" />
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Total CXC (Neto)</p>
-            <p className="text-2xl font-black text-amber-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalCharges)}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalCharges * exchangeRate)}</p>
+            <p className="text-2xl font-black text-amber-600 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalCharges)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalCharges * exchangeRate)}</p>
           </div>
 
           <div className="card p-5 bg-slate-900 border-slate-850 text-white shadow-md relative overflow-hidden ring-2 ring-slate-950">
@@ -637,8 +820,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               <CircleDollarSign size={60} className="text-indigo-400" />
             </div>
             <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1 relative z-10">Saldo Pendiente Global</p>
-            <p className="text-3xl font-black text-indigo-400 tracking-tighter relative z-10">{formatCurrency(globalStats.balance)}</p>
-            <p className="text-[11px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.balance * exchangeRate)}</p>
+            <p className="text-3xl font-black text-indigo-400 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.balance)}</p>
+            <p className="text-[11px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.balance * exchangeRate)}</p>
           </div>
         </div>
       </div>
@@ -654,8 +837,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               <CheckCircle size={60} className="text-emerald-600" />
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en USD ($)</p>
-            <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalPaymentsUsd)}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPaymentsUsd * exchangeRate)}</p>
+            <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalPaymentsUsd)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalPaymentsUsd * exchangeRate)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
               <span className="text-[9px] font-bold text-emerald-650 uppercase tracking-wider bg-emerald-50 px-1.5 py-0.5 rounded">Afecta Caja Activa</span>
             </div>
@@ -666,8 +849,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               <CheckCircle size={60} className="text-teal-600" />
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en Bs</p>
-            <p className="text-2xl font-black text-teal-650 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalPaymentsBs)}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(globalStats.totalPaymentsBsUsd)}</p>
+            <p className="text-2xl font-black text-teal-650 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalPaymentsBs)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(activeGlobalStats.totalPaymentsBsUsd)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
               <span className="text-[9px] font-bold text-teal-600 uppercase tracking-wider bg-teal-50 px-1.5 py-0.5 rounded">Afecta Caja Activa</span>
             </div>
@@ -678,8 +861,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               <History size={60} className="text-purple-600" />
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Garantías Aplicadas</p>
-            <p className="text-2xl font-black text-purple-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalWarranty)}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalWarranty * exchangeRate)}</p>
+            <p className="text-2xl font-black text-purple-600 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalWarranty)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalWarranty * exchangeRate)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-200/50 flex items-center justify-between">
               <span className="text-[9px] font-black text-purple-705 uppercase tracking-wider bg-purple-50 px-1.5 py-0.5 rounded">Garantía / Ajuste Contable</span>
             </div>
@@ -690,8 +873,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               <Tag size={60} className="text-pink-600" />
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Donaciones/Exenciones</p>
-            <p className="text-2xl font-black text-pink-600 tracking-tighter relative z-10">{formatCurrency(globalStats.totalDonation)}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(globalStats.totalDonation * exchangeRate)}</p>
+            <p className="text-2xl font-black text-pink-600 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalDonation)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalDonation * exchangeRate)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-200/50 flex items-center justify-between">
               <span className="text-[9px] font-black text-pink-700 uppercase tracking-wider bg-pink-50 px-1.5 py-0.5 rounded">Exención / No afecta Caja</span>
             </div>
