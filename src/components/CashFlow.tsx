@@ -87,7 +87,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         const isCXCPayment = conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)');
 
         // Skip credit sale transactions (charges/CXC) from physical Cash Flow as they represent debt, not received money
-        const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || isCXCPayment || 
+        const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || 
                            (t.type === TransactionType.SALE && (destComp.includes('CXC') || destComp.includes('COBRAR')));
         if (isCXCField) return;
 

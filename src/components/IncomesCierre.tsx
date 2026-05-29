@@ -84,6 +84,7 @@ export default function IncomesCierre({
   let totalBsInBanksUsd = 0; // Valor USD de Bancos BS
   let totalUsdInBanks = 0;
   let totalCxc = 0;
+  let totalCxcPaymentsUsd = 0;
 
   dailyTransactions.forEach((t) => {
     const rate = t.exchangeRate || exchangeRate || 1;
@@ -128,6 +129,11 @@ export default function IncomesCierre({
 
     if (isWarranty || isDonation) {
       return; // Do not sum to physical cash or bank balances
+    }
+
+    const isCXCPayment = conceptUpper.includes("ABONO CUENTAS POR COBRAR") || conceptUpper.includes("(CXC)");
+    if (isCXCPayment) {
+      totalCxcPaymentsUsd += amtUsd;
     }
 
     // Determine if it is a credit sale (Cuentas por Cobrar CXC)
@@ -190,7 +196,9 @@ export default function IncomesCierre({
         incomesBs += amountBsVal;
         incomesBsUsd += eqUsd;
       }
-      totalSalesUsd += eqUsd;
+      if (!isCXCPayment) {
+        totalSalesUsd += eqUsd;
+      }
     } else {
       // USD ($)
       if (isBank) {
@@ -198,7 +206,9 @@ export default function IncomesCierre({
       } else {
         incomesUsd += amtUsd;
       }
-      totalSalesUsd += amtUsd;
+      if (!isCXCPayment) {
+        totalSalesUsd += amtUsd;
+      }
     }
   });
 
@@ -585,6 +595,14 @@ export default function IncomesCierre({
                       </span>
                       <span className="font-bold text-slate-600">
                         {formatCurrency(totalCxc)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-600 ml-2">
+                        &bull; Abonos CXC Recibidos
+                      </span>
+                      <span className="font-bold text-slate-600">
+                        {formatCurrency(totalCxcPaymentsUsd)}
                       </span>
                     </div>
                   </div>
