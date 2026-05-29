@@ -133,9 +133,11 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        // We ignore credit sales (CXC charges) for the inflow counters as they represent debt, not received money.
        if (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) {
           const destClean = (t.destinationBank || '').trim().toUpperCase();
+           const conceptUpper = (t.concept || '').toUpperCase();
+           const isCXCPayment = conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)');
 
           // Skip credit sale transactions (charges/CXC) from physical Cash Flow as they represent debt, not received money
-          const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || 
+          const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || isCXCPayment || 
                              (t.type === TransactionType.SALE && (destClean.includes('CXC') || destClean.includes('COBRAR')));
           if (isCXCField) return;
           const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA') || destClean === '';
