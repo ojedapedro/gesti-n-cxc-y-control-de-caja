@@ -124,7 +124,7 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow create: if isSignedIn() && isValidReceipt(incoming()) && isValidId(receiptId) && incoming().createdAt == request.time;
       allow update: if isSignedIn() && isValidReceipt(incoming()) &&
-                    incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'recipient', 'concept', 'date']);
+                    incoming().diff(existing()).affectedKeys().hasOnly(['amountUsd', 'amountBs', 'exchangeRate', 'paymentMethod', 'recipient', 'concept', 'date', 'editReason', 'lastUpdated']);
       allow delete: if isSignedIn();
     }
 

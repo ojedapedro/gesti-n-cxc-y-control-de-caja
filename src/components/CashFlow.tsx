@@ -104,20 +104,37 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         const dest = (t.destinationBank || '').toUpperCase();
         const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
 
-        // USD Efectivo
-        if (t.amountUsdCash !== undefined && t.amountUsdCash > 0) {
-             cashUsdAmount += Number(t.amountUsdCash);
-        } else if (isCashByName || t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === '$ Efectivo') {
-             cashUsdAmount += Number(t.amountUsd) || 0;
-        }
+        const isBsMethod = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
+                           t.paymentMethod === 'Bs' || 
+                           t.paymentMethod === 'Bolivares' || 
+                           t.paymentMethod === PaymentMethod.BS ||
+                           t.paymentMethod === PaymentMethod.BS_CASH ||
+                           (t.currency && t.currency.toUpperCase().includes('BOLÍVARES'));
 
-        // BS Efectivo
-        if (t.amountBs && t.amountBs > 0 && t.exchangeRate && t.exchangeRate > 0) {
-             if (isCashByName || t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
-                  cashBsAmount += Number(t.amountBs);
-             }
-        } else if (t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo') {
-             cashBsAmount += (Number(t.amountUsd) || 0) * (Number(t.exchangeRate) || exchangeRate || 1);
+        const isUsdMethod = t.paymentMethod === '$' || 
+                            t.paymentMethod === 'Zelle' || 
+                            t.paymentMethod === 'Binance' ||
+                            t.paymentMethod === PaymentMethod.USD_CASH ||
+                            t.paymentMethod === PaymentMethod.ZELLE ||
+                            t.paymentMethod === PaymentMethod.BINANCE ||
+                            (t.currency && (t.currency.toUpperCase().includes('DÓLARES') || t.currency.toUpperCase().includes('DOLAR') || t.currency.toUpperCase().includes('$')));
+
+        const isBsTx = isBsMethod || (!isUsdMethod && t.amountBs && t.amountBs > 0);
+
+        if (isBsTx) {
+          const isCashBsMethod = t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo' || isCashByName;
+          if (isCashBsMethod) {
+            cashBsAmount = Number(t.amountBs) || (Number(t.amountUsd) * (Number(t.exchangeRate) || exchangeRate || 1));
+          }
+        } else {
+          const isCashUsdMethod = t.paymentMethod === PaymentMethod.USD_CASH || t.paymentMethod === 'Dolares Efectivo' || t.paymentMethod === '$ Efectivo' || isCashByName;
+          if (isCashUsdMethod) {
+            if (t.amountUsdCash !== undefined && t.amountUsdCash > 0) {
+              cashUsdAmount = Number(t.amountUsdCash);
+            } else {
+              cashUsdAmount = Number(t.amountUsd) || 0;
+            }
+          }
         }
 
         if (cashUsdAmount > 0 || cashBsAmount > 0) {
@@ -187,7 +204,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
 
   const totalInflow = totalInflowUsdCash + (totalInflowBsCash / (exchangeRate || 1));
   const totalOutflow = totalOutflowUsdCash + (totalOutflowBsCash / (exchangeRate || 1));
-
+  
   const totalNetUsdCash = totalInflowUsdCash - totalOutflowUsdCash;
   const totalNetBsCash = totalInflowBsCash - totalOutflowBsCash;
   const totalNet = totalNetUsdCash + (totalNetBsCash / (exchangeRate || 1));

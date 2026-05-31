@@ -83,7 +83,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        
        // 1. SALES VOLUME: Sum all sales within period (Cash and Bank; excluding Credit/CXC)
        if (t.type === TransactionType.SALE && !t.isCXC && t.paymentMethod !== PaymentMethod.CXC) {
-          totalVentasUsd += t.amountUsd;
+          // Excluded from totalVentasUsd here based on user's instruction (Bolivares are referential and handled below)
           
           const isBsMethod = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
                              t.paymentMethod === 'Bs' || 
@@ -105,6 +105,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
              const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * rate);
              totalVentasBs += amountBsVal;
           } else {
+             totalVentasUsd += t.amountUsd;
              totalVentasBs += t.amountUsd * rate;
           }
        }

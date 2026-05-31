@@ -196,8 +196,9 @@ export default function IncomesCierre({
         incomesBs += amountBsVal;
         incomesBsUsd += eqUsd;
       }
+      // Bolivares are only referential and do not sum as USD incomes/sales
       if (!isCXCPayment) {
-        totalSalesUsd += eqUsd;
+        // Excluded from totalSalesUsd based on user's instruction
       }
     } else {
       // USD ($)

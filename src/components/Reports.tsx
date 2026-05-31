@@ -12,8 +12,18 @@ import {
   TrendingDown, 
   Download,
   Building2,
-  ListFilter
+  ListFilter,
+  TrendingUp
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip
+} from 'recharts';
 import { format } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -402,6 +412,81 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
     });
     return { totalUsd, totalBs };
   }, [egresosValesData]);
+
+  // ==========================================
+  // HISTORICAL TREND FOR CXC MONTHLY BALANCES
+  // ==========================================
+  const trendData = useMemo(() => {
+    // 1. Generate the last 12 months list ending in the current month dynamically
+    const d = new Date();
+    let currentYear = d.getFullYear();
+    let currentMonth = d.getMonth(); // 0 is January, 11 is December
+    
+    const months: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      const mStr = String(currentMonth + 1).padStart(2, '0');
+      months.unshift(`${currentYear}-${mStr}`);
+      currentMonth--;
+      if (currentMonth < 0) {
+        currentMonth = 11;
+        currentYear--;
+      }
+    }
+
+    // 2. Sort all payments by date ascending
+    const sortedPayments = [...allPayments]
+      .filter(p => p.date)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // 3. Compute running balance for all payments sequentially across time
+    const monthlyBalances: Record<string, number> = {};
+    let runningBalance = 0;
+
+    sortedPayments.forEach(p => {
+      const pMonth = p.date.substring(0, 7); // "YYYY-MM"
+      const change = p.type === 'charge' ? p.amountUsd : -p.amountUsd;
+      runningBalance += change;
+      monthlyBalances[pMonth] = runningBalance;
+    });
+
+    // 4. Map the target 12 months carrying forward previous month's balance when no activity was present
+    const data: Array<{ month: string; label: string; balance: number }> = [];
+    
+    // Sum everything up to the beginning of the 12-month window to obtain opening balance
+    const firstMonth = months[0];
+    let initialBalance = 0;
+    sortedPayments.forEach(p => {
+      const pMonth = p.date.substring(0, 7);
+      if (pMonth < firstMonth) {
+        const change = p.type === 'charge' ? p.amountUsd : -p.amountUsd;
+        initialBalance += change;
+      }
+    });
+
+    let currentCarry = initialBalance;
+    const monthNamesSpanish = [
+      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+    ];
+
+    months.forEach(m => {
+      if (monthlyBalances[m] !== undefined) {
+        currentCarry = monthlyBalances[m];
+      }
+      
+      const [year, monthNum] = m.split('-');
+      const monthIndex = parseInt(monthNum, 10) - 1;
+      const label = `${monthNamesSpanish[monthIndex]} ${year}`;
+
+      data.push({
+        month: m,
+        label,
+        balance: parseFloat(Math.max(0, currentCarry).toFixed(2))
+      });
+    });
+
+    return data;
+  }, [allPayments]);
 
 
   // ==========================================
@@ -805,6 +890,53 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
           </div>
         )}
       </div>
+
+      {/* Historical Trend Line Chart (only shown when Active Report is CXC Detail) */}
+      {activeReport === 'cxc_detail' && (
+        <div className="card p-6 border-slate-200/60 bg-white shadow-md space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-slate-50 rounded-xl text-slate-900 border border-slate-200/50">
+              <TrendingUp size={20} className="text-slate-900" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Tendencia Histórica de Cuentas por Cobrar (CXC)</h3>
+              <p className="text-xs font-semibold text-slate-500">Saldo acumulado cobrable acumulado mes a mes durante el último año (USD)</p>
+            </div>
+          </div>
+          
+          <div className="h-[280px] w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData} margin={{ top: 15, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis 
+                  dataKey="label" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} 
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} 
+                  tickFormatter={(val) => `$${val.toLocaleString()}`}
+                />
+                <Tooltip 
+                  formatter={(value: any) => [formatCurrency(Number(value)), 'Saldo Pendiente']}
+                  contentStyle={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 600 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="balance" 
+                  stroke="#0f172a" 
+                  strokeWidth={3} 
+                  dot={{ r: 4, stroke: '#0f172a', strokeWidth: 2, fill: '#fff' }} 
+                  activeDot={{ r: 6, strokeWidth: 0, fill: '#0f172a' }} 
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Tabular Visualizer Panel */}
       <div className="card border-slate-200/60 overflow-hidden bg-white shadow-md">
