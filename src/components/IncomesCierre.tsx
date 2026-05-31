@@ -23,6 +23,40 @@ import {
   DollarSign,
 } from "lucide-react";
 
+const isBsTransaction = (t: Transaction): boolean => {
+  const normalize = (str?: string) => {
+    if (!str) return "";
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  };
+
+  const pMethod = normalize(t.paymentMethod);
+  const currency = normalize(t.currency);
+
+  const isBsMethod = 
+    pMethod.includes("bs") ||
+    pMethod.includes("bolivar") ||
+    pMethod.includes("pago movil") ||
+    pMethod.includes("transferencia") ||
+    currency.includes("bs") ||
+    currency.includes("bolivar");
+
+  const isUsdMethod = 
+    pMethod.includes("$") ||
+    pMethod.includes("usd") ||
+    pMethod.includes("dolar") ||
+    pMethod.includes("zelle") ||
+    pMethod.includes("binance") ||
+    currency.includes("$") ||
+    currency.includes("usd") ||
+    currency.includes("dolar");
+
+  return isBsMethod || (!isUsdMethod && !!t.amountBs && t.amountBs > 0);
+};
+
 export default function IncomesCierre({
   exchangeRate,
 }: {
@@ -74,6 +108,36 @@ export default function IncomesCierre({
     (r) => r.date >= startDate && r.date <= endDate,
   );
 
+  let expensesUsd = 0;
+  let expensesBs = 0;
+  dailyExpenses.forEach((e) => {
+    const isBs =
+      e.paymentMethod === PaymentMethod.BS_CASH ||
+      e.paymentMethod === PaymentMethod.BS ||
+      (typeof e.paymentMethod === "string" && e.paymentMethod.toUpperCase().includes("BS"));
+    if (isBs) {
+      const rate = e.exchangeRate || exchangeRate || 1;
+      expensesBs += e.amountBs && e.amountBs > 0 ? e.amountBs : e.amountUsd * rate;
+    } else {
+      expensesUsd += e.amountUsd;
+    }
+  });
+
+  let withdrawalsUsd = 0;
+  let withdrawalsBs = 0;
+  dailyReceipts.forEach((r) => {
+    const isBs =
+      r.paymentMethod === PaymentMethod.BS_CASH ||
+      r.paymentMethod === PaymentMethod.BS ||
+      (typeof r.paymentMethod === "string" && r.paymentMethod.toUpperCase().includes("BS"));
+    if (isBs) {
+      const rate = r.exchangeRate || exchangeRate || 1;
+      withdrawalsBs += r.amountBs && r.amountBs > 0 ? r.amountBs : r.amountUsd * rate;
+    } else {
+      withdrawalsUsd += r.amountUsd;
+    }
+  });
+
   let incomesUsd = 0; // Efectivo en Mano USD
   let incomesBs = 0; // Efectivo en Mano BS
   let incomesBsUsd = 0; // Valor USD del Efectivo BS
@@ -85,6 +149,23 @@ export default function IncomesCierre({
   let totalUsdInBanks = 0;
   let totalCxc = 0;
   let totalCxcPaymentsUsd = 0;
+
+  // Separated sales vs CXC payments
+  let salesIncomesUsd = 0;
+  let cxcIncomesUsd = 0;
+
+  let salesIncomesBs = 0;
+  let cxcIncomesBs = 0;
+  let salesIncomesBsUsd = 0;
+  let cxcIncomesBsUsd = 0;
+
+  let salesBsInBanks = 0;
+  let cxcBsInBanks = 0;
+  let salesBsInBanksUsd = 0;
+  let cxcBsInBanksUsd = 0;
+
+  let salesUsdInBanks = 0;
+  let cxcUsdInBanks = 0;
 
   dailyTransactions.forEach((t) => {
     const rate = t.exchangeRate || exchangeRate || 1;
@@ -131,7 +212,10 @@ export default function IncomesCierre({
       return; // Do not sum to physical cash or bank balances
     }
 
-    const isCXCPayment = conceptUpper.includes("ABONO CUENTAS POR COBRAR") || conceptUpper.includes("(CXC)");
+    const isCXCPayment =
+      t.type === TransactionType.INCOME &&
+      (conceptUpper.includes("ABONO CUENTAS POR COBRAR") ||
+        conceptUpper.includes("(CXC)"));
     if (isCXCPayment) {
       totalCxcPaymentsUsd += amtUsd;
     }
@@ -162,27 +246,7 @@ export default function IncomesCierre({
       t.paymentMethod === PaymentMethod.ZELLE ||
       t.paymentMethod === PaymentMethod.BINANCE;
 
-    // Determine currency: is BS?
-    const isBsMethod =
-      t.paymentMethod === "Transferencia Bs / Pago Móvil" ||
-      t.paymentMethod === "Bs" ||
-      t.paymentMethod === "Bolivares" ||
-      t.paymentMethod === "Bs Efectivo" ||
-      (t.currency && t.currency.toUpperCase().includes("BOLÍVARES"));
-
-    const isUsdMethod =
-      t.paymentMethod === "$" ||
-      t.paymentMethod === "Zelle" ||
-      t.paymentMethod === "Binance" ||
-      t.paymentMethod === PaymentMethod.USD_CASH ||
-      t.paymentMethod === PaymentMethod.ZELLE ||
-      t.paymentMethod === PaymentMethod.BINANCE ||
-      (t.currency &&
-        (t.currency.toUpperCase().includes("DÓLARES") ||
-          t.currency.toUpperCase().includes("DOLAR") ||
-          t.currency.toUpperCase().includes("$")));
-
-    const isBs = isBsMethod || (!isUsdMethod && t.amountBs && t.amountBs > 0);
+    const isBs = isBsTransaction(t);
 
     if (isBs) {
       const amountBsVal =
@@ -192,9 +256,23 @@ export default function IncomesCierre({
       if (isBank) {
         totalBsInBanks += amountBsVal;
         totalBsInBanksUsd += eqUsd;
+        if (isCXCPayment) {
+          cxcBsInBanks += amountBsVal;
+          cxcBsInBanksUsd += eqUsd;
+        } else {
+          salesBsInBanks += amountBsVal;
+          salesBsInBanksUsd += eqUsd;
+        }
       } else {
         incomesBs += amountBsVal;
         incomesBsUsd += eqUsd;
+        if (isCXCPayment) {
+          cxcIncomesBs += amountBsVal;
+          cxcIncomesBsUsd += eqUsd;
+        } else {
+          salesIncomesBs += amountBsVal;
+          salesIncomesBsUsd += eqUsd;
+        }
       }
       // Bolivares are only referential and do not sum as USD incomes/sales
       if (!isCXCPayment) {
@@ -204,8 +282,18 @@ export default function IncomesCierre({
       // USD ($)
       if (isBank) {
         totalUsdInBanks += amtUsd;
+        if (isCXCPayment) {
+          cxcUsdInBanks += amtUsd;
+        } else {
+          salesUsdInBanks += amtUsd;
+        }
       } else {
         incomesUsd += amtUsd;
+        if (isCXCPayment) {
+          cxcIncomesUsd += amtUsd;
+        } else {
+          salesIncomesUsd += amtUsd;
+        }
       }
       if (!isCXCPayment) {
         totalSalesUsd += amtUsd;
@@ -220,8 +308,8 @@ export default function IncomesCierre({
   const initialUsd = previousClosure?.actualBalanceUsd || 0;
   const initialBs = previousClosure?.actualBalanceBs || 0;
 
-  const expectedUsd = initialUsd + incomesUsd;
-  const expectedBs = initialBs + incomesBs;
+  const expectedUsd = initialUsd + incomesUsd - expensesUsd - withdrawalsUsd;
+  const expectedBs = initialBs + incomesBs - expensesBs - withdrawalsBs;
 
   // Filter closures recorded in the selected period for history display
   const periodClosures = closures
@@ -245,10 +333,10 @@ export default function IncomesCierre({
         initialBalanceBs: initialBs,
         incomesUsd,
         incomesBs,
-        expensesUsd: 0,
-        expensesBs: 0,
-        withdrawalsUsd: 0,
-        withdrawalsBs: 0,
+        expensesUsd,
+        expensesBs,
+        withdrawalsUsd,
+        withdrawalsBs,
         expectedBalanceUsd: expectedUsd,
         expectedBalanceBs: expectedBs,
         actualBalanceUsd: actUsd,
@@ -488,10 +576,26 @@ export default function IncomesCierre({
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-emerald-600">
-                        Ingresos
+                        Ingresos (+)
                       </span>
                       <span className="font-bold text-emerald-600">
                         +{formatCurrency(incomesUsd)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-rose-500">
+                        Gastos (-)
+                      </span>
+                      <span className="font-bold text-rose-500">
+                        -{formatCurrency(expensesUsd)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-rose-500">
+                        Retiros / Vales (-)
+                      </span>
+                      <span className="font-bold text-rose-500">
+                        -{formatCurrency(withdrawalsUsd)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
@@ -526,10 +630,26 @@ export default function IncomesCierre({
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-emerald-600">
-                        Ingresos
+                        Ingresos (+)
                       </span>
                       <span className="font-bold text-emerald-600">
                         +{formatBs(incomesBs)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-rose-500">
+                        Gastos (-)
+                      </span>
+                      <span className="font-bold text-rose-500">
+                        -{formatBs(expensesBs)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-rose-500">
+                        Retiros / Vales (-)
+                      </span>
+                      <span className="font-bold text-rose-500">
+                        -{formatBs(withdrawalsBs)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
@@ -551,58 +671,121 @@ export default function IncomesCierre({
                       de Operaciones
                     </h5>
                   </div>
-                  <div className="p-3 space-y-2 border-b border-slate-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-600 ml-2">
-                        &bull; Caja Efectivo USD
-                      </span>
-                      <span className="font-bold text-slate-600">
-                        {formatCurrency(incomesUsd)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-600 ml-2">
-                        &bull; Caja Efectivo BS{" "}
-                        <span className="text-[10px] font-bold text-slate-400">
-                          ({formatCurrency(incomesBsUsd)})
+                  <div className="p-3 space-y-3.5 border-b border-slate-200">
+                    {/* Caja Efectivo USD */}
+                    <div className="space-y-1 py-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700 ml-2">
+                          &bull; Caja Efectivo USD
                         </span>
-                      </span>
-                      <span className="font-bold text-slate-600">
-                        {formatBs(incomesBs)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-600 ml-2">
-                        &bull; Ingresos en Bancos BS{" "}
-                        <span className="text-[10px] font-bold text-slate-400">
-                          ({formatCurrency(totalBsInBanksUsd)})
+                        <span className="font-bold text-slate-800">
+                          {formatCurrency(incomesUsd)}
                         </span>
-                      </span>
-                      <span className="font-bold text-slate-600">
-                        {formatBs(totalBsInBanks)}
-                      </span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
+                        <span>Ventas Directas (Efectivo):</span>
+                        <span className="font-medium text-slate-500">{formatCurrency(salesIncomesUsd)}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
+                        <span>Abonos CXC (Efectivo):</span>
+                        <span className="font-medium text-slate-500">{formatCurrency(cxcIncomesUsd)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-600 ml-2">
-                        &bull; Ingresos en Bancos USD
-                      </span>
-                      <span className="font-bold text-slate-600">
-                        {formatCurrency(totalUsdInBanks)}
-                      </span>
+
+                    {/* Caja Efectivo BS */}
+                    <div className="space-y-1 py-1 border-t border-slate-100/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700 ml-2">
+                          &bull; Caja Efectivo BS{" "}
+                          <span className="text-[10px] font-bold text-slate-400">
+                            ({formatCurrency(incomesBsUsd)})
+                          </span>
+                        </span>
+                        <span className="font-bold text-slate-800">
+                          {formatBs(incomesBs)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
+                        <span>Ventas Directas (Efectivo BS):</span>
+                        <span className="font-medium text-slate-500">
+                          {formatBs(salesIncomesBs)}{" "}
+                          <span className="text-[10px] text-slate-400">({formatCurrency(salesIncomesBsUsd)})</span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
+                        <span>Abonos CXC (Efectivo BS):</span>
+                        <span className="font-medium text-slate-500">
+                          {formatBs(cxcIncomesBs)}{" "}
+                          <span className="text-[10px] text-slate-400">({formatCurrency(cxcIncomesBsUsd)})</span>
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-600 ml-2">
+
+                    {/* Ingresos en Bancos BS */}
+                    <div className="space-y-1 py-1 border-t border-slate-100/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700 ml-2">
+                          &bull; Ingresos en Bancos BS{" "}
+                          <span className="text-[10px] font-bold text-slate-400">
+                            ({formatCurrency(totalBsInBanksUsd)})
+                          </span>
+                        </span>
+                        <span className="font-bold text-slate-800">
+                          {formatBs(totalBsInBanks)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
+                        <span>Ventas Directas (Bancos BS):</span>
+                        <span className="font-medium text-slate-500">
+                          {formatBs(salesBsInBanks)}{" "}
+                          <span className="text-[10px] text-slate-400">({formatCurrency(salesBsInBanksUsd)})</span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
+                        <span>Abonos CXC (Bancos BS):</span>
+                        <span className="font-medium text-slate-500">
+                          {formatBs(cxcBsInBanks)}{" "}
+                          <span className="text-[10px] text-slate-400">({formatCurrency(cxcBsInBanksUsd)})</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Ingresos en Bancos USD */}
+                    <div className="space-y-1 py-1 border-t border-slate-100/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700 ml-2">
+                          &bull; Ingresos en Bancos USD
+                        </span>
+                        <span className="font-bold text-slate-800">
+                          {formatCurrency(totalUsdInBanks)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
+                        <span>Ventas Directas (Zelle/Binance/Bancos USD):</span>
+                        <span className="font-medium text-slate-500">{formatCurrency(salesUsdInBanks)}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
+                        <span>Abonos CXC (Zelle/Binance/Bancos USD):</span>
+                        <span className="font-medium text-slate-500">{formatCurrency(cxcUsdInBanks)}</span>
+                      </div>
+                    </div>
+
+                    {/* Cuentas por Cobrar CXC */}
+                    <div className="flex items-center justify-between border-t border-slate-100/50 pt-2">
+                      <span className="text-sm font-semibold text-slate-700 ml-2">
                         &bull; Cuentas por Cobrar (CXC)
                       </span>
-                      <span className="font-bold text-slate-600">
+                      <span className="font-bold text-slate-800">
                         {formatCurrency(totalCxc)}
                       </span>
                     </div>
+
+                    {/* Abonos CXC Recibidos Total */}
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-600 ml-2">
-                        &bull; Abonos CXC Recibidos
+                      <span className="text-sm font-semibold text-slate-700 ml-2">
+                        &bull; Total Abonos CXC Recibidos
                       </span>
-                      <span className="font-bold text-slate-600">
+                      <span className="font-bold text-emerald-600">
                         {formatCurrency(totalCxcPaymentsUsd)}
                       </span>
                     </div>

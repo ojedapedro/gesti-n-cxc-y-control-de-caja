@@ -30,6 +30,40 @@ import { formatCurrency } from '../lib/utils';
 import { startOfMonth, endOfMonth, format, subMonths, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+const isBsTransaction = (t: Transaction): boolean => {
+  const normalize = (str?: string) => {
+    if (!str) return "";
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  };
+
+  const pMethod = normalize(t.paymentMethod);
+  const currency = normalize(t.currency);
+
+  const isBsMethod = 
+    pMethod.includes("bs") ||
+    pMethod.includes("bolivar") ||
+    pMethod.includes("pago movil") ||
+    pMethod.includes("transferencia") ||
+    currency.includes("bs") ||
+    currency.includes("bolivar");
+
+  const isUsdMethod = 
+    pMethod.includes("$") ||
+    pMethod.includes("usd") ||
+    pMethod.includes("dolar") ||
+    pMethod.includes("zelle") ||
+    pMethod.includes("binance") ||
+    currency.includes("$") ||
+    currency.includes("usd") ||
+    currency.includes("dolar");
+
+  return isBsMethod || (!isUsdMethod && !!t.amountBs && t.amountBs > 0);
+};
+
 export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -64,12 +98,32 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
 
   let totalBsBancoUsd = 0;
   let totalBsBancoBs = 0;
+  let salesBsBancoUsd = 0;
+  let salesBsBancoBs = 0;
+  let cxcBsBancoUsd = 0;
+  let cxcBsBancoBs = 0;
+
   let totalBsEfectivoUsd = 0;
   let totalBsEfectivoBs = 0;
+  let salesBsEfectivoUsd = 0;
+  let salesBsEfectivoBs = 0;
+  let cxcBsEfectivoUsd = 0;
+  let cxcBsEfectivoBs = 0;
+
   let totalUsdBancoUsd = 0;
   let totalUsdBancoBs = 0;
+  let salesUsdBancoUsd = 0;
+  let salesUsdBancoBs = 0;
+  let cxcUsdBancoUsd = 0;
+  let cxcUsdBancoBs = 0;
+
   let totalUsdEfectivoUsd = 0;
   let totalUsdEfectivoBs = 0;
+  let salesUsdEfectivoUsd = 0;
+  let salesUsdEfectivoBs = 0;
+  let cxcUsdEfectivoUsd = 0;
+  let cxcUsdEfectivoBs = 0;
+
   let totalVentasUsd = 0;
   let totalVentasBs = 0;
   let periodCxcCharges = 0;
@@ -84,22 +138,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        // 1. SALES VOLUME: Sum all sales within period (Cash and Bank; excluding Credit/CXC)
        if (t.type === TransactionType.SALE && !t.isCXC && t.paymentMethod !== PaymentMethod.CXC) {
           // Excluded from totalVentasUsd here based on user's instruction (Bolivares are referential and handled below)
-          
-          const isBsMethod = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
-                             t.paymentMethod === 'Bs' || 
-                             t.paymentMethod === 'Bolivares' || 
-                             t.paymentMethod === 'Bs Efectivo' || 
-                             (t.currency && t.currency.toUpperCase().includes('BOLÍVARES'));
-
-          const isUsdMethod = t.paymentMethod === '$' || 
-                              t.paymentMethod === 'Zelle' || 
-                              t.paymentMethod === 'Binance' ||
-                              t.paymentMethod === PaymentMethod.USD_CASH ||
-                              t.paymentMethod === PaymentMethod.ZELLE ||
-                              t.paymentMethod === PaymentMethod.BINANCE ||
-                              (t.currency && (t.currency.toUpperCase().includes('DÓLARES') || t.currency.toUpperCase().includes('DOLAR') || t.currency.toUpperCase().includes('$')));
-
-          const isBs = isBsMethod || (!isUsdMethod && t.amountBs && t.amountBs > 0);
+          const isBs = isBsTransaction(t);
 
           if (isBs) {
              const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * rate);
@@ -134,11 +173,12 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        // We ignore credit sales (CXC charges) for the inflow counters as they represent debt, not received money.
        if (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) {
           const destClean = (t.destinationBank || '').trim().toUpperCase();
-           const conceptUpper = (t.concept || '').toUpperCase();
-           const isCXCPayment = conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)');
+          const conceptUpper = (t.concept || '').toUpperCase();
+          const isCXCPayment = t.type === TransactionType.INCOME && (conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)'));
 
-          // Skip credit sale transactions (charges/CXC) from physical Cash Flow as they represent debt, not received money
-          const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || isCXCPayment || 
+          // Skip credit sale transactions (charges/CXC) from physical Cash Flow as they represent debt, not received money.
+          // Do NOT skip CXC payments (abonos) as they are real received money.
+          const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || 
                              (t.type === TransactionType.SALE && (destClean.includes('CXC') || destClean.includes('COBRAR')));
           if (isCXCField) return;
           const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA') || destClean === '';
@@ -146,22 +186,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
 
           const isBank = isBankDest || t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE;
 
-          // Determine if it is a Bolívares (BS) transaction or USD ($) transaction
-          const isBsMethod = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
-                             t.paymentMethod === 'Bs' || 
-                             t.paymentMethod === 'Bolivares' || 
-                             t.paymentMethod === 'Bs Efectivo' || 
-                             (t.currency && t.currency.toUpperCase().includes('BOLÍVARES'));
-
-          const isUsdMethod = t.paymentMethod === '$' || 
-                              t.paymentMethod === 'Zelle' || 
-                              t.paymentMethod === 'Binance' ||
-                              t.paymentMethod === PaymentMethod.USD_CASH ||
-                              t.paymentMethod === PaymentMethod.ZELLE ||
-                              t.paymentMethod === PaymentMethod.BINANCE ||
-                              (t.currency && (t.currency.toUpperCase().includes('DÓLARES') || t.currency.toUpperCase().includes('DOLAR') || t.currency.toUpperCase().includes('$')));
-
-          const isBs = isBsMethod || (!isUsdMethod && t.amountBs && t.amountBs > 0);
+          const isBs = isBsTransaction(t);
 
           if (isBs) {
              const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * rate);
@@ -170,9 +195,23 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
              if (isBank) {
                 totalBsBancoUsd += eqUsd;
                 totalBsBancoBs += amountBsVal;
+                if (isCXCPayment) {
+                   cxcBsBancoUsd += eqUsd;
+                   cxcBsBancoBs += amountBsVal;
+                } else {
+                   salesBsBancoUsd += eqUsd;
+                   salesBsBancoBs += amountBsVal;
+                }
              } else {
                 totalBsEfectivoUsd += eqUsd;
                 totalBsEfectivoBs += amountBsVal;
+                if (isCXCPayment) {
+                   cxcBsEfectivoUsd += eqUsd;
+                   cxcBsEfectivoBs += amountBsVal;
+                } else {
+                   salesBsEfectivoUsd += eqUsd;
+                   salesBsEfectivoBs += amountBsVal;
+                }
              }
           } else {
              // USD Transaction
@@ -180,9 +219,23 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
              if (isBank) {
                 totalUsdBancoUsd += usdAmount;
                 totalUsdBancoBs += usdAmount * rate;
+                if (isCXCPayment) {
+                   cxcUsdBancoUsd += usdAmount;
+                   cxcUsdBancoBs += usdAmount * rate;
+                } else {
+                   salesUsdBancoUsd += usdAmount;
+                   salesUsdBancoBs += usdAmount * rate;
+                }
              } else {
                 totalUsdEfectivoUsd += usdAmount;
                 totalUsdEfectivoBs += usdAmount * rate;
+                if (isCXCPayment) {
+                   cxcUsdEfectivoUsd += usdAmount;
+                   cxcUsdEfectivoBs += usdAmount * rate;
+                 } else {
+                   salesUsdEfectivoUsd += usdAmount;
+                   salesUsdEfectivoBs += usdAmount * rate;
+                }
              }
           }
        }
@@ -281,10 +334,66 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
 
   const stats = [
     { label: 'TOTAL VENTAS', value: totalVentasUsd, valueBs: totalVentasBs, icon: TrendingUp, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { label: 'TOTAL INGRESO BOLIVARES BANCO', value: totalBsBancoUsd, valueBs: totalBsBancoBs, icon: CreditCard, color: 'text-sky-600', bg: 'bg-sky-50' },
-    { label: 'TOTAL INGRESO BOLIVARES EFECTIVO', value: totalBsEfectivoUsd, valueBs: totalBsEfectivoBs, icon: Banknote, color: 'text-teal-600', bg: 'bg-teal-50' },
-    { label: 'TOTAL INGRESO DOLARES BANCO', value: totalUsdBancoUsd, valueBs: totalUsdBancoBs, icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'TOTAL INGRESO DOLARES EFECTIVO', value: totalUsdEfectivoUsd, valueBs: totalUsdEfectivoBs, icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
+    { 
+      label: 'TOTAL INGRESO BOLIVARES BANCO', 
+      value: totalBsBancoUsd, 
+      valueBs: totalBsBancoBs, 
+      icon: CreditCard, 
+      color: 'text-sky-600', 
+      bg: 'bg-sky-50',
+      breakdown: {
+        salesUsd: salesBsBancoUsd,
+        salesBs: salesBsBancoBs,
+        cxcUsd: cxcBsBancoUsd,
+        cxcBs: cxcBsBancoBs,
+        isBs: true
+      }
+    },
+    { 
+      label: 'TOTAL INGRESO BOLIVARES EFECTIVO', 
+      value: totalBsEfectivoUsd, 
+      valueBs: totalBsEfectivoBs, 
+      icon: Banknote, 
+      color: 'text-teal-600', 
+      bg: 'bg-teal-50',
+      breakdown: {
+        salesUsd: salesBsEfectivoUsd,
+        salesBs: salesBsEfectivoBs,
+        cxcUsd: cxcBsEfectivoUsd,
+        cxcBs: cxcBsEfectivoBs,
+        isBs: true
+      }
+    },
+    { 
+      label: 'TOTAL INGRESO DOLARES BANCO', 
+      value: totalUsdBancoUsd, 
+      valueBs: totalUsdBancoBs, 
+      icon: CreditCard, 
+      color: 'text-emerald-600', 
+      bg: 'bg-emerald-50',
+      breakdown: {
+        salesUsd: salesUsdBancoUsd,
+        salesBs: salesUsdBancoBs,
+        cxcUsd: cxcUsdBancoUsd,
+        cxcBs: cxcUsdBancoBs,
+        isBs: false
+      }
+    },
+    { 
+      label: 'TOTAL INGRESO DOLARES EFECTIVO', 
+      value: totalUsdEfectivoUsd, 
+      valueBs: totalUsdEfectivoBs, 
+      icon: Banknote, 
+      color: 'text-green-600', 
+      bg: 'bg-green-50',
+      breakdown: {
+        salesUsd: salesUsdEfectivoUsd,
+        salesBs: salesUsdEfectivoBs,
+        cxcUsd: cxcUsdEfectivoUsd,
+        cxcBs: cxcUsdEfectivoBs,
+        isBs: false
+      }
+    },
   ];
 
   if (loading) {
@@ -339,17 +448,35 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {stats.map((stat, i) => (
-          <div key={i} className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300">
+          <div key={i} className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
                 <h3 className={`text-3xl font-black mt-2 tracking-tight ${stat.color}`}>{formatCurrency(stat.value)}</h3>
                 <p className={`text-xs mt-1 font-bold ${stat.color} opacity-70`}>Bs. {new Intl.NumberFormat('es-VE').format(stat.valueBs)}</p>
               </div>
-              <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color}`}>
+              <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color} shrink-0`}>
                 <stat.icon size={22} strokeWidth={2.5} />
               </div>
             </div>
+            {stat.breakdown && (
+              <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-[11px]">
+                <div className="flex justify-between items-center text-slate-500">
+                  <span>Ventas Directas:</span>
+                  <span className="font-bold text-slate-800">
+                    {formatCurrency(stat.breakdown.salesUsd)}
+                    {stat.breakdown.isBs && ` (Bs. ${new Intl.NumberFormat('es-VE').format(stat.breakdown.salesBs)})`}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-500">
+                  <span>Abonos Recibidos (CXC):</span>
+                  <span className="font-bold text-emerald-600">
+                    {formatCurrency(stat.breakdown.cxcUsd)}
+                    {stat.breakdown.isBs && ` (Bs. ${new Intl.NumberFormat('es-VE').format(stat.breakdown.cxcBs)})`}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

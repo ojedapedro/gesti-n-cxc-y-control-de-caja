@@ -44,6 +44,40 @@ interface ReportsProps {
 
 type ReportType = 'cxc_detail' | 'abonos' | 'bank_reconciliation' | 'egresos_vales';
 
+const checkIsBsMethod = (paymentMethod?: string, currency?: string, amountBs?: number): boolean => {
+  const normalize = (str?: string) => {
+    if (!str) return '';
+    return str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  };
+
+  const pMethod = normalize(paymentMethod);
+  const curr = normalize(currency);
+
+  const isBsMethod = 
+    pMethod.includes('bs') ||
+    pMethod.includes('bolivar') ||
+    pMethod.includes('pago movil') ||
+    pMethod.includes('transferencia') ||
+    curr.includes('bs') ||
+    curr.includes('bolivar');
+
+  const isUsdMethod = 
+    pMethod.includes('$') ||
+    pMethod.includes('usd') ||
+    pMethod.includes('dolar') ||
+    pMethod.includes('zelle') ||
+    pMethod.includes('binance') ||
+    curr.includes('$') ||
+    curr.includes('usd') ||
+    curr.includes('dolar');
+
+  return isBsMethod || (!isUsdMethod && !!amountBs && amountBs > 0);
+};
+
 export default function Reports({ exchangeRate = 1 }: ReportsProps) {
   const [activeReport, setActiveReport] = useState<ReportType>('cxc_detail');
   
@@ -227,9 +261,8 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       } else if (isDonation) {
         totalDonation += p.amountUsd;
       } else {
-        // If payment is USD cash/Zelle/Binance
-        const isUsd = p.paymentMethod === PaymentMethod.USD_CASH || p.paymentMethod === PaymentMethod.ZELLE || p.paymentMethod === PaymentMethod.BINANCE;
-        if (isUsd) {
+        const isBs = checkIsBsMethod(p.paymentMethod, undefined, p.amountBs);
+        if (!isBs) {
           totalUsd += p.amountUsd;
         } else {
           totalBs += p.amountBs || (p.amountUsd * (p.exchangeRate || exchangeRate));
@@ -267,7 +300,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       const bankClean = t.destinationBank.trim().toUpperCase();
       if (bankClean.includes('EFECTIVO') || bankClean.includes('CAJA CHICA') || bankClean.trim() === '') return;
       
-      const isBs = t.currency?.includes('BS') || t.currency?.toLowerCase().includes('bolivar') || t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.BS_CASH;
+      const isBs = checkIsBsMethod(t.paymentMethod, t.currency, t.amountBs);
       
       list.push({
         date: t.date,
@@ -301,7 +334,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
 
       if (isWarranty || isDonation) return;
 
-      const isBs = p.paymentMethod === PaymentMethod.BS || p.paymentMethod === PaymentMethod.BS_CASH;
+      const isBs = checkIsBsMethod(p.paymentMethod, undefined, p.amountBs);
       const cName = clientMap.get(p.clientId) || 'Cliente';
 
       list.push({
@@ -538,7 +571,8 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       abonosData.forEach(p => {
         const clientName = clientMap.get(p.clientId) || 'Desconocido';
         const clientBalance = clientBalanceMap.get(p.clientId) || 0;
-        const isUsd = p.paymentMethod === PaymentMethod.USD_CASH || p.paymentMethod === PaymentMethod.ZELLE || p.paymentMethod === PaymentMethod.BINANCE;
+        const isBs = checkIsBsMethod(p.paymentMethod, undefined, p.amountBs);
+        const isUsd = !isBs;
         
         tableRows.push([
           p.date,
@@ -1032,7 +1066,8 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
                   {abonosData.map(p => {
                     const clientName = clientMap.get(p.clientId) || 'Desconocido';
                     const clientBalance = clientBalanceMap.get(p.clientId) || 0;
-                    const isUsd = p.paymentMethod === PaymentMethod.USD_CASH || p.paymentMethod === PaymentMethod.ZELLE || p.paymentMethod === PaymentMethod.BINANCE;
+                    const isBs = checkIsBsMethod(p.paymentMethod, undefined, p.amountBs);
+                    const isUsd = !isBs;
                     
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">

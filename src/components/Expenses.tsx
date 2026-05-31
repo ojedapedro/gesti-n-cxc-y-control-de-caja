@@ -40,6 +40,13 @@ export default function ExpensesModule({ exchangeRate }: { exchangeRate?: number
           <span>Resumen Liquidez</span>
         </button>
         <button 
+          onClick={() => setActiveTab('gastos')}
+          className={`pb-3 font-bold text-[15px] flex items-center gap-2 transition-colors whitespace-nowrap ${activeTab === 'gastos' ? 'border-b-2 border-rose-600 text-rose-600' : 'text-slate-500 hover:text-slate-800'}`}
+        >
+          <TrendingDown size={18} />
+          <span>Gastos Operativos</span>
+        </button>
+        <button 
           onClick={() => setActiveTab('retiros')}
           className={`pb-3 font-bold text-[15px] flex items-center gap-2 transition-colors whitespace-nowrap ${activeTab === 'retiros' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
         >
@@ -50,6 +57,9 @@ export default function ExpensesModule({ exchangeRate }: { exchangeRate?: number
 
       <div className={activeTab === 'resumen' ? 'block' : 'hidden'}>
         <CashFlow exchangeRate={exchangeRate} />
+      </div>
+      <div className={activeTab === 'gastos' ? 'block' : 'hidden'}>
+        <Expenses exchangeRate={exchangeRate} />
       </div>
       <div className={activeTab === 'retiros' ? 'block' : 'hidden'}>
         <Receipts exchangeRate={exchangeRate} />

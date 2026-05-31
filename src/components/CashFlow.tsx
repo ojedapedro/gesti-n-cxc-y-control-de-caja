@@ -16,6 +16,40 @@ interface DailyCashFlow {
   netBsCash: number;
 }
 
+const isBsTransaction = (t: Transaction): boolean => {
+  const normalize = (str?: string) => {
+    if (!str) return "";
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  };
+
+  const pMethod = normalize(t.paymentMethod);
+  const currency = normalize(t.currency);
+
+  const isBsMethod = 
+    pMethod.includes("bs") ||
+    pMethod.includes("bolivar") ||
+    pMethod.includes("pago movil") ||
+    pMethod.includes("transferencia") ||
+    currency.includes("bs") ||
+    currency.includes("bolivar");
+
+  const isUsdMethod = 
+    pMethod.includes("$") ||
+    pMethod.includes("usd") ||
+    pMethod.includes("dolar") ||
+    pMethod.includes("zelle") ||
+    pMethod.includes("binance") ||
+    currency.includes("$") ||
+    currency.includes("usd") ||
+    currency.includes("dolar");
+
+  return isBsMethod || (!isUsdMethod && !!t.amountBs && t.amountBs > 0);
+};
+
 export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -84,7 +118,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
 
         const destComp = (t.destinationBank || '').trim().toUpperCase();
         const conceptUpper = (t.concept || '').toUpperCase();
-        const isCXCPayment = conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)');
+        const isCXCPayment = t.type === TransactionType.INCOME && (conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)'));
 
         // Skip credit sale transactions (charges/CXC) from physical Cash Flow as they represent debt, not received money
         const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || 
@@ -104,22 +138,7 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         const dest = (t.destinationBank || '').toUpperCase();
         const isCashByName = dest.includes('EFECTIVO') || dest.includes('CAJA');
 
-        const isBsMethod = t.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
-                           t.paymentMethod === 'Bs' || 
-                           t.paymentMethod === 'Bolivares' || 
-                           t.paymentMethod === PaymentMethod.BS ||
-                           t.paymentMethod === PaymentMethod.BS_CASH ||
-                           (t.currency && t.currency.toUpperCase().includes('BOLÍVARES'));
-
-        const isUsdMethod = t.paymentMethod === '$' || 
-                            t.paymentMethod === 'Zelle' || 
-                            t.paymentMethod === 'Binance' ||
-                            t.paymentMethod === PaymentMethod.USD_CASH ||
-                            t.paymentMethod === PaymentMethod.ZELLE ||
-                            t.paymentMethod === PaymentMethod.BINANCE ||
-                            (t.currency && (t.currency.toUpperCase().includes('DÓLARES') || t.currency.toUpperCase().includes('DOLAR') || t.currency.toUpperCase().includes('$')));
-
-        const isBsTx = isBsMethod || (!isUsdMethod && t.amountBs && t.amountBs > 0);
+        const isBsTx = isBsTransaction(t);
 
         if (isBsTx) {
           const isCashBsMethod = t.paymentMethod === PaymentMethod.BS_CASH || t.paymentMethod === 'Bolivares Efectivo' || t.paymentMethod === 'Bs Efectivo' || isCashByName;
