@@ -478,6 +478,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <option value="VENEZUELA" />
                       <option value="BANCO DEL TESORO" />
                       <option value="BNC" />
+                      <option value="BINANCE P2P" />
+                      <option value="ZELLE" />
                       <option value="EFECTIVO" />
                     </>
                   ) : (
