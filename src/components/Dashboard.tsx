@@ -25,7 +25,7 @@ import {
   Pie
 } from 'recharts';
 import { dbService } from '../services/db';
-import { TransactionType, PaymentMethod, type Transaction, type Expense, type CXCAccount } from '../types';
+import { TransactionType, PaymentMethod, type Transaction, type Expense, type CXCAccount, type CXCPayment } from '../types';
 import { formatCurrency } from '../lib/utils';
 import { startOfMonth, endOfMonth, format, subMonths, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -68,6 +68,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [cxcAccounts, setCXCAccounts] = useState<CXCAccount[]>([]);
+  const [allPayments, setAllPayments] = useState<CXCPayment[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [startDate, setStartDate] = useState('');
@@ -76,6 +77,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
   useEffect(() => {
     const unsubT = dbService.subscribeToTransactions(setTransactions);
     const unsubE = dbService.subscribeToExpenses(setExpenses);
+    const unsubP = dbService.subscribeToAllPayments(setAllPayments);
     const unsubC = dbService.subscribeToCXCAccounts((accounts) => {
       setCXCAccounts(accounts);
       setLoading(false);
@@ -84,6 +86,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     return () => {
       unsubT();
       unsubE();
+      unsubP();
       unsubC();
     };
   }, []);
@@ -127,15 +130,15 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
   let periodCxcCharges = 0;
   let periodCxcPayments = 0;
   
+  // 1. Process standard transactions (excluding CXC payment entries which are computed from allPayments to match the bank reports)
   transactions
     .filter(t => filterByDate(t.date))
     .forEach(t => {
        const dest = (t.destinationBank || '').toUpperCase();
        const rate = t.exchangeRate || exchangeRate || 1;
        
-       // 1. SALES VOLUME: Sum all sales within period (Cash and Bank; excluding Credit/CXC)
+       // SALES VOLUME: Sum all sales within period (Cash and Bank; excluding Credit/CXC)
        if (t.type === TransactionType.SALE && !t.isCXC && t.paymentMethod !== PaymentMethod.CXC) {
-          // Excluded from totalVentasUsd here based on user's instruction (Bolivares are referential and handled below)
           const isBs = isBsTransaction(t);
 
           if (isBs) {
@@ -151,31 +154,19 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
        if (t.isCXC && t.type === TransactionType.SALE) {
           periodCxcCharges += t.amountUsd;
        }
-       if (t.type === TransactionType.INCOME && t.concept?.includes('ABONO CUENTAS POR COBRAR')) {
-          const conceptUpper = (t.concept || '').toUpperCase();
-          const destUpper = (t.destinationBank || '').toUpperCase();
-          const pMethodUpper = (t.paymentMethod || '').toUpperCase();
-          const isWarranty = conceptUpper.includes('GARANT') || destUpper.includes('GARANT') || pMethodUpper.includes('GARANT');
-          const isDonation = conceptUpper.includes('DONAC') || destUpper.includes('DONAC') || pMethodUpper.includes('DONAC') ||
-                             conceptUpper.includes('EXENC') || destUpper.includes('EXENC') || pMethodUpper.includes('EXENC') ||
-                             conceptUpper.includes('EXCENC') || destUpper.includes('EXCENC') || pMethodUpper.includes('EXCENC') ||
-                             conceptUpper.includes('EXENT') || destUpper.includes('EXENT') || pMethodUpper.includes('EXENT') ||
-                             conceptUpper.includes('EXCENT') || destUpper.includes('EXCENT') || pMethodUpper.includes('EXCENT');
-          
-          if (!isWarranty && !isDonation) {
-             periodCxcPayments += t.amountUsd;
-          }
+
+       // Skip CXC payment entries in Transactions to avoid double counting
+       const conceptUpper = (t.concept || '').toUpperCase();
+       const isCXCPaymentEntry = conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)');
+       if (isCXCPaymentEntry) {
+          return;
        }
 
-       // 2. CASH FLOW: Sum actual money entering (Cash Sales + All Incomes/Payments)
-       // We ignore credit sales (CXC charges) for the inflow counters as they represent debt, not received money.
+       // CASH FLOW for direct entries (Sales / other non-CXC Abono Incomes)
        if (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) {
           const destClean = (t.destinationBank || '').trim().toUpperCase();
-          const conceptUpper = (t.concept || '').toUpperCase();
-          const isCXCPayment = t.type === TransactionType.INCOME && (conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)'));
 
           // Skip credit sale transactions (charges/CXC) from physical Cash Flow as they represent debt, not received money.
-          // Do NOT skip CXC payments (abonos) as they are real received money.
           const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || 
                              (t.type === TransactionType.SALE && (destClean.includes('CXC') || destClean.includes('COBRAR')));
           if (isCXCField) return;
@@ -193,23 +184,13 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
              if (isBank) {
                 totalBsBancoUsd += eqUsd;
                 totalBsBancoBs += amountBsVal;
-                if (isCXCPayment) {
-                   cxcBsBancoUsd += eqUsd;
-                   cxcBsBancoBs += amountBsVal;
-                } else {
-                   salesBsBancoUsd += eqUsd;
-                   salesBsBancoBs += amountBsVal;
-                }
+                salesBsBancoUsd += eqUsd;
+                salesBsBancoBs += amountBsVal;
              } else {
                 totalBsEfectivoUsd += eqUsd;
                 totalBsEfectivoBs += amountBsVal;
-                if (isCXCPayment) {
-                   cxcBsEfectivoUsd += eqUsd;
-                   cxcBsEfectivoBs += amountBsVal;
-                } else {
-                   salesBsEfectivoUsd += eqUsd;
-                   salesBsEfectivoBs += amountBsVal;
-                }
+                salesBsEfectivoUsd += eqUsd;
+                salesBsEfectivoBs += amountBsVal;
              }
           } else {
              // USD Transaction
@@ -217,24 +198,91 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
              if (isBank) {
                 totalUsdBancoUsd += usdAmount;
                 totalUsdBancoBs += usdAmount * rate;
-                if (isCXCPayment) {
-                   cxcUsdBancoUsd += usdAmount;
-                   cxcUsdBancoBs += usdAmount * rate;
-                } else {
-                   salesUsdBancoUsd += usdAmount;
-                   salesUsdBancoBs += usdAmount * rate;
-                }
+                salesUsdBancoUsd += usdAmount;
+                salesUsdBancoBs += usdAmount * rate;
              } else {
                 totalUsdEfectivoUsd += usdAmount;
                 totalUsdEfectivoBs += usdAmount * rate;
-                if (isCXCPayment) {
-                   cxcUsdEfectivoUsd += usdAmount;
-                   cxcUsdEfectivoBs += usdAmount * rate;
-                 } else {
-                   salesUsdEfectivoUsd += usdAmount;
-                   salesUsdEfectivoBs += usdAmount * rate;
-                }
+                salesUsdEfectivoUsd += usdAmount;
+                salesUsdEfectivoBs += usdAmount * rate;
              }
+          }
+       }
+    });
+
+  // 2. Process CXC payments (abonos) from source of truth allPayments
+  allPayments
+    .filter(p => filterByDate(p.date))
+    .forEach(p => {
+       if (p.type === 'charge') return; // Only process actual payments / abonos
+
+       const bankClean = (p.destinationBank || '').trim().toUpperCase();
+       if (bankClean.trim() === '') return; // Skip entries that aren't cash flow destined or logged
+
+       const pMethodUpper = (p.paymentMethod || '').trim().toUpperCase();
+       const conceptUpper = (p.concept || '').trim().toUpperCase();
+       
+       const isWarranty = bankClean.includes('GARANT') || pMethodUpper.includes('GARANT') || conceptUpper.includes('GARANT');
+       const isDonation = bankClean.includes('DONAC') || pMethodUpper.includes('DONAC') || conceptUpper.includes('DONAC') ||
+                          bankClean.includes('EXENC') || pMethodUpper.includes('EXENC') || conceptUpper.includes('EXENC') ||
+                          bankClean.includes('EXCENC') || pMethodUpper.includes('EXCENC') || conceptUpper.includes('EXCENC') ||
+                          bankClean.includes('EXENT') || pMethodUpper.includes('EXENT') || conceptUpper.includes('EXENT') ||
+                          bankClean.includes('EXCENT') || pMethodUpper.includes('EXCENT') || conceptUpper.includes('EXCENT') ||
+                          bankClean.includes('CORTES') || pMethodUpper.includes('CORTES') || conceptUpper.includes('CORTES') ||
+                          bankClean.includes('DESCUENT') || pMethodUpper.includes('DESCUENT') || conceptUpper.includes('DESCUENT') ||
+                          bankClean.includes('ANULA') || pMethodUpper.includes('ANULA') || conceptUpper.includes('ANULA') ||
+                          bankClean.includes('BONIF') || pMethodUpper.includes('BONIF') || conceptUpper.includes('BONIF');
+
+       if (isWarranty || isDonation) return;
+
+       // Track period payments
+       periodCxcPayments += p.amountUsd;
+
+       const isCashDest = bankClean.includes('EFECTIVO') || bankClean.includes('CAJA CHICA');
+       const isBankDest = !isCashDest;
+
+       const isBank = isBankDest || p.paymentMethod === PaymentMethod.BS || p.paymentMethod === PaymentMethod.ZELLE || p.paymentMethod === PaymentMethod.BINANCE;
+
+       const normalizePaymentMethod = (str?: string) => {
+         if (!str) return '';
+         return str
+           .toLowerCase()
+           .normalize('NFD')
+           .replace(/[\u0300-\u036f]/g, '')
+           .trim();
+       };
+       const normPMethod = normalizePaymentMethod(p.paymentMethod);
+       const isBs = normPMethod.includes('bs') || normPMethod.includes('bolivar') || normPMethod.includes('pago movil') || normPMethod.includes('transferencia');
+
+       const pRate = p.exchangeRate || exchangeRate || 1;
+
+       if (isBs) {
+          const amountBsVal = p.amountBs || (p.amountUsd * pRate);
+          const eqUsd = pRate > 0 ? amountBsVal / pRate : p.amountUsd;
+
+          if (isBank) {
+             totalBsBancoUsd += eqUsd;
+             totalBsBancoBs += amountBsVal;
+             cxcBsBancoUsd += eqUsd;
+             cxcBsBancoBs += amountBsVal;
+          } else {
+             totalBsEfectivoUsd += eqUsd;
+             totalBsEfectivoBs += amountBsVal;
+             cxcBsEfectivoUsd += eqUsd;
+             cxcBsEfectivoBs += amountBsVal;
+          }
+       } else {
+          const usdAmount = p.amountUsd;
+          if (isBank) {
+             totalUsdBancoUsd += usdAmount;
+             totalUsdBancoBs += usdAmount * pRate;
+             cxcUsdBancoUsd += usdAmount;
+             cxcUsdBancoBs += usdAmount * pRate;
+          } else {
+             totalUsdEfectivoUsd += usdAmount;
+             totalUsdEfectivoBs += usdAmount * pRate;
+             cxcUsdEfectivoUsd += usdAmount;
+             cxcUsdEfectivoBs += usdAmount * pRate;
           }
        }
     });
