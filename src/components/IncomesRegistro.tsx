@@ -288,14 +288,24 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
   });
 
   const totals = filteredTransactions.reduce((acc, t) => {
-    acc.bs += t.amountBs || 0;
-    acc.usdConvert = (t.amountBs || 0) / (t.exchangeRate || 1); // Helper
-    acc.usdConv += acc.usdConvert;
+    const destClean = (t.destinationBank || '').trim().toUpperCase();
+    const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA');
+    const isBsTx = !!(t.amountBs && t.amountBs > 0);
+
+    if (isBsTx) {
+      if (isCashDest) {
+        acc.bsCash += t.amountBs || 0;
+      } else {
+        acc.bs += t.amountBs || 0;
+        acc.usdConvert = (t.amountBs || 0) / (t.exchangeRate || 1); // Helper
+        acc.usdConv += acc.usdConvert;
+      }
+    }
+
     acc.usdCash += t.amountUsdCash || 0;
     acc.zelle += t.amountZelle || 0;
     acc.cxc += t.amountCXC || 0;
     
-    const isBsTx = !!(t.amountBs && t.amountBs > 0);
     const valueUsd = isBsTx ? ((t.amountUsdCash || 0) + (t.amountZelle || 0) + (t.amountCXC || 0)) : (t.totalDailySale || t.amountUsd || 0);
     acc.ventaDiaria += valueUsd;
     
@@ -303,7 +313,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     acc.ventaDiariaBs += valueUsd * rate;
     
     return acc;
-  }, { bs: 0, usdConv: 0, usdCash: 0, zelle: 0, cxc: 0, ventaDiaria: 0, ventaDiariaBs: 0 } as { bs: number; usdConv: number; usdCash: number; zelle: number; cxc: number; ventaDiaria: number; ventaDiariaBs: number; usdConvert?: number });
+  }, { bs: 0, usdConv: 0, usdCash: 0, zelle: 0, cxc: 0, bsCash: 0, ventaDiaria: 0, ventaDiariaBs: 0 } as { bs: number; usdConv: number; usdCash: number; zelle: number; cxc: number; bsCash: number; ventaDiaria: number; ventaDiariaBs: number; usdConvert?: number });
 
   return (
     <div className="space-y-6">
@@ -620,6 +630,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-orange-950/20">Dolars Conv.</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Efectivo ($)</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Zelle/Binance</th>
+                <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-orange-950/20">Efectivo Bs</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700">Venta Diaria</th>
                 <th className="p-3 text-center text-[10px] uppercase font-black">Edit</th>
               </tr>
@@ -632,6 +643,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <td className="p-3 text-right text-orange-700 bg-orange-100/50">{formatCurrency(totals.usdConv)}</td>
                 <td className="p-3 text-right text-emerald-700 bg-emerald-100/50">{formatCurrency(totals.usdCash)}</td>
                 <td className="p-3 text-right text-emerald-700 bg-emerald-100/50">{formatCurrency(totals.zelle)}</td>
+                <td className="p-3 text-right text-orange-700 bg-orange-100/50">{new Intl.NumberFormat('es-VE').format(totals.bsCash)}</td>
                 <td className="p-3 text-right text-slate-900 bg-slate-200 border-r border-slate-300">
                   {formatCurrency(totals.ventaDiaria)}
                   <span className="block text-[9px] text-slate-500 font-bold mt-0.5 whitespace-nowrap">
@@ -659,11 +671,33 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       </td>
                       <td className="p-3 border-r border-slate-100 text-slate-600">{t.currency || '-'}</td>
                       <td className="p-3 border-r border-slate-100 font-bold">{t.destinationBank || '-'}</td>
-                      <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30">{new Intl.NumberFormat('es-VE').format(t.amountBs || 0)}</td>
+                      <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30 font-bold text-slate-800">
+                        {(() => {
+                          const destClean = (t.destinationBank || '').trim().toUpperCase();
+                          const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA');
+                          const isBsTx = !!(t.amountBs && t.amountBs > 0);
+                          return isBsTx && !isCashDest ? new Intl.NumberFormat('es-VE').format(t.amountBs || 0) : '0';
+                        })()}
+                      </td>
                       <td className="p-3 text-right border-r border-slate-100 font-mono text-blue-600">{t.exchangeRate}</td>
-                      <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30">{formatCurrency(conv)}</td>
+                      <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30">
+                        {(() => {
+                          const destClean = (t.destinationBank || '').trim().toUpperCase();
+                          const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA');
+                          const isBsTx = !!(t.amountBs && t.amountBs > 0);
+                          return isBsTx && !isCashDest ? formatCurrency(conv) : formatCurrency(0);
+                        })()}
+                      </td>
                       <td className="p-3 text-right border-r border-slate-100 bg-emerald-50/30">{formatCurrency(t.amountUsdCash || 0)}</td>
                       <td className="p-3 text-right border-r border-slate-100 bg-emerald-50/30">{formatCurrency(t.amountZelle || 0)}</td>
+                      <td className="p-3 text-right border-r border-slate-100 bg-orange-50/30 font-bold text-orange-850 bg-orange-50">
+                        {(() => {
+                          const destClean = (t.destinationBank || '').trim().toUpperCase();
+                          const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA');
+                          const isBsTx = !!(t.amountBs && t.amountBs > 0);
+                          return isBsTx && isCashDest ? new Intl.NumberFormat('es-VE').format(t.amountBs || 0) : '-';
+                        })()}
+                      </td>
                       <td className="p-3 text-right font-black text-slate-900 bg-slate-50 border-r border-slate-100">
                         {(() => {
                           const isBsTx = !!(t.amountBs && t.amountBs > 0);
@@ -680,8 +714,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       </td>
                       <td className="p-3 text-center">
                         <button 
-                          onClick={() => setEditingTransaction(t)}
-                          className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
+                           onClick={() => setEditingTransaction(t)}
+                           className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
                         >
                           <Edit size={14} />
                         </button>
@@ -691,7 +725,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 })}
               {filteredTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="p-10 text-center text-slate-400 italic">No hay cuadres de caja registrados en el periodo seleccionado.</td>
+                  <td colSpan={13} className="p-10 text-center text-slate-400 italic">No hay cuadres de caja registrados en el periodo seleccionado.</td>
                 </tr>
               )}
             </tbody>
