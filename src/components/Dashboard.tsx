@@ -445,38 +445,80 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {stats.map((stat, i) => (
-          <div key={i} className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
-                <h3 className={`text-3xl font-black mt-2 tracking-tight ${stat.color}`}>{formatCurrency(stat.value)}</h3>
-                <p className={`text-xs mt-1 font-bold ${stat.color} opacity-70`}>Bs. {new Intl.NumberFormat('es-VE').format(stat.valueBs)}</p>
-              </div>
-              <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color} shrink-0`}>
-                <stat.icon size={22} strokeWidth={2.5} />
-              </div>
+        {stats.map((stat, i) => {
+          const isTotalVentas = stat.label === 'TOTAL VENTAS';
+          
+          return (
+            <div key={i} className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
+              {isTotalVentas ? (
+                <div className="w-full flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between w-full">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
+                    </div>
+                    <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color} shrink-0`}>
+                      <stat.icon size={22} strokeWidth={2.5} />
+                    </div>
+                  </div>
+                  
+                  <div className="mt-5 space-y-2.5 text-xs text-slate-600">
+                    <div className="flex justify-between items-center gap-4">
+                      <span className="font-medium text-slate-500">total ingreso bolivares banco</span>
+                      <span className="font-bold text-slate-800">{formatCurrency(salesBsBancoUsd)}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-4">
+                      <span className="font-medium text-slate-500">total ingreso bolivares</span>
+                      <span className="font-bold text-slate-800">{formatCurrency(salesBsEfectivoUsd)}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-4">
+                      <span className="font-medium text-slate-500">total binance/zelle</span>
+                      <span className="font-bold text-slate-800">{formatCurrency(salesUsdBancoUsd)}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-4">
+                      <span className="font-medium text-slate-500">total efectivo $</span>
+                      <span className="font-bold text-slate-800">{formatCurrency(salesUsdEfectivoUsd)}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-slate-200/60 pt-2.5 mt-2.5 font-bold text-slate-900">
+                      <span className="text-slate-800">total ventas</span>
+                      <span className="text-sm font-black text-violet-700">{formatCurrency(salesBsBancoUsd + salesBsEfectivoUsd + salesUsdBancoUsd + salesUsdEfectivoUsd)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
+                      <h3 className={`text-3xl font-black mt-2 tracking-tight ${stat.color}`}>{formatCurrency(stat.value)}</h3>
+                      <p className={`text-xs mt-1 font-bold ${stat.color} opacity-70`}>Bs. {new Intl.NumberFormat('es-VE').format(stat.valueBs)}</p>
+                    </div>
+                    <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color} shrink-0`}>
+                      <stat.icon size={22} strokeWidth={2.5} />
+                    </div>
+                  </div>
+                  {stat.breakdown && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-[11px]">
+                      <div className="flex justify-between items-center text-slate-500">
+                        <span>Ventas Directas:</span>
+                        <span className="font-bold text-slate-800">
+                          {formatCurrency(stat.breakdown.salesUsd)}
+                          {stat.breakdown.isBs && ` (Bs. ${new Intl.NumberFormat('es-VE').format(stat.breakdown.salesBs)})`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-500">
+                        <span>Abonos Recibidos (CXC):</span>
+                        <span className="font-bold text-emerald-600">
+                          {formatCurrency(stat.breakdown.cxcUsd)}
+                          {stat.breakdown.isBs && ` (Bs. ${new Intl.NumberFormat('es-VE').format(stat.breakdown.cxcBs)})`}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            {stat.breakdown && (
-              <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-[11px]">
-                <div className="flex justify-between items-center text-slate-500">
-                  <span>Ventas Directas:</span>
-                  <span className="font-bold text-slate-800">
-                    {formatCurrency(stat.breakdown.salesUsd)}
-                    {stat.breakdown.isBs && ` (Bs. ${new Intl.NumberFormat('es-VE').format(stat.breakdown.salesBs)})`}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-slate-500">
-                  <span>Abonos Recibidos (CXC):</span>
-                  <span className="font-bold text-emerald-600">
-                    {formatCurrency(stat.breakdown.cxcUsd)}
-                    {stat.breakdown.isBs && ` (Bs. ${new Intl.NumberFormat('es-VE').format(stat.breakdown.cxcBs)})`}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
