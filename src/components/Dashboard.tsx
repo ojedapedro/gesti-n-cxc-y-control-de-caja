@@ -70,10 +70,8 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
   const [cxcAccounts, setCXCAccounts] = useState<CXCAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const defaultStartDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const defaultEndDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
-  const [startDate, setStartDate] = useState(defaultStartDate);
-  const [endDate, setEndDate] = useState(defaultEndDate);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     const unsubT = dbService.subscribeToTransactions(setTransactions);
