@@ -137,23 +137,31 @@ async function startServer() {
   });
 
   // Conectar Vite como Middleware de desarrollo
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+    }).on("error", (err: any) => {
+      console.error("SERVER BIND ERROR (e.g. EADDRINUSE):", err);
+    });
+  } catch (error) {
+    console.error("CRITICAL ERROR INITIALIZING VITE MIDDLEWARE:", error);
+  }
 }
 
-startServer();
+startServer().catch((error) => {
+  console.error("CRITICAL FATAL UNHANDLED SERVER EXCEPTION:", error);
+});

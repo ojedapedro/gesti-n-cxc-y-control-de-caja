@@ -158,13 +158,26 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
         })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'No se pudo conectar al servicio de análisis inteligente.');
+      let resultData: any;
+      const contentType = response.headers.get("content-type");
+
+      if (contentType && contentType.includes("application/json")) {
+        resultData = await response.json();
+      } else {
+        const rawText = await response.text();
+        console.warn("La respuesta de la API no contiene JSON válido:", rawText.slice(0, 300));
+        if (!response.ok) {
+          throw new Error(`Error del servidor (${response.status}): El servidor retornó una página no válida o se encuentra inactivo temporalmente.`);
+        } else {
+          throw new Error("El servidor retornó un formato de datos no compatible en lugar del reporte JSON.");
+        }
       }
 
-      const result = await response.json();
-      setAiResult(result);
+      if (!response.ok) {
+        throw new Error(resultData.error || `Error ${response.status}: No se pudo completar el análisis inteligente.`);
+      }
+
+      setAiResult(resultData);
     } catch (err: any) {
       console.error(err);
       setAiError(err.message || 'Error al conectar con la Inteligencia Artificial.');
