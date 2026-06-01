@@ -145,8 +145,7 @@ async function startServer() {
         totalOutflow: Number(summary.totalOutflow || 0),
         totalNetUsdCash: Number(summary.totalNetUsdCash || 0),
         totalNetBsCash: Number(summary.totalNetBsCash || 0),
-        totalNet: Number(summary.totalNet || 0),
-        totalOutflowUsdCash: Number(summary.totalOutflowUsdCash || 0)
+        totalNet: Number(summary.totalNet || 0)
       };
 
       console.log("Iniciando análisis financiero con Gemini...");
