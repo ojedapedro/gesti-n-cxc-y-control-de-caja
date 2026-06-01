@@ -114,6 +114,11 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use((req, res, next) => {
+    console.log(`[Express] Request received: ${req.method} ${req.url}`);
+    next();
+  });
+
   app.use(express.json({ limit: "10mb" }));
 
   // API del Análisis Financiero Inteligencia Artificial
@@ -131,6 +136,19 @@ async function startServer() {
         return res.status(400).json({ error: "Faltan datos financieros requeridos." });
       }
 
+      const safeSummary = {
+        totalInflowUsdCash: Number(summary.totalInflowUsdCash || 0),
+        totalInflowBsCash: Number(summary.totalInflowBsCash || 0),
+        totalOutflowUsdCash: Number(summary.totalOutflowUsdCash || 0),
+        totalOutflowBsCash: Number(summary.totalOutflowBsCash || 0),
+        totalInflow: Number(summary.totalInflow || 0),
+        totalOutflow: Number(summary.totalOutflow || 0),
+        totalNetUsdCash: Number(summary.totalNetUsdCash || 0),
+        totalNetBsCash: Number(summary.totalNetBsCash || 0),
+        totalNet: Number(summary.totalNet || 0),
+        totalOutflowUsdCash: Number(summary.totalOutflowUsdCash || 0)
+      };
+
       console.log("Iniciando análisis financiero con Gemini...");
       const ai = new GoogleGenAI({
         apiKey,
@@ -146,15 +164,15 @@ async function startServer() {
         Tasa de Cambio actual de referencia: ${exchangeRate || "No establecida"} Bs/USD.
         
         Resumen de Datos del Periodo Seleccionado:
-        - Ingresos (Inflow) en Dólares Efectivo: $${summary.totalInflowUsdCash.toFixed(2)}
-        - Ingresos (Inflow) en Bolívares Efectivo: ${summary.totalInflowBsCash.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs (Equivalente a $${(summary.totalInflowBsCash / (exchangeRate || 1)).toFixed(2)} USD)
-        - Egresos (Outflow) en Dólares Efectivo: $${summary.totalOutflowUsdCash.toFixed(2)}
-        - Egresos (Outflow) en Bolívares Efectivo: ${summary.totalOutflowBsCash.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs (Equivalente a $${(summary.totalOutflowBsCash / (exchangeRate || 1)).toFixed(2)} USD)
-        - Total General de Ingresos (Convertido a USD): $${summary.totalInflow.toFixed(2)}
-        - Total General de Salidas (Convertido a USD): $${summary.totalOutflow.toFixed(2)}
-        - Flujo Neto en dólares puros: $${summary.totalNetUsdCash.toFixed(2)}
-        - Flujo Neto en bolívares puros: ${summary.totalNetBsCash.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs (Equivalente a $${(summary.totalNetBsCash / (exchangeRate || 1)).toFixed(2)} USD)
-        - Flujo Neto de Caja total (Combinado y expresado Equivalente en USD): $${summary.totalNet.toFixed(2)}
+        - Ingresos (Inflow) en Dólares Efectivo: $${safeSummary.totalInflowUsdCash.toFixed(2)}
+        - Ingresos (Inflow) en Bolívares Efectivo: ${safeSummary.totalInflowBsCash.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs (Equivalente a $${(safeSummary.totalInflowBsCash / (exchangeRate || 1)).toFixed(2)} USD)
+        - Egresos (Outflow) en Dólares Efectivo: $${safeSummary.totalOutflowUsdCash.toFixed(2)}
+        - Egresos (Outflow) en Bolívares Efectivo: ${safeSummary.totalOutflowBsCash.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs (Equivalente a $${(safeSummary.totalOutflowBsCash / (exchangeRate || 1)).toFixed(2)} USD)
+        - Total General de Ingresos (Convertido a USD): $${safeSummary.totalInflow.toFixed(2)}
+        - Total General de Salidas (Convertido a USD): $${safeSummary.totalOutflow.toFixed(2)}
+        - Flujo Neto en dólares puros: $${safeSummary.totalNetUsdCash.toFixed(2)}
+        - Flujo Neto en bolívares puros: ${safeSummary.totalNetBsCash.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs (Equivalente a $${(safeSummary.totalNetBsCash / (exchangeRate || 1)).toFixed(2)} USD)
+        - Flujo Neto de Caja total (Combinado y expresado Equivalente en USD): $${safeSummary.totalNet.toFixed(2)}
 
         Desglose de flujos diarios (muestra resumida de los movimientos):
         ${JSON.stringify(dailyFlows.slice(0, 20))}
@@ -226,7 +244,7 @@ async function startServer() {
 
       if (!response) {
         console.warn("Todos los intentos con Gemini fallaron o están bajo alta demanda (503). Utilizando generador analítico financiero de contingencia local.");
-        const fallbackResult = generateLocalFallbackAnalysis(timeframe, summary, exchangeRate);
+        const fallbackResult = generateLocalFallbackAnalysis(timeframe, safeSummary, exchangeRate);
         return res.json(fallbackResult);
       }
 
