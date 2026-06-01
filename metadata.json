@@ -2,5 +2,5 @@
   "name": "Gestión de Cuentas por Cobrar (CXC) y Control de Caja",
   "description": "Sistema integral para la gestión de cuentas por cobrar, ingresos por caja, control de ventas a crédito, registro de gastos y generación de recibos.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

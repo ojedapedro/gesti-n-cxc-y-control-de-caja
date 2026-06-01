@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../services/db';
 import { Transaction, Expense, Receipt, TransactionType, PaymentMethod } from '../types';
-import { Activity, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, DollarSign, Calendar, Sparkles, Brain, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, Layers } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -59,6 +59,119 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // AI Financial Analysis states
+  const [aiTimeframe, setAiTimeframe] = useState<'today' | 'week' | 'month' | 'filtered'>('week');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<{
+    status: string;
+    statusColor: string;
+    overview: string;
+    strengths: string[];
+    risks: string[];
+    recommendations: string[];
+    trend: string;
+  } | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const getTotalsForTimeframe = (timeframe: 'today' | 'week' | 'month' | 'filtered') => {
+    let targetRows = [...data];
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    
+    if (timeframe === 'today') {
+      targetRows = data.filter(row => row.date === todayStr);
+    } else if (timeframe === 'week') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const sevenDaysAgoStr = format(sevenDaysAgo, 'yyyy-MM-dd');
+      targetRows = data.filter(row => row.date >= sevenDaysAgoStr);
+    } else if (timeframe === 'month') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgoStr = format(thirtyDaysAgo, 'yyyy-MM-dd');
+      targetRows = data.filter(row => row.date >= thirtyDaysAgoStr);
+    } else {
+      targetRows = filteredData;
+    }
+
+    const inflowUsdCash = targetRows.reduce((acc, curr) => acc + curr.inflowUsdCash, 0);
+    const inflowBsCash = targetRows.reduce((acc, curr) => acc + curr.inflowBsCash, 0);
+    const outflowUsdCash = targetRows.reduce((acc, curr) => acc + curr.outflowUsdCash, 0);
+    const outflowBsCash = targetRows.reduce((acc, curr) => acc + curr.outflowBsCash, 0);
+
+    const inflow = inflowUsdCash + (inflowBsCash / (exchangeRate || 1));
+    const outflow = outflowUsdCash + (outflowBsCash / (exchangeRate || 1));
+    const netUsdCash = inflowUsdCash - outflowUsdCash;
+    const netBsCash = inflowBsCash - outflowBsCash;
+    const net = netUsdCash + (netBsCash / (exchangeRate || 1));
+
+    return {
+      rows: targetRows,
+      summary: {
+        totalInflowUsdCash: inflowUsdCash,
+        totalInflowBsCash: inflowBsCash,
+        totalOutflowUsdCash: outflowUsdCash,
+        totalOutflowBsCash: outflowBsCash,
+        totalInflow: inflow,
+        totalOutflow: outflow,
+        totalNetUsdCash: netUsdCash,
+        totalNetBsCash: netBsCash,
+        totalNet: net,
+      }
+    };
+  };
+
+  const runAiAnalysis = async (selectedTf: 'today' | 'week' | 'month' | 'filtered') => {
+    setAiLoading(true);
+    setAiError(null);
+    setAiResult(null);
+
+    const labelMap = {
+      today: 'Día de hoy',
+      week: 'Últimos 7 días (Semana)',
+      month: 'Últimos 30 días (Mes)',
+      filtered: `Rango filtrado (${startDate || 'Inicio'} hasta ${endDate || 'Fin'})`
+    };
+
+    const timeframeLabel = labelMap[selectedTf];
+    const { rows, summary } = getTotalsForTimeframe(selectedTf);
+
+    try {
+      const response = await fetch('/api/ai/analyze-financials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          timeframe: timeframeLabel,
+          summary,
+          dailyFlows: rows.map(r => ({
+            date: r.date,
+            inflowUsd: r.inflowUsdCash,
+            inflowBs: r.inflowBsCash,
+            outflowUsd: r.outflowUsdCash,
+            outflowBs: r.outflowBsCash,
+            netUsd: r.netUsdCash,
+            netBs: r.netBsCash
+          })),
+          exchangeRate
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'No se pudo conectar al servicio de análisis inteligente.');
+      }
+
+      const result = await response.json();
+      setAiResult(result);
+    } catch (err: any) {
+      console.error(err);
+      setAiError(err.message || 'Error al conectar con la Inteligencia Artificial.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     let tLoaded = false;
@@ -359,6 +472,176 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
               </div>
             </div>
          </div>
+      </div>
+
+      {/* SECCIÓN DEL ANÁLISIS FINANCIERO INTELIGENTE (IA) */}
+      <div className="card p-6 border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-md relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+          <Brain size={120} className="text-slate-900" />
+        </div>
+        
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-100 pb-5">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                <Sparkles size={18} className="animate-pulse" />
+              </span>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Análisis Financiero Inteligente</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Evaluación automática de liquidez y consejos comerciales adaptados a mercados bimonetarios con el motor Gemini.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-white px-2 py-1.5 rounded-lg border border-slate-200 shadow-sm text-xs">
+              <label className="text-slate-400 font-bold uppercase text-[9px] mr-1">Periodo:</label>
+              <select
+                value={aiTimeframe}
+                onChange={(e) => setAiTimeframe(e.target.value as any)}
+                className="bg-transparent font-semibold text-slate-800 outline-none cursor-pointer"
+              >
+                <option value="today">Día de hoy</option>
+                <option value="week">Últimos 7 días</option>
+                <option value="month">Últimos 30 días</option>
+                <option value="filtered">Filtro activo actual</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => runAiAnalysis(aiTimeframe)}
+              disabled={aiLoading}
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+            >
+              {aiLoading ? (
+                <>
+                  <RefreshCw size={14} className="animate-spin" />
+                  <span>Analizando...</span>
+                </>
+              ) : (
+                <>
+                  <Brain size={14} />
+                  <span>Generar Reporte</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* AI LOADING STATE */}
+        {aiLoading && (
+          <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-full border-4 border-slate-100 border-t-slate-800 animate-spin"></div>
+              <Sparkles size={16} className="text-blue-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-ping" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-850">Analizando el balance de caja y flujos...</p>
+              <p className="text-xs text-slate-400 mt-0.5">Calculando saldos y diagnosticando riesgos de devaluación cambiaria.</p>
+            </div>
+          </div>
+        )}
+
+        {/* AI ERROR STATE */}
+        {aiError && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-red-700 text-xs">
+            <AlertTriangle className="shrink-0 mt-0.5" size={16} />
+            <div>
+              <p className="font-bold">No se pudo generar el análisis financiero</p>
+              <p className="mt-1 opacity-90">{aiError}</p>
+            </div>
+          </div>
+        )}
+
+        {/* AI DEFAULT INSTRUCTION STATE */}
+        {!aiLoading && !aiResult && !aiError && (
+          <div className="py-8 text-center flex flex-col items-center max-w-lg mx-auto">
+            <Brain className="text-slate-300 mb-3" size={32} />
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-widest font-mono">Diagnóstico de Tesorería</h4>
+            <p className="text-xs text-slate-500 mt-1">
+              Haz clic en "Generar Reporte" para evaluar la salud de tu flujo de caja en USD y BS, detectar acumulación riesgosa de bolívares y recibir consejos específicos para la realidad bimonetaria de Venezuela.
+            </p>
+          </div>
+        )}
+
+        {/* AI SYSTEM ANALYSIS RESULT */}
+        {aiResult && (
+          <div className="mt-5 space-y-5 text-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Salud Financiera del Periodo:</span>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider
+                  ${aiResult.statusColor === 'emerald' ? 'bg-emerald-100 text-emerald-850 border border-emerald-200' : ''}
+                  ${aiResult.statusColor === 'teal' ? 'bg-teal-100 text-teal-850 border border-teal-200' : ''}
+                  ${aiResult.statusColor === 'blue' ? 'bg-blue-100 text-blue-850 border border-blue-200' : ''}
+                  ${aiResult.statusColor === 'orange' ? 'bg-amber-100 text-amber-850 border border-amber-200' : ''}
+                  ${aiResult.statusColor === 'red' ? 'bg-red-100 text-red-850 border border-red-200' : ''}
+                `}>
+                  {aiResult.status}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                <TrendingUp size={14} className="text-slate-400" />
+                <span className="font-semibold">Tendencia proyectada:</span>
+                <span className="font-bold text-slate-900 bg-white px-2 py-0.5 border border-slate-200 rounded">{aiResult.trend}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Resumen & Fortalezas */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400">Diagnóstico Global</h4>
+                  <p className="text-sm leading-relaxed text-slate-600 font-medium">
+                    {aiResult.overview}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-600">Fortalezas Identificadas</h4>
+                  <ul className="space-y-1.5">
+                    {aiResult.strengths.map((st, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-slate-600 font-medium">
+                        <CheckCircle2 size={14} className="text-emerald-500 mt-0.5 shrink-0" />
+                        <span>{st}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Riesgos & Recomendaciones */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-rose-600 flex items-center gap-1">
+                    <AlertTriangle size={13} /> Alertas & Riesgos de Liquidez
+                  </h4>
+                  <ul className="space-y-1.5">
+                    {aiResult.risks.map((rk, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-slate-600 font-medium border-l-2 border-orange-200 pl-2">
+                        <span>{rk}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="space-y-2.5 bg-blue-50/40 p-4 border border-blue-100 rounded-xl">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-blue-700">Recomendaciones de Acción</h4>
+                  <ul className="space-y-2">
+                    {aiResult.recommendations.map((rc, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-slate-700 font-medium">
+                        <span className="flex items-center justify-center w-4 h-4 rounded-full bg-blue-100 text-[10px] font-black text-blue-700 shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span>{rc}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card overflow-hidden">
