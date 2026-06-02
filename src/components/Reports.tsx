@@ -42,7 +42,7 @@ interface ReportsProps {
   exchangeRate?: number;
 }
 
-type ReportType = 'cxc_detail' | 'abonos' | 'bank_reconciliation' | 'egresos_vales';
+type ReportType = 'cxc_detail' | 'abonos' | 'bank_reconciliation' | 'egresos_vales' | 'predictive_analysis';
 
 const checkIsBsMethod = (paymentMethod?: string, currency?: string, amountBs?: number): boolean => {
   const normalize = (str?: string) => {
@@ -521,6 +521,185 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
     return data;
   }, [allPayments]);
 
+  const predictiveAnalysisData = useMemo(() => {
+    // 1. Cartera de deudas activa
+    const totalCXCPending = cxcAccounts.reduce((sum, acc) => sum + (acc.totalBalance || 0), 0);
+
+    // 2. Cargos de deudas en periodo
+    const periodDebts = allPayments.filter(p => p.type === 'charge' && (!startDate || p.date >= startDate) && (!endDate || p.date <= endDate));
+    const totalPeriodGrossDebts = periodDebts.reduce((sum, p) => sum + (p.grossAmountUsd || p.amountUsd), 0);
+    const totalPeriodNetDebts = periodDebts.reduce((sum, p) => sum + p.amountUsd, 0);
+    const totalPeriodSellerCommissions = periodDebts.reduce((sum, p) => sum + (p.commissionAmountUsd || 0), 0);
+
+    // 3. Abonos de deudas en periodo
+    const periodAbonos = allPayments.filter(p => p.type !== 'charge' && (!startDate || p.date >= startDate) && (!endDate || p.date <= endDate));
+    const totalPeriodAbonosUsdVal = periodAbonos.reduce((sum, p) => sum + p.amountUsd, 0);
+
+    // Classification of abonos
+    let usdCashAmount = 0;
+    let usdZelleAmount = 0;
+    let bsAmountUsdVal = 0;
+    let bsAmountBsActual = 0;
+    let warrantyAmountUsd = 0;
+    let donationAmountUsd = 0;
+
+    periodAbonos.forEach(p => {
+      const dest = (p.destinationBank || '').toUpperCase();
+      const pMethod = (p.paymentMethod || '').toUpperCase();
+      const concept = (p.concept || '').toUpperCase();
+      
+      const isWarranty = dest.includes('GARANT') || pMethod.includes('GARANT') || concept.includes('GARANT');
+      const isDonation = dest.includes('DONAC') || pMethod.includes('DONAC') || concept.includes('DONAC') ||
+                         dest.includes('EXENC') || pMethod.includes('EXENC') || concept.includes('EXENC') ||
+                         dest.includes('EXCENC') || pMethod.includes('EXCENC') || concept.includes('EXCENC') ||
+                         dest.includes('EXENT') || pMethod.includes('EXENT') || concept.includes('EXENT') ||
+                         dest.includes('EXCENT') || pMethod.includes('EXCENT') || concept.includes('EXCENT') ||
+                         dest.includes('CORTES') || pMethod.includes('CORTES') || concept.includes('CORTES') ||
+                         dest.includes('DESCUENT') || pMethod.includes('DESCUENT') || concept.includes('DESCUENT') ||
+                         dest.includes('ANULA') || pMethod.includes('ANULA') || concept.includes('ANULA') ||
+                         dest.includes('BONIF') || pMethod.includes('BONIF') || concept.includes('BONIF');
+
+      if (isWarranty) {
+        warrantyAmountUsd += p.amountUsd;
+      } else if (isDonation) {
+        donationAmountUsd += p.amountUsd;
+      } else {
+        const isBs = checkIsBsMethod(p.paymentMethod, undefined, p.amountBs);
+        if (isBs) {
+          bsAmountUsdVal += p.amountUsd;
+          bsAmountBsActual += p.amountBs || (p.amountUsd * (p.exchangeRate || exchangeRate));
+        } else {
+          const isCash = pMethod.includes('EFECTIVO') || pMethod.includes('CASH') || dest.includes('EFECTIVO') || dest.includes('CAJA CHICA') || (!pMethod.includes('ZELLE') && !pMethod.includes('BINANCE') && !pMethod.includes('TRANSFERENCIA'));
+          if (isCash) {
+            usdCashAmount += p.amountUsd;
+          } else {
+            usdZelleAmount += p.amountUsd;
+          }
+        }
+      }
+    });
+
+    // 4. Egresos del periodo
+    const totalOutflowUsdVal = egresosValesSummary.totalUsd;
+    const totalOutflowBs = egresosValesSummary.totalBs;
+
+    // 5. Rates and Indices
+    const recoveryRate = totalPeriodNetDebts > 0 ? (totalPeriodAbonosUsdVal / totalPeriodNetDebts) * 100 : 100;
+    const dollarizationIndex = totalPeriodAbonosUsdVal > 0 ? ((usdCashAmount + usdZelleAmount) / (totalPeriodAbonosUsdVal - warrantyAmountUsd - donationAmountUsd || 1)) * 100 : 100;
+    const cashCollectionRatio = totalPeriodAbonosUsdVal > 0 ? (usdCashAmount / (totalPeriodAbonosUsdVal || 1)) * 100 : 0;
+
+    // 6. Problems Detected list
+    const problems: Array<{
+      id: string;
+      title: string;
+      severity: 'CRÍTICO' | 'ALTO' | 'MODERADO' | 'BAJO';
+      color: string;
+      description: string;
+      solution: string;
+    }> = [];
+
+    // Problem 1: slow velocity / low recovery
+    if (totalPeriodNetDebts > 300 && recoveryRate < 70) {
+      problems.push({
+        id: 'slow_collection',
+        title: 'Descalce en la Tasa de Cobranza',
+        severity: recoveryRate < 45 ? 'CRÍTICO' : 'ALTO',
+        color: recoveryRate < 45 ? 'rose' : 'amber',
+        description: `El ritmo de recaudación crédito es del ${recoveryRate.toFixed(1)}% de la facturación en este periodo. Estás acumulando deuda pendiente a una velocidad mayor de lo que recuperas liquidez.`,
+        solution: 'Implementar inmediato plan de recargo del 5% en facturas vencidas más de 12 días e incentivar pronto pago con 2% de deducción para retornos en menos de 5 días hábiles.'
+      });
+    }
+
+    // Problem 2: High Bolívares exposure
+    const bsRatio = totalPeriodAbonosUsdVal > 0 ? (bsAmountUsdVal / totalPeriodAbonosUsdVal) * 100 : 0;
+    if (bsRatio > 35) {
+      problems.push({
+        id: 'bs_devaluation',
+        title: 'Exposición Elevada en Bolívares',
+        severity: bsRatio > 55 ? 'CRÍTICO' : 'MODERADO',
+        color: bsRatio > 55 ? 'rose' : 'amber',
+        description: `El ${bsRatio.toFixed(1)}% de todos tus abonos ingresan en bolívares. Mantener saldos en bolívares o demorar en la reposición genera pérdidas invisibles pero severas de capital debido a la devaluación acumulativa.`,
+        solution: 'Ejecutar regla de vaciado diario total en bolívares mediante transferencias inmediatas de pago a proveedores de transporte/fletes o adquisición instantánea de dólares en el mercado financiero.'
+      });
+    }
+
+    // Problem 3: commission drainage
+    const commissionRatio = totalPeriodNetDebts > 0 ? (totalPeriodSellerCommissions / totalPeriodNetDebts) * 100 : 0;
+    if (commissionRatio > 12) {
+      problems.push({
+        id: 'commission_drainage',
+        title: 'Drenaje de Margen por Comisiones',
+        severity: 'ALTO',
+        color: 'amber',
+        description: `Las comisiones devengadas por la fuerza de venta representan el ${commissionRatio.toFixed(1)}% del facturado neto a crédito en el periodo analizado.`,
+        solution: 'Rediseñar la estructura comercial: Pagar la comisión del vendedor únicamente cuando el cliente efectúa el abono y no al momento de cargar la factura, indexando penalizaciones por retraso del cliente.'
+      });
+    }
+
+    // Problem 4: Cash Flow Deficit in Divisas
+    if (totalOutflowUsdVal > (usdCashAmount + usdZelleAmount) && (usdCashAmount + usdZelleAmount) > 50) {
+      problems.push({
+        id: 'cash_depletion',
+        title: 'Drenaje de Reservas de Bóveda en Divisas',
+        severity: 'ALTO',
+        color: 'amber',
+        description: `Las salidas monetarias en dólares ($${totalOutflowUsdVal.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD) superan ampliamente las captaciones directas en divisas ($${(usdCashAmount + usdZelleAmount).toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD).`,
+        solution: 'Alinear los egresos e indexarlos para que se liquiden desde cuentas bancarias en bolívares remanentes y preservar las divisas físicas puramente para compras mayoristas de mercancías críticas.'
+      });
+    }
+
+    // Default problems if none detected
+    if (problems.length === 0) {
+      problems.push({
+        id: 'no_problems',
+        title: 'Estabilidad de Cartera en Divisas',
+        severity: 'BAJO',
+        color: 'emerald',
+        description: 'La gestión de cartera crediticia no muestra descalces graves. Los cobros de abonos en divisas fuertes ($) dominan con una excelente conversión en caja.',
+        solution: 'Seguir operando bajo las normativas actuales de crédito selectivo limitando el plazo total a un máximo estricto de 15 días.'
+      });
+    }
+
+    // 7. Predictive Math
+    // Días de retorno estimados
+    const daysInPeriod = Math.max(1, Math.round((new Date(endDate || new Date()).getTime() - new Date(startDate || new Date(Date.now() - 30 * 86400000)).getTime()) / 86400000)) || 30;
+    const dailyRepaymentVelocity = totalPeriodAbonosUsdVal / daysInPeriod;
+    const estimatedDaysToClear = dailyRepaymentVelocity > 0 ? Math.round(totalCXCPending / dailyRepaymentVelocity) : 45;
+
+    // Projected Change and 30-day index
+    const projectedCXCChange30d = (totalPeriodNetDebts - totalPeriodAbonosUsdVal) * (30 / daysInPeriod);
+    const projectedCXCSaldo30d = Math.max(0, totalCXCPending + projectedCXCChange30d);
+
+    // Projected loss due to Bolívar devaluation if not converted
+    const projectedDevaluationLossUsd = (bsAmountUsdVal * 0.05) * (30 / daysInPeriod);
+
+    return {
+      totalCXCPending,
+      totalPeriodGrossDebts,
+      totalPeriodNetDebts,
+      totalPeriodSellerCommissions,
+      totalPeriodAbonosUsdVal,
+      usdCashAmount,
+      usdZelleAmount,
+      bsAmountUsdVal,
+      bsAmountBsActual,
+      warrantyAmountUsd,
+      donationAmountUsd,
+      totalOutflowUsdVal,
+      totalOutflowBs,
+      recoveryRate,
+      dollarizationIndex,
+      cashCollectionRatio,
+      problems,
+      estimatedDaysToClear,
+      projectedCXCChange30d,
+      projectedCXCSaldo30d,
+      projectedDevaluationLossUsd,
+      daysInPeriod,
+      bsRatio
+    };
+  }, [cxcAccounts, allPayments, startDate, endDate, egresosValesSummary, exchangeRate]);
+
 
   // ==========================================
   // PDF GENERATION WITH jspdf and autopdf
@@ -529,6 +708,156 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
     const doc = new jsPDF('p', 'mm', 'a4');
     const todayStr = format(new Date(), 'dd/MM/yyyy HH:mm');
     
+    if (activeReport === 'predictive_analysis') {
+      doc.text('INVEPINCA CA', 14, 18);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text('Informe Directivo: Analisis Financiero y Predictivo', 14, 25);
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Fecha Emision: ${todayStr} | Tasa de Cambio Base BCV: ${formatBs(exchangeRate)}`, 14, 30);
+      
+      let filterText = 'Filtros de Periodo: ';
+      if (startDate) filterText += `Desde: ${startDate} `;
+      if (endDate) filterText += `Hasta: ${endDate} `;
+      if (!startDate && !endDate) filterText += 'Historico Completo';
+      doc.text(filterText, 14, 34);
+      
+      // 1. KPI Cards
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text('1. INDICADORES CLAVE DE RENDIMIENTO (KPIs)', 14, 42);
+
+      const kpis = [
+        ['Metrica Bimonetaria', 'Valor Calculado', 'Significado y Salud Financiera'],
+        ['Saldo Neto Pendiente Cartera', formatCurrency(predictiveAnalysisData.totalCXCPending), 'Monto total en la calle a ser cobrado'],
+        ['Tasa de Retorno/Cobranza', `${predictiveAnalysisData.recoveryRate.toFixed(1)}%`, predictiveAnalysisData.recoveryRate >= 75 ? 'Excelente velocidad de cobro' : 'Alerta: retrasos en abonos'],
+        ['Indice Dolarizacion Recaudacion', `${predictiveAnalysisData.dollarizationIndex.toFixed(1)}%`, 'Porcentaje del ingreso total cobrado en USD ($)'],
+        ['Tiempo de Retorno de Flujo', `${predictiveAnalysisData.estimatedDaysToClear === 999 ? 'Ninguno' : `${predictiveAnalysisData.estimatedDaysToClear} dias`}`, 'Dias promedio para liquidar el saldo total actual']
+      ];
+
+      autoTable(doc, {
+        startY: 45,
+        head: [kpis[0]],
+        body: kpis.slice(1),
+        theme: 'grid',
+        headStyles: { fillColor: [15, 23, 42] },
+        styles: { fontSize: 8.5 }
+      });
+
+      // 2. Breakdown of collection table
+      const currentY1 = (doc as any).lastAutoTable.finalY + 8;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text('2. DESGLOSE BIMONETARIO DE COBROS Y PAGOS REALIZADOS', 14, currentY1);
+
+      const totalAbonosVal = predictiveAnalysisData.totalPeriodAbonosUsdVal || 1;
+      const breakdownRows = [
+        ['Instrumento de Pago', 'Monto Equivalente ($)', 'Proporcion (%)', 'Descripcion'],
+        ['Dolares Efectivo (Cash $)', formatCurrency(predictiveAnalysisData.usdCashAmount), `${(predictiveAnalysisData.usdCashAmount / totalAbonosVal * 100).toFixed(1)}%`, 'Flujo en dolares fisicos billete'],
+        ['Dolares Transferencia / Zelle', formatCurrency(predictiveAnalysisData.usdZelleAmount), `${(predictiveAnalysisData.usdZelleAmount / totalAbonosVal * 100).toFixed(1)}%`, 'Divisas electronicas de compensacion'],
+        ['Bolivares (Pago Movil / Transf.)', formatCurrency(predictiveAnalysisData.bsAmountUsdVal), `${(predictiveAnalysisData.bsAmountUsdVal / totalAbonosVal * 100).toFixed(1)}%`, `Equivalente a ${formatBs(predictiveAnalysisData.bsAmountBsActual)}`],
+        ['Garantias Aplicadas', formatCurrency(predictiveAnalysisData.warrantyAmountUsd), `${(predictiveAnalysisData.warrantyAmountUsd / totalAbonosVal * 100).toFixed(1)}%`, 'Compensacion de retornos de envases'],
+        ['Donaciones o Exenciones', formatCurrency(predictiveAnalysisData.donationAmountUsd), `${(predictiveAnalysisData.donationAmountUsd / totalAbonosVal * 100).toFixed(1)}%`, 'Bonificaciones excepcionales hechas']
+      ];
+
+      autoTable(doc, {
+        startY: currentY1 + 3,
+        head: [breakdownRows[0]],
+        body: breakdownRows.slice(1),
+        theme: 'grid',
+        headStyles: { fillColor: [51, 65, 85] },
+        styles: { fontSize: 8.5 }
+      });
+
+      // 3. Proyecciones Predictivas
+      const currentY2 = (doc as any).lastAutoTable.finalY + 8;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text('3. PRONOSTICOS Y PROYECCIONES PREDICTIVAS A 30 DIAS', 14, currentY2);
+
+      const trendStr = predictiveAnalysisData.projectedCXCChange30d > 0
+        ? `En Alza (aumentara $${predictiveAnalysisData.projectedCXCChange30d.toLocaleString()} USD)`
+        : `En Descenso (disminuira $${Math.abs(predictiveAnalysisData.projectedCXCChange30d).toLocaleString()} USD)`;
+
+      const predictionsRows = [
+        ['Indicador Predictivo', 'Valor Pronosticado', 'Impacto Operativo'],
+        ['Tendencia del Saldo Cartera (30d)', formatCurrency(predictiveAnalysisData.projectedCXCSaldo30d), `Deberia situarse en ${trendStr}`],
+        ['Riesgo Cambiario en Bs (Anualizado/30d)', `-$${predictiveAnalysisData.projectedDevaluationLossUsd.toFixed(2)} USD`, 'Perdida por depreciacion si los Bolivares se retienen'],
+        ['Dias de Retorno Efectivo de Fondos', `${predictiveAnalysisData.estimatedDaysToClear === 999 ? 'Incalculable' : `${predictiveAnalysisData.estimatedDaysToClear} dias`}`, 'Plazo promedio que toma cada dolar en volver a caja']
+      ];
+
+      autoTable(doc, {
+        startY: currentY2 + 3,
+        head: [predictionsRows[0]],
+        body: predictionsRows.slice(1),
+        theme: 'grid',
+        headStyles: { fillColor: [15, 118, 110] },
+        styles: { fontSize: 8.5 }
+      });
+
+      // 4. Diagnostico de Problemas Detectados y Soluciones
+      const currentY3 = (doc as any).lastAutoTable.finalY + 8;
+      
+      // Check if we need a page break to fit the problems
+      let startingY4 = currentY3;
+      if (startingY4 > 220) {
+        doc.addPage();
+        startingY4 = 20;
+      }
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text('4. DIAGNOCITO DE PROBLEMAS Y COMPROMISOS TACTICOS RECOMENDADOS', 14, startingY4);
+
+      const problemRows: any[] = [];
+      predictiveAnalysisData.problems.forEach((p, idx) => {
+        problemRows.push([
+          `[${p.severity}] ${p.title}`,
+          p.description,
+          p.solution
+        ]);
+      });
+
+      autoTable(doc, {
+        startY: startingY4 + 3,
+        head: [['Gravedad & Problema Detectado', 'Detalles Analizados', 'Solucion Propuesta Recomendada']],
+        body: problemRows,
+        theme: 'grid',
+        headStyles: { fillColor: [190, 24, 74] },
+        styles: { fontSize: 8.5, cellPadding: 3 },
+        columnStyles: {
+          0: { cellWidth: 50 },
+          1: { cellWidth: 70 },
+          2: { cellWidth: 70 }
+        }
+      });
+
+      // Footer signature
+      const finalY = (doc as any).lastAutoTable.finalY + 12;
+      let signatureY = finalY;
+      if (signatureY > 265) {
+        doc.addPage();
+        signatureY = 30;
+      }
+      
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(100, 116, 139);
+      doc.text('Este es un informe financiero predictivo bimonetario automatizado para INVEPINCA CA.', 14, signatureY);
+      doc.text('Generado mediante el Motor Experto AI-Predictive en Dolares y Bolivares de manera segura.', 14, signatureY + 4);
+
+      const pdfName = `Informe_Predictivo_INVEPINCA_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      doc.save(pdfName);
+      return;
+    }
+
     // Cover Design / Headings
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
@@ -750,6 +1079,16 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
           }`}
         >
           <TrendingDown size={14} /> Egresos, Vales y Retiros
+        </button>
+        <button
+          onClick={() => setActiveReport('predictive_analysis')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase transition-colors flex items-center gap-2 ${
+            activeReport === 'predictive_analysis' 
+              ? 'bg-amber-600 text-white shadow-sm font-bold border border-amber-600' 
+              : 'bg-amber-50 text-amber-850 hover:bg-amber-100 border border-amber-200'
+          }`}
+        >
+          <TrendingUp size={14} /> Análisis Financiero y Predictivo
         </button>
       </div>
 
@@ -1257,6 +1596,223 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
                 </div>
               </div>
             )}
+          </div>
+        )}
+        
+        {/* Report 5: Análisis Financiero y Predictivo */}
+        {activeReport === 'predictive_analysis' && (
+          <div className="p-6 space-y-6 bg-slate-50/50">
+            {/* Top overview info banner with premium feel */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl shadow-md border border-slate-700/30">
+              <div className="space-y-1">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 uppercase tracking-widest leading-none">Motor Analítico Activo</span>
+                <h4 className="text-lg font-black tracking-tight mt-1 flex items-center gap-2">
+                  <TrendingUp className="text-amber-500" size={18} />
+                  Análisis Predictivo Integral de Gestión
+                </h4>
+                <p className="text-xs text-slate-300 font-medium max-w-xl leading-relaxed">
+                  Evaluación estadística detallada de la velocidad de recuperación de saldos cargados, distribución monetaria de cobros en caja, problemas operacionales críticos y devaluación estimada.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 bg-white/10 px-4 py-3 rounded-xl border border-white/10">
+                <div className="text-xs font-semibold text-slate-200">
+                  <div>Retorno Estimado de Fondos</div>
+                  <div className="text-base font-black text-white">{predictiveAnalysisData.estimatedDaysToClear === 999 ? 'Indefinido' : `~ ${predictiveAnalysisData.estimatedDaysToClear} días`}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* KPIs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 bg-white rounded-2xl border border-slate-150 shadow-sm flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Cartera CXC Pendiente</span>
+                  <p className="text-2xl font-black text-slate-900 mt-1">{formatCurrency(predictiveAnalysisData.totalCXCPending)}</p>
+                </div>
+                <span className="text-[10px] font-semibold text-slate-500 mt-2 block">Saldo bruto activo cobrable en la calle</span>
+              </div>
+
+              <div className="p-4 bg-white rounded-2xl border border-slate-150 shadow-sm flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Tasa de Cobranza (Periodo)</span>
+                  <div className="flex items-baseline gap-1.5 mt-1">
+                    <p className="text-2xl font-black text-slate-900">{predictiveAnalysisData.recoveryRate.toFixed(1)}%</p>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      predictiveAnalysisData.recoveryRate >= 75 ? 'bg-emerald-100 text-emerald-800' :
+                      predictiveAnalysisData.recoveryRate >= 50 ? 'bg-amber-100 text-amber-805' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {predictiveAnalysisData.recoveryRate >= 75 ? 'Excelente' :
+                       predictiveAnalysisData.recoveryRate >= 50 ? 'Aceptable' : 'Peligro'}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-semibold text-slate-500 mt-2 block">Porcentaje de abonos recibidos vs deudas cargadas</span>
+              </div>
+
+              <div className="p-4 bg-white rounded-2xl border border-slate-150 shadow-sm flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Índice Dolarización Reclamos</span>
+                  <p className="text-2xl font-black text-emerald-600 mt-1">{predictiveAnalysisData.dollarizationIndex.toFixed(1)}%</p>
+                </div>
+                <span className="text-[10px] font-semibold text-slate-500 mt-2 block">Indica la proporción de cobro efectivo en moneda fuerte ($)</span>
+              </div>
+
+              <div className="p-4 bg-white rounded-2xl border border-slate-150 shadow-sm flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Egresos Totales (Periodo)</span>
+                  <p className="text-2xl font-black text-rose-600 mt-1">{formatCurrency(predictiveAnalysisData.totalOutflowUsdVal)}</p>
+                </div>
+                <span className="text-[10px] font-semibold text-rose-600 mt-2 block">
+                  Provisto en Bsf: {formatBs(predictiveAnalysisData.totalOutflowBs)}
+                </span>
+              </div>
+            </div>
+
+            {/* Breakdown of Payments (Gestión de Pagos Realizados) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Box 1: Payments Breakdown Instrument and Proportions */}
+              <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-sm space-y-4">
+                <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                  <DollarSign size={14} className="text-amber-500" /> Desglose de Instrumentos de Pago Recibidos
+                </h5>
+                <div className="space-y-4">
+                  {/* USD Cash */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-slate-700">Dólares Efectivo (Cash $)</span>
+                      <span className="font-extrabold text-slate-900">{formatCurrency(predictiveAnalysisData.usdCashAmount)} ({(predictiveAnalysisData.usdCashAmount / (predictiveAnalysisData.totalPeriodAbonosUsdVal || 1) * 100).toFixed(1)}%)</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(predictiveAnalysisData.usdCashAmount / (predictiveAnalysisData.totalPeriodAbonosUsdVal || 1) * 100)}%` }} />
+                    </div>
+                  </div>
+
+                  {/* USD Zelle/Virtual */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-slate-700">Dólares Electrónico (Zelle/Transferencia)</span>
+                      <span className="font-extrabold text-slate-900">{formatCurrency(predictiveAnalysisData.usdZelleAmount)} ({(predictiveAnalysisData.usdZelleAmount / (predictiveAnalysisData.totalPeriodAbonosUsdVal || 1) * 100).toFixed(1)}%)</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${(predictiveAnalysisData.usdZelleAmount / (predictiveAnalysisData.totalPeriodAbonosUsdVal || 1) * 100)}%` }} />
+                    </div>
+                  </div>
+
+                  {/* Bolívares */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-slate-700">Bolívares (Pago Móvil / Transferencias BS)</span>
+                      <span className="font-extrabold text-slate-900">{formatCurrency(predictiveAnalysisData.bsAmountUsdVal)} ({(predictiveAnalysisData.bsAmountUsdVal / (predictiveAnalysisData.totalPeriodAbonosUsdVal || 1) * 100).toFixed(1)}%)</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-sky-400 rounded-full" style={{ width: `${(predictiveAnalysisData.bsAmountUsdVal / (predictiveAnalysisData.totalPeriodAbonosUsdVal || 1) * 100)}%` }} />
+                    </div>
+                    <span className="text-[10px] font-semibold block text-right font-mono text-sky-600">Total recibido en moneda nacional: {formatBs(predictiveAnalysisData.bsAmountBsActual)}</span>
+                  </div>
+
+                  {/* Warranties & Exemptions */}
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                    <div className="p-2.5 bg-purple-50 border border-purple-100 rounded-xl text-center">
+                      <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest block">Garantías Aplicadas</span>
+                      <span className="text-sm font-black text-purple-700">{formatCurrency(predictiveAnalysisData.warrantyAmountUsd)}</span>
+                    </div>
+                    <div className="p-2.5 bg-pink-50 border border-pink-100 rounded-xl text-center">
+                      <span className="text-[10px] font-black text-pink-500 uppercase tracking-widest block">Exenciones / Descuentos</span>
+                      <span className="text-sm font-black text-pink-700">{formatCurrency(predictiveAnalysisData.donationAmountUsd)}</span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Box 2: 30-day Predictive Models Forecast */}
+              <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-sm space-y-4">
+                <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                  <TrendingUp size={14} className="text-indigo-500" /> Pronósticos y Modelos Predictivos (Próximos 30 días)
+                </h5>
+                <div className="grid grid-cols-1 gap-3">
+                  
+                  <div className="p-3.5 bg-slate-50 border border-slate-150 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Tendencia Saldo de Cartera (30 d)</span>
+                      <span className="text-base font-black text-slate-900 mt-0.5 block">{formatCurrency(predictiveAnalysisData.projectedCXCSaldo30d)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-xs font-bold ${predictiveAnalysisData.projectedCXCChange30d > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {predictiveAnalysisData.projectedCXCChange30d > 0 ? '▲ En Aumento' : '▼ En Descenso'}
+                      </span>
+                      <span className="text-[11px] text-slate-400 block mt-0.5">({predictiveAnalysisData.projectedCXCChange30d > 0 ? 'Acredita más de lo cobrado' : 'Cobros dominan cartera'})</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-amber-50/40 border border-amber-100 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Previsión Depreciación Bolívares</span>
+                      <span className="text-sm font-black text-red-650 mt-0.5 block">-$ {predictiveAnalysisData.projectedDevaluationLossUsd.toFixed(2)} USD</span>
+                    </div>
+                    <div className="text-right max-w-[150px]">
+                      <span className="text-[10px] font-semibold text-amber-950 leading-relaxed block text-right">Pérdida inflacionaria estimada por mantener tenencias en Bs o retrasar conversiones cambiarias.</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-emerald-50/40 border border-emerald-100 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Retorno Pleno del Fondo Monetario</span>
+                      <span className="text-sm font-black text-emerald-700 mt-0.5 block font-mono">{predictiveAnalysisData.estimatedDaysToClear === 999 ? 'No estimable' : `${predictiveAnalysisData.estimatedDaysToClear} días`}</span>
+                    </div>
+                    <div className="text-right max-w-[160px]">
+                      <span className="text-[10px] font-medium text-emerald-900 leading-relaxed block text-right">Tiempo necesario para cobrar el 100% al flujo promedio diario actual.</span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Detailed Diagnósticos / Problems and recommended actions */}
+            <div className="space-y-4">
+              <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 pl-1">
+                <Activity size={14} className="text-rose-600" /> Diagnóstico de Problemas Detectados y Soluciones
+              </h5>
+
+              <div className="grid grid-cols-1 gap-4">
+                {predictiveAnalysisData.problems.map((p, index) => (
+                  <div key={index} className="p-5 bg-white border border-slate-150 rounded-2xl shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-wider leading-none uppercase ${
+                          p.severity === 'CRÍTICO' ? 'bg-red-100 text-red-700 border border-red-200' :
+                          p.severity === 'ALTO' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                          p.severity === 'MODERADO' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                          'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                        }`}>
+                          {p.severity}
+                        </span>
+                        <h6 className="text-sm font-black text-slate-900">{p.title}</h6>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Compromiso Financiero #{index + 1}</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Problema Identificado</span>
+                        <p className="text-slate-600 font-semibold leading-relaxed select-text">{p.description}</p>
+                      </div>
+
+                      <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-150">
+                        <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-widest block">Solución Táctica Recomendada</span>
+                        <p className="text-slate-700 font-bold leading-relaxed">{p.solution}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Note on model reliability */}
+            <p className="text-[10px] text-center text-slate-400 italic">
+              Este informe financiero dinámico simula la contabilidad analítica de mercado bimonetario (USD / BS) con proyecciones dinámicas basadas en los registros reales del módulo de cuentas por cobrar de INVEPINCA.
+            </p>
           </div>
         )}
 
