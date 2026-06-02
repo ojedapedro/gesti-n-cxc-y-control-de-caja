@@ -50,6 +50,119 @@ const isBsTransaction = (t: Transaction): boolean => {
   return isBsMethod || (!isUsdMethod && !!t.amountBs && t.amountBs > 0);
 };
 
+// Función de contingencia analítica local experta en bimonetarismo venezolano (Client-side Fallback)
+function generateLocalFallbackAnalysis(timeframe: string, summary: any, exchangeRate: number | null) {
+  const rate = exchangeRate || 1;
+  const totalInflow = summary.totalInflow || 0;
+  const totalOutflow = summary.totalOutflow || 0;
+  const totalNet = summary.totalNet || 0;
+  
+  const inflowBsInUsd = (summary.totalInflowBsCash || 0) / rate;
+  const inflowUsd = summary.totalInflowUsdCash || 0;
+  const totalInflowCalculated = inflowBsInUsd + inflowUsd;
+  
+  const bsRatio = totalInflowCalculated > 0 ? (inflowBsInUsd / totalInflowCalculated) * 100 : 0;
+  
+  let status = "Saludable";
+  let statusColor = "teal";
+  let overview = "";
+  const strengths: string[] = [];
+  const risks: string[] = [];
+  const recommendations: string[] = [];
+  let trend = "";
+
+  if (totalInflow === 0 && totalOutflow === 0) {
+    status = "Estable";
+    statusColor = "blue";
+    overview = `No se registran transacciones filtradas para el periodo de ${timeframe}. Tu tesorería bimonetaria se encuentra estática, sin ingresos u egresos de caja registrados.`;
+    strengths.push("Preservación intacta de la liquidez al no incurrir en fugas de efectivo ni salidas operacionales.");
+    risks.push("Inactividad transaccional: No se ha ingresado flujo en divisas ni moneda de curso nacional.");
+    recommendations.push("Asegurar el registro continuo y oportuno de todas las ventas del día para alimentar el flujo de caja.");
+    trend = "Neutral por inactividad operativa temporal.";
+  } else {
+    // Determinar el estado y descripción global
+    if (totalNet < 0) {
+      status = "Atención Requerida";
+      statusColor = "orange";
+      if (Math.abs(totalNet) > totalInflow * 0.2) {
+        status = "Crítico";
+        statusColor = "red";
+      }
+    } else if (totalNet > totalInflow * 0.3) {
+      status = "Excelente";
+      statusColor = "emerald";
+    } else {
+      status = "Estable";
+      statusColor = "blue";
+    }
+
+    // Resumen ejecutivo
+    overview = `Análisis financiero bimonetario consolidado para el período de ${timeframe}. Tu negocio reporta ingresos de $${totalInflow.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD frente a egresos totales de $${totalOutflow.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD, consolidando un flujo neto de $${totalNet.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD. Del total captado, el ${(100 - bsRatio).toFixed(1)}% ingresa como flujo orgánico en divisas en efectivo, mientras que el ${bsRatio.toFixed(1)}% se percibe en Bolívares. (Nota: Análisis local optimizado por desconexión o tráfico en los servidores de IA).`;
+
+    // Fortalezas
+    if (inflowUsd > 0) {
+      strengths.push(`Sólido flujo orgánico de divisas en efectivo ($${inflowUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD), otorgando liquidez de confianza y alto poder de reposición.`);
+    }
+    if (totalNet > 0) {
+      strengths.push(`Excelente retención y superávit neto acumulado de $${totalNet.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD, logrando un flujo positivo equivalente al ${(totalNet/totalInflow * 100).toFixed(1)}% de las ventas.`);
+    } else {
+      strengths.push("Alineación rápida de ventas tácticas y despachos de alta rotación para amortiguar la caída del margen operativo.");
+    }
+    if (bsRatio < 40) {
+      strengths.push(`Baja exposición en bolívares virtuales (${bsRatio.toFixed(1)}%), disminuyendo drásticamente el impacto de la devaluación cambiaria.`);
+    } else {
+      strengths.push("Alta velocidad de captación en pasarelas de cobro local en bolívares, dominando el volumen de transacciones locales.");
+    }
+
+    // Riesgos
+    if (totalNet < 0) {
+      risks.push(`Pérdida en el flujo neto de $${Math.abs(totalNet).toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD. El ritmo de egresos fijos y variables está sobrepasando la recaudación de caja.`);
+    }
+    if (bsRatio > 40) {
+      risks.push(`Riesgo Cambiario Elevado: El ${bsRatio.toFixed(1)}% de tus ingresos se perciben en bolívares. Un estancamiento en la rotación de estos fondos representaría pérdidas por devaluación.`);
+    }
+    if (summary.totalOutflowUsdCash > summary.totalInflowUsdCash) {
+      risks.push(`Déficit de Divisas Físicas: Las salidas de dólares ($${summary.totalOutflowUsdCash.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD) exceden los ingresos directos ($${summary.totalInflowUsdCash.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD), erosionando las reservas operativas.`);
+    }
+    if (risks.length === 0) {
+      risks.push("Variaciones imprevistas en los costos de reposición de inventario indexado al dólar.");
+      risks.push("Costos ocultos y comisiones elevadas en operaciones de cambio de divisas de última hora.");
+    }
+
+    // Recomendaciones
+    if (bsRatio > 25) {
+      recommendations.push("Aplicar una regla estricta de 'Vaciado Diario' de Bolívares: convertir saldos e intermediar pagos a proveedores en bolívares a primera hora del día.");
+    }
+    recommendations.push("Negociar con proveedores estratégicos un esquema de pagos calendarizados o descuentos por pronto pago en divisas para retener flujo.");
+    if (totalNet < 0) {
+      recommendations.push("Congelar gastos discrecionales inmediatos, suspender retiros superfluos y reestructurar deudas de inventarios de baja rotación.");
+    }
+    recommendations.push("Mantener un monitoreo continuo de precios en punto de venta con indexación automática a la tasa de cambio de referencia de Banco Central de Venezuela.");
+    if (summary.totalInflowUsdCash > summary.totalOutflowUsdCash && totalNet > 0) {
+      recommendations.push(`Asignar el excedente de divisas ($${(summary.totalInflowUsdCash - summary.totalOutflowUsdCash).toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD) a compras directas de mercancía mayorista de alta demanda.`);
+    }
+
+    // Tendencia
+    if (totalNet > 0 && bsRatio < 40) {
+      trend = "Alcista y Consolidada: Se proyecta estabilidad con incremento continuo en el fondo líquido de divisas con bajo nivel de devaluación en tus reservas.";
+    } else if (totalNet < 0) {
+      trend = "A la baja con Alerta Operativa: Existe presión sobre el capital de trabajo de la firma. Se requiere corrección en la estructura corporativa de egresos.";
+    } else {
+      trend = "Neutral con Sesgo Vigilante: Flujo stable pero muy influenciado por la agilidad y velocidad de rotación de tus posiciones en moneda local.";
+    }
+  }
+
+  return {
+    status,
+    statusColor,
+    overview,
+    strengths,
+    risks,
+    recommendations,
+    trend
+  };
+}
+
 export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -179,8 +292,14 @@ export default function CashFlow({ exchangeRate }: { exchangeRate?: number }) {
 
       setAiResult(resultData);
     } catch (err: any) {
-      console.error(err);
-      setAiError(err.message || 'Error al conectar con la Inteligencia Artificial.');
+      console.warn("La llamada a la API remota falló (común si se hospeda en un servidor estático sin Node/Express, o ante alta demanda). Activando motor de contingencia financiera local...", err);
+      try {
+        const fallbackResult = generateLocalFallbackAnalysis(timeframeLabel, summary, exchangeRate || 1);
+        setAiResult(fallbackResult);
+      } catch (localErr: any) {
+        console.error("Error crítico en el motor local:", localErr);
+        setAiError(err.message || 'Error al conectar con la Inteligencia Artificial.');
+      }
     } finally {
       setAiLoading(false);
     }
