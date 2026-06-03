@@ -7,6 +7,7 @@ import {
   Transaction,
   Expense,
   Receipt,
+  CXCPayment,
 } from "../types";
 import { formatCurrency } from "../lib/utils";
 import { format, isValid } from "date-fns";
@@ -75,12 +76,16 @@ export default function IncomesCierre({
   const [actualBs, setActualBs] = useState("0");
   const [observations, setObservations] = useState("");
 
+  const [allPayments, setAllPayments] = useState<CXCPayment[]>([]);
+
   useEffect(() => {
     const unsub1 = dbService.subscribeToCashClosures(setClosures);
     const unsub2 = dbService.subscribeToTransactions(setTransactions);
+    const unsub3 = dbService.subscribeToAllPayments(setAllPayments);
     return () => {
       unsub1();
       unsub2();
+      unsub3();
     };
   }, []);
 
@@ -101,34 +106,14 @@ export default function IncomesCierre({
   const withdrawalsUsd = 0;
   const withdrawalsBs = 0;
 
-  let incomesUsd = 0; // Efectivo en Mano USD
-  let incomesBs = 0; // Efectivo en Mano BS
-  let incomesBsUsd = 0; // Valor USD del Efectivo BS
-
-  // Breakdown metrics
-  let totalSalesUsd = 0;
-  let totalBsInBanks = 0;
-  let totalBsInBanksUsd = 0; // Valor USD de Bancos BS
-  let totalUsdInBanks = 0;
-  let totalCxc = 0;
-  let totalCxcPaymentsUsd = 0;
-
-  // Separated sales vs CXC payments
+  // Let's first compute the standard sales metrics from normal transactions
+  // (which are all transactions EXCEPT credit sales/CXC charges and CXC payments/abonos)
   let salesIncomesUsd = 0;
-  let cxcIncomesUsd = 0;
-
   let salesIncomesBs = 0;
-  let cxcIncomesBs = 0;
   let salesIncomesBsUsd = 0;
-  let cxcIncomesBsUsd = 0;
-
   let salesBsInBanks = 0;
-  let cxcBsInBanks = 0;
   let salesBsInBanksUsd = 0;
-  let cxcBsInBanksUsd = 0;
-
   let salesUsdInBanks = 0;
-  let cxcUsdInBanks = 0;
 
   dailyTransactions.forEach((t) => {
     const rate = t.exchangeRate || exchangeRate || 1;
@@ -179,22 +164,16 @@ export default function IncomesCierre({
       t.type === TransactionType.INCOME &&
       (conceptUpper.includes("ABONO CUENTAS POR COBRAR") ||
         conceptUpper.includes("(CXC)"));
-    if (isCXCPayment) {
-      totalCxcPaymentsUsd += amtUsd;
-    }
 
-    // Determine if it is a credit sale (Cuentas por Cobrar CXC)
     const isCXCField =
       t.isCXC ||
       t.paymentMethod === PaymentMethod.CXC ||
       destClean.includes("CXC") ||
       destClean.includes("COBRAR");
 
-    if (isCXCField) {
-      const grossCxc = t.grossAmountUsd || t.totalDailySale || amtUsd;
-      totalCxc += grossCxc;
-      totalSalesUsd += grossCxc;
-      return; // Do not sum to physical cash or bank balances, but include in operational breakdown
+    // Skip CXC charges and payments here because they are calculated from the master payments list
+    if (isCXCField || isCXCPayment) {
+      return;
     }
 
     const isCashDest =
@@ -217,52 +196,138 @@ export default function IncomesCierre({
       const eqUsd = rate > 0 ? amountBsVal / rate : amtUsd;
 
       if (isBank) {
-        totalBsInBanks += amountBsVal;
-        totalBsInBanksUsd += eqUsd;
-        if (isCXCPayment) {
-          cxcBsInBanks += amountBsVal;
-          cxcBsInBanksUsd += eqUsd;
-        } else {
-          salesBsInBanks += amountBsVal;
-          salesBsInBanksUsd += eqUsd;
-        }
+        salesBsInBanks += amountBsVal;
+        salesBsInBanksUsd += eqUsd;
       } else {
-        incomesBs += amountBsVal;
-        incomesBsUsd += eqUsd;
-        if (isCXCPayment) {
-          cxcIncomesBs += amountBsVal;
-          cxcIncomesBsUsd += eqUsd;
-        } else {
-          salesIncomesBs += amountBsVal;
-          salesIncomesBsUsd += eqUsd;
-        }
-      }
-      // Bolivares are only referential and do not sum as USD incomes/sales
-      if (!isCXCPayment) {
-        // Excluded from totalSalesUsd based on user's instruction
+        salesIncomesBs += amountBsVal;
+        salesIncomesBsUsd += eqUsd;
       }
     } else {
       // USD ($)
       if (isBank) {
-        totalUsdInBanks += amtUsd;
-        if (isCXCPayment) {
-          cxcUsdInBanks += amtUsd;
-        } else {
-          salesUsdInBanks += amtUsd;
-        }
+        salesUsdInBanks += amtUsd;
       } else {
-        incomesUsd += amtUsd;
-        if (isCXCPayment) {
-          cxcIncomesUsd += amtUsd;
-        } else {
-          salesIncomesUsd += amtUsd;
-        }
-      }
-      if (!isCXCPayment) {
-        totalSalesUsd += amtUsd;
+        salesIncomesUsd += amtUsd;
       }
     }
   });
+
+  // Calculate CXC charges and CXC payments (abonos) directly from All Payments subcollection group
+  const periodPaymentsList = allPayments.filter(
+    (p) => p.date >= startDate && p.date <= endDate
+  );
+
+  let totalCxc = 0;
+  let totalCxcPaymentsUsd = 0;
+
+  let cxcIncomesUsd = 0;
+  let cxcIncomesBs = 0;
+  let cxcIncomesBsUsd = 0;
+  let cxcBsInBanks = 0;
+  let cxcBsInBanksUsd = 0;
+  let cxcUsdInBanks = 0;
+
+  periodPaymentsList.forEach((p) => {
+    const dest = (p.destinationBank || "").toUpperCase();
+    const pMethod = (p.paymentMethod || "").toUpperCase();
+    const concept = (p.concept || "").toUpperCase();
+
+    const isWarranty =
+      dest.includes("GARANT") ||
+      pMethod.includes("GARANT") ||
+      concept.includes("GARANT");
+    const isDonation =
+      dest.includes("DONAC") ||
+      pMethod.includes("DONAC") ||
+      concept.includes("DONAC") ||
+      dest.includes("EXENC") ||
+      pMethod.includes("EXENC") ||
+      concept.includes("EXENC") ||
+      dest.includes("EXCENC") ||
+      pMethod.includes("EXCENC") ||
+      concept.includes("EXCENC") ||
+      dest.includes("EXENT") ||
+      pMethod.includes("EXENT") ||
+      concept.includes("EXENT") ||
+      dest.includes("EXCENT") ||
+      pMethod.includes("EXCENT") ||
+      concept.includes("EXCENT") ||
+      dest.includes("CORTES") ||
+      pMethod.includes("CORTES") ||
+      concept.includes("CORTES") ||
+      dest.includes("DESCUENT") ||
+      pMethod.includes("DESCUENT") ||
+      concept.includes("DESCUENT") ||
+      dest.includes("ANULA") ||
+      pMethod.includes("ANULA") ||
+      concept.includes("ANULA") ||
+      dest.includes("BONIF") ||
+      pMethod.includes("BONIF") ||
+      concept.includes("BONIF");
+
+    if (p.type === "charge") {
+      // Balance to accounts receivable, we match the Monto Bruto of reports
+      totalCxc += p.grossAmountUsd || p.amountUsd || 0;
+    } else {
+      // Must be a payment (not a charge)
+      if (!isWarranty && !isDonation) {
+        const isBs =
+          p.paymentMethod === PaymentMethod.BS_CASH ||
+          p.paymentMethod === PaymentMethod.BS ||
+          (typeof p.paymentMethod === "string" &&
+            p.paymentMethod.toUpperCase().includes("BS")) ||
+          (p.amountBs && p.amountBs > 0);
+
+        const isCashDest =
+          dest.includes("EFECTIVO") ||
+          dest.includes("CAJA") ||
+          dest === "";
+        const isBankDest = dest.length > 0 && !isCashDest;
+        const isBank =
+          isBankDest ||
+          p.paymentMethod === PaymentMethod.BS ||
+          p.paymentMethod === PaymentMethod.ZELLE ||
+          p.paymentMethod === PaymentMethod.BINANCE ||
+          pMethod.includes("ZELLE") ||
+          pMethod.includes("BINANCE");
+
+        if (isBs) {
+          const payRate = p.exchangeRate || exchangeRate || 1;
+          const amountBsVal = p.amountBs && p.amountBs > 0 ? p.amountBs : (p.amountUsd || 0) * payRate;
+          const eqUsd = payRate > 0 ? amountBsVal / payRate : p.amountUsd || 0;
+
+          if (isBank) {
+            cxcBsInBanks += amountBsVal;
+            cxcBsInBanksUsd += eqUsd;
+          } else {
+            cxcIncomesBs += amountBsVal;
+            cxcIncomesBsUsd += eqUsd;
+          }
+          totalCxcPaymentsUsd += eqUsd;
+        } else {
+          const eqUsd = p.amountUsd || 0;
+          if (isBank) {
+            cxcUsdInBanks += eqUsd;
+          } else {
+            cxcIncomesUsd += eqUsd;
+          }
+          totalCxcPaymentsUsd += eqUsd;
+        }
+      }
+    }
+  });
+
+  // Re-aggregate incomes and total balances for the system boxes (matching what's physical/bank)
+  const incomesUsd = salesIncomesUsd + cxcIncomesUsd;
+  const incomesBs = salesIncomesBs + cxcIncomesBs;
+  const incomesBsUsd = salesIncomesBsUsd + cxcIncomesBsUsd;
+
+  const totalBsInBanks = salesBsInBanks + cxcBsInBanks;
+  const totalBsInBanksUsd = salesBsInBanksUsd + cxcBsInBanksUsd;
+  const totalUsdInBanks = salesUsdInBanks + cxcUsdInBanks;
+
+  // Total sales includes regular cash/bank sales in USD + the CXC charges (from the report!)
+  const totalSalesUsd = salesIncomesUsd + salesUsdInBanks + totalCxc;
 
   // Expected balances based on the startDate
   const previousClosure = closures
