@@ -66,8 +66,6 @@ export default function IncomesCierre({
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [closures, setClosures] = useState<CashClosure[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
 
   const [unlockKey, setUnlockKey] = useState("");
   const [unlockError, setUnlockError] = useState("");
@@ -80,13 +78,9 @@ export default function IncomesCierre({
   useEffect(() => {
     const unsub1 = dbService.subscribeToCashClosures(setClosures);
     const unsub2 = dbService.subscribeToTransactions(setTransactions);
-    const unsub3 = dbService.subscribeToExpenses(setExpenses);
-    const unsub4 = dbService.subscribeToReceipts(setReceipts);
     return () => {
       unsub1();
       unsub2();
-      unsub3();
-      unsub4();
     };
   }, []);
 
@@ -101,42 +95,11 @@ export default function IncomesCierre({
       t.date <= endDate &&
       t.type !== TransactionType.WITHDRAWAL,
   );
-  const dailyExpenses = expenses.filter(
-    (e) => e.date >= startDate && e.date <= endDate,
-  );
-  const dailyReceipts = receipts.filter(
-    (r) => r.date >= startDate && r.date <= endDate,
-  );
 
-  let expensesUsd = 0;
-  let expensesBs = 0;
-  dailyExpenses.forEach((e) => {
-    const isBs =
-      e.paymentMethod === PaymentMethod.BS_CASH ||
-      e.paymentMethod === PaymentMethod.BS ||
-      (typeof e.paymentMethod === "string" && e.paymentMethod.toUpperCase().includes("BS"));
-    if (isBs) {
-      const rate = e.exchangeRate || exchangeRate || 1;
-      expensesBs += e.amountBs && e.amountBs > 0 ? e.amountBs : e.amountUsd * rate;
-    } else {
-      expensesUsd += e.amountUsd;
-    }
-  });
-
-  let withdrawalsUsd = 0;
-  let withdrawalsBs = 0;
-  dailyReceipts.forEach((r) => {
-    const isBs =
-      r.paymentMethod === PaymentMethod.BS_CASH ||
-      r.paymentMethod === PaymentMethod.BS ||
-      (typeof r.paymentMethod === "string" && r.paymentMethod.toUpperCase().includes("BS"));
-    if (isBs) {
-      const rate = r.exchangeRate || exchangeRate || 1;
-      withdrawalsBs += r.amountBs && r.amountBs > 0 ? r.amountBs : r.amountUsd * rate;
-    } else {
-      withdrawalsUsd += r.amountUsd;
-    }
-  });
+  const expensesUsd = 0;
+  const expensesBs = 0;
+  const withdrawalsUsd = 0;
+  const withdrawalsBs = 0;
 
   let incomesUsd = 0; // Efectivo en Mano USD
   let incomesBs = 0; // Efectivo en Mano BS
@@ -582,22 +545,6 @@ export default function IncomesCierre({
                         +{formatCurrency(incomesUsd)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-rose-500">
-                        Gastos (-)
-                      </span>
-                      <span className="font-bold text-rose-500">
-                        -{formatCurrency(expensesUsd)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-rose-500">
-                        Retiros / Vales (-)
-                      </span>
-                      <span className="font-bold text-rose-500">
-                        -{formatCurrency(withdrawalsUsd)}
-                      </span>
-                    </div>
                     <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
                       <span className="text-sm font-black text-slate-800">
                         Saldo Esperado USD
@@ -634,22 +581,6 @@ export default function IncomesCierre({
                       </span>
                       <span className="font-bold text-emerald-600">
                         +{formatBs(incomesBs)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-rose-500">
-                        Gastos (-)
-                      </span>
-                      <span className="font-bold text-rose-500">
-                        -{formatBs(expensesBs)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-rose-500">
-                        Retiros / Vales (-)
-                      </span>
-                      <span className="font-bold text-rose-500">
-                        -{formatBs(withdrawalsBs)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
