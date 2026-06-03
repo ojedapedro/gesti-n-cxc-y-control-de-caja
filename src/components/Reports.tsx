@@ -238,6 +238,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
   const abonosSummary = useMemo(() => {
     let totalUsd = 0;
     let totalBs = 0;
+    let totalEquivalentUsd = 0;
     let totalWarranty = 0;
     let totalDonation = 0;
     abonosData.forEach(p => {
@@ -264,12 +265,15 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
         const isBs = checkIsBsMethod(p.paymentMethod, undefined, p.amountBs);
         if (!isBs) {
           totalUsd += p.amountUsd;
+          totalEquivalentUsd += p.amountUsd;
         } else {
           totalBs += p.amountBs || (p.amountUsd * (p.exchangeRate || exchangeRate));
+          const payRate = p.exchangeRate || exchangeRate || 1;
+          totalEquivalentUsd += p.amountBs ? (p.amountBs / payRate) : p.amountUsd;
         }
       }
     });
-    return { totalUsd, totalBs, totalWarranty, totalDonation };
+    return { totalUsd, totalBs, totalEquivalentUsd, totalWarranty, totalDonation };
   }, [abonosData, exchangeRate]);
 
   // ==========================================
@@ -895,13 +899,16 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
     } 
     else if (activeReport === 'abonos') {
       titleText = 'Reporte de Abonos Recibidos';
-      tableHeaders = ['Fecha', 'Cliente', 'Vendedor', 'Abono ($)', 'Abono (Bs)', 'Saldo Cliente'];
+      tableHeaders = ['Fecha', 'Cliente', 'Vendedor', 'Abono ($)', 'Abono (Bs)', 'Cobr. Equiv ($)', 'Saldo Cliente'];
       
       abonosData.forEach(p => {
         const clientName = clientMap.get(p.clientId) || 'Desconocido';
         const clientBalance = clientBalanceMap.get(p.clientId) || 0;
         const isBs = checkIsBsMethod(p.paymentMethod, undefined, p.amountBs);
         const isUsd = !isBs;
+        const paymentEquivUsd = isUsd 
+          ? p.amountUsd 
+          : (p.amountBs ? p.amountBs / (p.exchangeRate || exchangeRate || 1) : p.amountUsd);
         
         tableRows.push([
           p.date,
@@ -909,6 +916,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
           p.sellerName || '-',
           isUsd ? formatCurrency(p.amountUsd) : '-',
           !isUsd ? formatBs(p.amountBs || (p.amountUsd * (p.exchangeRate || exchangeRate))) : '-',
+          formatCurrency(paymentEquivUsd),
           formatCurrency(clientBalance)
         ]);
       });
@@ -917,6 +925,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
         { content: 'TOTAL ACUMULADO', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } },
         { content: formatCurrency(abonosSummary.totalUsd), styles: { fontStyle: 'bold', textColor: [5, 150, 105] } },
         { content: formatBs(abonosSummary.totalBs), styles: { fontStyle: 'bold', textColor: [15, 120, 210] } },
+        { content: formatCurrency(abonosSummary.totalEquivalentUsd), styles: { fontStyle: 'bold', textColor: [29, 78, 216], fillColor: [219, 234, 254] } },
         { content: '-', styles: { halign: 'center' } }
       ]);
     } 
@@ -1398,6 +1407,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
                     <th className="p-4 text-left font-bold text-slate-600 text-xs">Concepto / Ref</th>
                     <th className="p-4 text-right font-bold text-slate-600 text-xs">Abono ($)</th>
                     <th className="p-4 text-right font-bold text-slate-600 text-xs">Abono (Bs)</th>
+                    <th className="p-4 text-right font-bold text-slate-600 text-xs text-blue-700">Equiv. USD ($)</th>
                     <th className="p-4 text-right font-bold text-slate-600 text-xs">Saldo actual Cliente</th>
                   </tr>
                 </thead>
@@ -1407,18 +1417,52 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
                     const clientBalance = clientBalanceMap.get(p.clientId) || 0;
                     const isBs = checkIsBsMethod(p.paymentMethod, undefined, p.amountBs);
                     const isUsd = !isBs;
+                    const paymentEquivUsd = isUsd 
+                      ? p.amountUsd 
+                      : (p.amountBs ? p.amountBs / (p.exchangeRate || exchangeRate || 1) : p.amountUsd);
+
+                    const destUpper = (p.destinationBank || '').toUpperCase();
+                    const pMethodUpper = (p.paymentMethod || '').toUpperCase();
+                    const conceptUpper = (p.concept || '').toUpperCase();
                     
+                    const isWarranty = destUpper.includes('GARANT') || pMethodUpper.includes('GARANT') || conceptUpper.includes('GARANT');
+                    const isDonation = destUpper.includes('DONAC') || pMethodUpper.includes('DONAC') || conceptUpper.includes('DONAC') ||
+                                       destUpper.includes('EXENC') || pMethodUpper.includes('EXENC') || conceptUpper.includes('EXENC') ||
+                                       destUpper.includes('EXCENC') || pMethodUpper.includes('EXCENC') || conceptUpper.includes('EXCENC') ||
+                                       destUpper.includes('EXENT') || pMethodUpper.includes('EXENT') || conceptUpper.includes('EXENT') ||
+                                       destUpper.includes('EXCENT') || pMethodUpper.includes('EXCENT') || conceptUpper.includes('EXCENT') ||
+                                       destUpper.includes('CORTES') || pMethodUpper.includes('CORTES') || conceptUpper.includes('CORTES') ||
+                                       destUpper.includes('DESCUENT') || pMethodUpper.includes('DESCUENT') || conceptUpper.includes('DESCUENT') ||
+                                       destUpper.includes('ANULA') || pMethodUpper.includes('ANULA') || conceptUpper.includes('ANULA') ||
+                                       destUpper.includes('BONIF') || pMethodUpper.includes('BONIF') || conceptUpper.includes('BONIF');
+
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="p-4 font-semibold text-slate-600">{p.date}</td>
                         <td className="p-4 font-bold text-slate-800">{clientName}</td>
                         <td className="p-4 font-medium text-slate-500">{p.sellerName || '-'}</td>
-                        <td className="p-4 text-slate-400 font-medium text-xs truncate max-w-[150px]">{p.concept || 'ABONO'}</td>
+                        <td className="p-4 text-slate-400 font-medium text-xs">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="truncate max-w-[130px]">{p.concept || 'ABONO'}</span>
+                            {isWarranty && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-100 text-purple-705 border border-purple-200 uppercase tracking-wider">Garantía</span>
+                            )}
+                            {isDonation && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-pink-100 text-pink-705 border border-pink-200 uppercase tracking-wider">Ajuste/Bonif</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="p-4 text-right font-black text-emerald-600 bg-emerald-50/10">
                           {isUsd ? formatCurrency(p.amountUsd) : '-'}
                         </td>
                         <td className="p-4 text-right font-black text-sky-600 bg-sky-50/10">
                           {!isUsd ? formatBs(p.amountBs || (p.amountUsd * (p.exchangeRate || exchangeRate))) : '-'}
+                          {!isUsd && p.exchangeRate && (
+                            <span className="block text-[9px] text-slate-400 font-medium font-mono">Tasa: {formatBs(p.exchangeRate)}</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-right font-black text-blue-700 bg-blue-50/20 font-mono">
+                          {formatCurrency(paymentEquivUsd)}
                         </td>
                         <td className="p-4 text-right font-bold text-slate-900">{formatCurrency(clientBalance)}</td>
                       </tr>
@@ -1427,7 +1471,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
 
                   {abonosData.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="p-10 text-center text-slate-400 italic">No se encontraron abonos registrados con los filtros seleccionados.</td>
+                      <td colSpan={8} className="p-10 text-center text-slate-400 italic">No se encontraron abonos registrados con los filtros seleccionados.</td>
                     </tr>
                   )}
                 </tbody>
@@ -1436,22 +1480,26 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
 
             {/* Table Sum-up Footer */}
             {abonosData.length > 0 && (
-              <div className="bg-slate-50 p-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-50 p-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="p-3 bg-white rounded-xl border border-slate-150 text-right">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Consolidado USD ($ Cash/Zelle)</span>
-                  <span className="text-xl font-black text-emerald-600">{formatCurrency(abonosSummary.totalUsd)}</span>
+                  <span className="text-lg font-black text-emerald-600">{formatCurrency(abonosSummary.totalUsd)}</span>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-slate-150 text-right">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Consolidado BS (Pago Móvil/Bs)</span>
-                  <span className="text-xl font-black text-sky-600">{formatBs(abonosSummary.totalBs)}</span>
+                  <span className="text-lg font-black text-sky-600">{formatBs(abonosSummary.totalBs)}</span>
                 </div>
-                <div className="p-3 bg-white rounded-xl border border-slate-150 text-right">
+                <div className="p-3 bg-slate-900 border border-slate-900 rounded-xl text-right !ring-2 ring-blue-500 ring-offset-1">
+                  <span className="text-[10px] font-black text-blue-300 uppercase tracking-widest block">TOTAL COBRADO (EQUIV. USD)</span>
+                  <span className="text-xl font-black text-white">{formatCurrency(abonosSummary.totalEquivalentUsd)}</span>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-slate-150 text-right font-medium">
                   <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block">Garantías Aplicadas (Ref)</span>
-                  <span className="text-xl font-black text-purple-600">{formatCurrency(abonosSummary.totalWarranty)}</span>
+                  <span className="text-lg font-black text-purple-600">{formatCurrency(abonosSummary.totalWarranty)}</span>
                 </div>
-                <div className="p-3 bg-white rounded-xl border border-slate-150 text-right">
+                <div className="p-3 bg-white rounded-xl border border-slate-150 text-right font-medium">
                   <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest block">Donaciones/Exenciones (Ref)</span>
-                  <span className="text-xl font-black text-pink-600">{formatCurrency(abonosSummary.totalDonation)}</span>
+                  <span className="text-lg font-black text-pink-600">{formatCurrency(abonosSummary.totalDonation)}</span>
                 </div>
               </div>
             )}
