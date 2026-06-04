@@ -8,6 +8,7 @@ import {
   Expense,
   Receipt,
   CXCPayment,
+  CXCAccount,
 } from "../types";
 import { formatCurrency } from "../lib/utils";
 import { format, isValid } from "date-fns";
@@ -22,6 +23,14 @@ import {
   CheckCircle,
   Activity,
   DollarSign,
+  Eye,
+  FileText,
+  Clock,
+  ArrowRight,
+  TrendingUp,
+  Building2,
+  Users,
+  Coins,
 } from "lucide-react";
 
 const isBsTransaction = (t: Transaction): boolean => {
@@ -58,15 +67,49 @@ const isBsTransaction = (t: Transaction): boolean => {
   return isBsMethod || (!isUsdMethod && !!t.amountBs && t.amountBs > 0);
 };
 
+const isCxcPaymentBs = (p: CXCPayment): boolean => {
+  const normalize = (str?: string) => {
+    if (!str) return "";
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  };
+
+  const pMethod = normalize(p.paymentMethod);
+
+  const isBsMethod = 
+    pMethod.includes("bs") ||
+    pMethod.includes("bolivar") ||
+    pMethod.includes("pago movil") ||
+    pMethod.includes("transferencia");
+
+  const isUsdMethod = 
+    pMethod.includes("$") ||
+    pMethod.includes("usd") ||
+    pMethod.includes("dolar") ||
+    pMethod.includes("zelle") ||
+    pMethod.includes("binance") ||
+    (pMethod.includes("efectivo") && !pMethod.includes("bs"));
+
+  return isBsMethod || (!isUsdMethod && !!p.amountBs && p.amountBs > 0);
+};
+
 export default function IncomesCierre({
   exchangeRate,
 }: {
   exchangeRate?: number;
 }) {
+  const [activeTab, setActiveTab] = useState<"cierre" | "reporte">("cierre");
+  const [reportDate, setReportDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [detailSubTab, setDetailSubTab] = useState<"ventas" | "abonos" | "cargos">("ventas");
+
   const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [closures, setClosures] = useState<CashClosure[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [cxcAccounts, setCxcAccounts] = useState<CXCAccount[]>([]);
 
   const [unlockKey, setUnlockKey] = useState("");
   const [unlockError, setUnlockError] = useState("");
@@ -82,10 +125,12 @@ export default function IncomesCierre({
     const unsub1 = dbService.subscribeToCashClosures(setClosures);
     const unsub2 = dbService.subscribeToTransactions(setTransactions);
     const unsub3 = dbService.subscribeToAllPayments(setAllPayments);
+    const unsub4 = dbService.subscribeToCXCAccounts(setCxcAccounts);
     return () => {
       unsub1();
       unsub2();
       unsub3();
+      unsub4();
     };
   }, []);
 
@@ -271,12 +316,7 @@ export default function IncomesCierre({
     } else {
       // Must be a payment (not a charge)
       if (!isWarranty && !isDonation) {
-        const isBs =
-          p.paymentMethod === PaymentMethod.BS_CASH ||
-          p.paymentMethod === PaymentMethod.BS ||
-          (typeof p.paymentMethod === "string" &&
-            p.paymentMethod.toUpperCase().includes("BS")) ||
-          (p.amountBs && p.amountBs > 0);
+        const isBs = isCxcPaymentBs(p);
 
         const isCashDest =
           dest.includes("EFECTIVO") ||
@@ -328,6 +368,12 @@ export default function IncomesCierre({
 
   // Total sales includes regular cash/bank sales in USD + the CXC charges (from the report!)
   const totalSalesUsd = salesIncomesUsd + salesUsdInBanks + totalCxc;
+
+  // Let's compute the Total of Direct Sales in USD
+  const totalVentasDirectasUsd = salesIncomesUsd + salesIncomesBsUsd + salesBsInBanksUsd + salesUsdInBanks;
+
+  // Total Resumen de operaciones = Cuentas por Cobrar (CXC) + Total Abonos CXC Recibidos + Total Ventas Directas
+  const totalResumenOperaciones = totalCxc + totalCxcPaymentsUsd + totalVentasDirectasUsd;
 
   // Expected balances based on the startDate
   const previousClosure = closures
@@ -441,6 +487,264 @@ export default function IncomesCierre({
     );
   };
 
+  // Isolate query variables for reportDate
+  const reportTransactions = transactions.filter(
+    (t) => t.date === reportDate && t.type !== TransactionType.WITHDRAWAL
+  );
+
+  let rSalesIncomesUsd = 0;
+  let rSalesIncomesBs = 0;
+  let rSalesIncomesBsUsd = 0;
+  let rSalesBsInBanks = 0;
+  let rSalesBsInBanksUsd = 0;
+  let rSalesUsdInBanks = 0;
+
+  reportTransactions.forEach((t) => {
+    const rate = t.exchangeRate || exchangeRate || 1;
+    const amtUsd = t.amountUsd || 0;
+    const destClean = (t.destinationBank || "").trim().toUpperCase();
+    const conceptUpper = (t.concept || "").toUpperCase();
+    const pMethodUpper = (t.paymentMethod || "").toUpperCase();
+
+    const isWarranty =
+      destClean.includes("GARANT") ||
+      pMethodUpper.includes("GARANT") ||
+      conceptUpper.includes("GARANT");
+    const isDonation =
+      destClean.includes("DONAC") ||
+      pMethodUpper.includes("DONAC") ||
+      conceptUpper.includes("DONAC") ||
+      destClean.includes("EXENC") ||
+      pMethodUpper.includes("EXENC") ||
+      conceptUpper.includes("EXENC") ||
+      destClean.includes("EXCENC") ||
+      pMethodUpper.includes("EXCENC") ||
+      conceptUpper.includes("EXCENC") ||
+      destClean.includes("EXENT") ||
+      pMethodUpper.includes("EXENT") ||
+      conceptUpper.includes("EXENT") ||
+      destClean.includes("EXCENT") ||
+      pMethodUpper.includes("EXCENT") ||
+      conceptUpper.includes("EXCENT") ||
+      destClean.includes("CORTES") ||
+      pMethodUpper.includes("CORTES") ||
+      conceptUpper.includes("CORTES") ||
+      destClean.includes("DESCUENT") ||
+      pMethodUpper.includes("DESCUENT") ||
+      conceptUpper.includes("DESCUENT") ||
+      destClean.includes("ANULA") ||
+      pMethodUpper.includes("ANULA") ||
+      conceptUpper.includes("ANULA") ||
+      destClean.includes("BONIF") ||
+      pMethodUpper.includes("BONIF") ||
+      conceptUpper.includes("BONIF");
+
+    if (isWarranty || isDonation) {
+      return;
+    }
+
+    const isCXCPayment =
+      t.type === TransactionType.INCOME &&
+      (conceptUpper.includes("ABONO CUENTAS POR COBRAR") ||
+        conceptUpper.includes("(CXC)"));
+
+    const isCXCField =
+      t.isCXC ||
+      t.paymentMethod === PaymentMethod.CXC ||
+      destClean.includes("CXC") ||
+      destClean.includes("COBRAR");
+
+    if (isCXCField || isCXCPayment) {
+      return;
+    }
+
+    const isCashDest =
+      destClean.includes("EFECTIVO") ||
+      destClean.includes("CAJA") ||
+      destClean === "";
+    const isBankDest = destClean.length > 0 && !isCashDest;
+
+    const isBank =
+      isBankDest ||
+      t.paymentMethod === PaymentMethod.BS ||
+      t.paymentMethod === PaymentMethod.ZELLE ||
+      t.paymentMethod === PaymentMethod.BINANCE;
+
+    const isBs = isBsTransaction(t);
+
+    if (isBs) {
+      const amountBsVal =
+        t.amountBs && t.amountBs > 0 ? t.amountBs : amtUsd * rate;
+      const eqUsd = rate > 0 ? amountBsVal / rate : amtUsd;
+
+      if (isBank) {
+        rSalesBsInBanks += amountBsVal;
+        rSalesBsInBanksUsd += eqUsd;
+      } else {
+        rSalesIncomesBs += amountBsVal;
+        rSalesIncomesBsUsd += eqUsd;
+      }
+    } else {
+      if (isBank) {
+        rSalesUsdInBanks += amtUsd;
+      } else {
+        rSalesIncomesUsd += amtUsd;
+      }
+    }
+  });
+
+  const reportPaymentsList = allPayments.filter((p) => p.date === reportDate);
+
+  let rTotalCxc = 0;
+  let rTotalCxcPaymentsUsd = 0;
+
+  let rCxcIncomesUsd = 0;
+  let rCxcIncomesBs = 0;
+  let rCxcIncomesBsUsd = 0;
+  let rCxcBsInBanks = 0;
+  let rCxcBsInBanksUsd = 0;
+  let rCxcUsdInBanks = 0;
+
+  reportPaymentsList.forEach((p) => {
+    const dest = (p.destinationBank || "").toUpperCase();
+    const pMethod = (p.paymentMethod || "").toUpperCase();
+    const concept = (p.concept || "").toUpperCase();
+
+    const isWarranty =
+      dest.includes("GARANT") ||
+      pMethod.includes("GARANT") ||
+      concept.includes("GARANT");
+    const isDonation =
+      dest.includes("DONAC") ||
+      pMethod.includes("DONAC") ||
+      concept.includes("DONAC") ||
+      dest.includes("EXENC") ||
+      pMethod.includes("EXENC") ||
+      concept.includes("EXENC") ||
+      dest.includes("EXCENC") ||
+      pMethod.includes("EXCENC") ||
+      concept.includes("EXCENC") ||
+      dest.includes("EXENT") ||
+      pMethod.includes("EXENT") ||
+      concept.includes("EXENT") ||
+      dest.includes("EXCENT") ||
+      pMethod.includes("EXCENT") ||
+      concept.includes("EXCENT") ||
+      dest.includes("CORTES") ||
+      pMethod.includes("CORTES") ||
+      concept.includes("CORTES") ||
+      dest.includes("DESCUENT") ||
+      pMethod.includes("DESCUENT") ||
+      concept.includes("DESCUENT") ||
+      dest.includes("ANULA") ||
+      pMethod.includes("ANULA") ||
+      concept.includes("ANULA") ||
+      dest.includes("BONIF") ||
+      pMethod.includes("BONIF") ||
+      concept.includes("BONIF");
+
+    if (p.type === "charge") {
+      rTotalCxc += p.grossAmountUsd || p.amountUsd || 0;
+    } else {
+      if (!isWarranty && !isDonation) {
+        const isBs = isCxcPaymentBs(p);
+
+        const isCashDest =
+          dest.includes("EFECTIVO") ||
+          dest.includes("CAJA") ||
+          dest === "";
+        const isBankDest = dest.length > 0 && !isCashDest;
+        const isBank =
+          isBankDest ||
+          p.paymentMethod === PaymentMethod.BS ||
+          p.paymentMethod === PaymentMethod.ZELLE ||
+          p.paymentMethod === PaymentMethod.BINANCE ||
+          pMethod.includes("ZELLE") ||
+          pMethod.includes("BINANCE");
+
+        if (isBs) {
+          const payRate = p.exchangeRate || exchangeRate || 1;
+          const amountBsVal = p.amountBs && p.amountBs > 0 ? p.amountBs : (p.amountUsd || 0) * payRate;
+          const eqUsd = payRate > 0 ? amountBsVal / payRate : p.amountUsd || 0;
+
+          if (isBank) {
+            rCxcBsInBanks += amountBsVal;
+            rCxcBsInBanksUsd += eqUsd;
+          } else {
+            rCxcIncomesBs += amountBsVal;
+            rCxcIncomesBsUsd += eqUsd;
+          }
+          rTotalCxcPaymentsUsd += eqUsd;
+        } else {
+          const eqUsd = p.amountUsd || 0;
+          if (isBank) {
+            rCxcUsdInBanks += eqUsd;
+          } else {
+            rCxcIncomesUsd += eqUsd;
+          }
+          rTotalCxcPaymentsUsd += eqUsd;
+        }
+      }
+    }
+  });
+
+  const rIncomesUsd = rSalesIncomesUsd + rCxcIncomesUsd;
+  const rIncomesBs = rSalesIncomesBs + rCxcIncomesBs;
+  const rIncomesBsUsd = rSalesIncomesBsUsd + rCxcIncomesBsUsd;
+
+  const rTotalBsInBanks = rSalesBsInBanks + rCxcBsInBanks;
+  const rTotalBsInBanksUsd = rSalesBsInBanksUsd + rCxcBsInBanksUsd;
+  const rTotalUsdInBanks = rSalesUsdInBanks + rCxcUsdInBanks;
+
+  const rTotalSalesUsd = rSalesIncomesUsd + rSalesUsdInBanks + rTotalCxc;
+
+  // Expected balances
+  const reportPreviousClosure = closures
+    .filter((c) => c.date < reportDate && c.isClosed)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  const rInitialUsd = reportPreviousClosure?.actualBalanceUsd || 0;
+  const rInitialBs = reportPreviousClosure?.actualBalanceBs || 0;
+
+  const rExpectedUsd = rInitialUsd + rIncomesUsd;
+  const rExpectedBs = rInitialBs + rIncomesBs;
+
+  const rCurrentClosure = closures.find((c) => c.date === reportDate);
+  const rIsClosed = rCurrentClosure?.isClosed || false;
+
+  // Jump date helper
+  const jumpDate = (days: number) => {
+    const parts = reportDate.split("-");
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    d.setDate(d.getDate() + days);
+    setReportDate(format(d, "yyyy-MM-dd"));
+  };
+
+  const reportVentasDirectas = reportTransactions.filter((t) => {
+    const destClean = (t.destinationBank || "").trim().toUpperCase();
+    const conceptUpper = (t.concept || "").toUpperCase();
+    const pMethodUpper = (t.paymentMethod || "").toUpperCase();
+    const isWarranty = destClean.includes("GARANT") || pMethodUpper.includes("GARANT") || conceptUpper.includes("GARANT");
+    const isDonation = destClean.includes("DONAC") || pMethodUpper.includes("DONAC") || conceptUpper.includes("DONAC") ||
+                       destClean.includes("EXENC") || pMethodUpper.includes("EXENC") || conceptUpper.includes("EXENC") ||
+                       destClean.includes("EXCENC") || pMethodUpper.includes("EXCENC") || conceptUpper.includes("EXCENC") ||
+                       destClean.includes("EXENT") || pMethodUpper.includes("EXENT") || conceptUpper.includes("EXENT") ||
+                       destClean.includes("EXCENT") || pMethodUpper.includes("EXCENT") || conceptUpper.includes("EXCENT") ||
+                       destClean.includes("CORTES") || pMethodUpper.includes("CORTES") || conceptUpper.includes("CORTES") ||
+                       destClean.includes("DESCUENT") || pMethodUpper.includes("DESCUENT") || conceptUpper.includes("DESCUENT") ||
+                       destClean.includes("ANULA") || pMethodUpper.includes("ANULA") || conceptUpper.includes("ANULA") ||
+                       destClean.includes("BONIF") || pMethodUpper.includes("BONIF") || conceptUpper.includes("BONIF");
+
+    if (isWarranty || isDonation) return false;
+
+    const isCXCPayment = t.type === TransactionType.INCOME && (conceptUpper.includes("ABONO CUENTAS POR COBRAR") || conceptUpper.includes("(CXC)"));
+    const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || destClean.includes("CXC") || destClean.includes("COBRAR");
+
+    return !isCXCField && !isCXCPayment;
+  });
+
+  const reportAbonosList = reportPaymentsList.filter((p) => p.type !== "charge");
+  const reportCargosList = reportPaymentsList.filter((p) => p.type === "charge");
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -452,8 +756,38 @@ export default function IncomesCierre({
             Cuadre diario de efectivo e impresión de histórico.
           </p>
         </div>
+      </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto">
+      {/* Tabs list navigation */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab("cierre")}
+          id="btn-tab-cierre"
+          className={`px-5 py-3 font-bold text-sm border-b-2 mr-6 transition-all flex items-center gap-2 ${
+            activeTab === "cierre"
+              ? "border-blue-600 text-blue-600 font-extrabold"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Lock size={16} /> Cierre Diario y Control Físico
+        </button>
+        <button
+          onClick={() => setActiveTab("reporte")}
+          id="btn-tab-reporte"
+          className={`px-5 py-3 font-bold text-sm border-b-2 transition-all flex items-center gap-2 ${
+            activeTab === "reporte"
+              ? "border-blue-600 text-blue-600 font-extrabold"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Eye size={16} /> Consulta de Reportes Detallados
+        </button>
+      </div>
+
+      {activeTab === "cierre" ? (
+        <>
+          <div className="flex justify-end mt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto font-bold font-semibold">
           <div className="flex items-center gap-2 px-2 w-full sm:w-auto">
             <Calendar size={16} className="text-slate-400 shrink-0" />
             <div className="flex flex-col w-full">
@@ -766,6 +1100,16 @@ export default function IncomesCierre({
                       </div>
                     </div>
 
+                    {/* Total Ventas Directas */}
+                    <div className="flex items-center justify-between border-t border-slate-100/50 pt-2">
+                      <span className="text-sm font-semibold text-slate-700 ml-2">
+                        &bull; Total Ventas Directas
+                      </span>
+                      <span className="font-bold text-slate-800">
+                        {formatCurrency(totalVentasDirectasUsd)}
+                      </span>
+                    </div>
+
                     {/* Cuentas por Cobrar CXC */}
                     <div className="flex items-center justify-between border-t border-slate-100/50 pt-2">
                       <span className="text-sm font-semibold text-slate-700 ml-2">
@@ -786,13 +1130,13 @@ export default function IncomesCierre({
                       </span>
                     </div>
                   </div>
-                  <div className="p-3 bg-white">
+                  <div className="p-3 bg-white border-t border-slate-200">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-black text-slate-900 uppercase tracking-wide">
-                        Total de Ventas
+                        Total Resumen de operaciones
                       </span>
                       <span className="font-black text-xl text-emerald-600">
-                        {formatCurrency(totalSalesUsd)}
+                        {formatCurrency(totalResumenOperaciones)}
                       </span>
                     </div>
                   </div>
@@ -1012,6 +1356,402 @@ export default function IncomesCierre({
           )}
         </div>
       </div>
+        </>
+      ) : (
+        // Detailed daily box reports (consult date, completely read-only)
+        <div className="space-y-6 animate-fade-in">
+          {/* Date Selector Banner */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1">
+                <Clock size={12} className="text-blue-500" /> Consulta Histórica Detallada
+              </span>
+              <h3 className="text-xl font-extrabold text-slate-900 capitalize">
+                Caja del {getDayName(reportDate) || reportDate}
+              </h3>
+              <p className="text-xs font-semibold text-slate-400 leading-none">
+                Seleccione cualquier fecha para auditar los movimientos detallados de caja.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 font-semibold">
+              <button
+                onClick={() => jumpDate(-1)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-600 font-bold border border-slate-200 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider"
+                title="Día Anterior"
+              >
+                &larr; Anterior
+              </button>
+              <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
+                <Calendar size={15} className="text-slate-400" />
+                <input
+                  type="date"
+                  value={reportDate}
+                  onChange={(e) => setReportDate(e.target.value)}
+                  className="text-sm font-bold text-slate-800 outline-none cursor-pointer"
+                />
+              </div>
+              <button
+                onClick={() => jumpDate(1)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-600 font-bold border border-slate-200 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider"
+                title="Día Siguiente"
+              >
+                Siguiente &rarr;
+              </button>
+            </div>
+          </div>
+
+          {/* Closure Status Alert */}
+          {rIsClosed ? (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl p-5 flex items-start gap-4 shadow-sm font-semibold">
+              <div className="p-2 bg-emerald-100 rounded-xl text-emerald-800 shrink-0 mt-0.5">
+                <Lock size={20} strokeWidth={2.5} />
+              </div>
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-extrabold text-sm uppercase tracking-wider text-emerald-950">
+                    Cerrada y Asegurada
+                  </h4>
+                  {rCurrentClosure?.closedAt && (
+                    <span className="text-[10px] bg-emerald-200/50 text-emerald-900 font-mono font-bold px-2 py-0.5 rounded-full">
+                      {format(new Date(rCurrentClosure.closedAt instanceof Date ? rCurrentClosure.closedAt : rCurrentClosure.closedAt?.toDate?.() || rCurrentClosure.closedAt), "dd/MM/yyyy h:mm a")}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-emerald-800 leading-relaxed font-semibold">
+                  Esta caja fue cerrada físicamente. Es de solo lectura para evitar alteraciones del histórico.
+                </p>
+                {rCurrentClosure?.observations && (
+                  <div className="bg-white/50 border border-emerald-100/50 rounded-xl p-3 text-xs italic mt-2.5 text-emerald-950 font-medium">
+                    &ldquo;{rCurrentClosure.observations}&rdquo;
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-5 flex items-start gap-4 shadow-sm font-semibold">
+              <div className="p-2 bg-amber-100 rounded-xl text-amber-800 shrink-0 mt-0.5">
+                <AlertTriangle size={20} strokeWidth={2.5} />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-extrabold text-sm uppercase tracking-wider text-amber-950">
+                  Cierre Físico Pendiente
+                </h4>
+                <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                  La caja de este día no ha sido asegurada con verificación física de conteo en el sistema. Los montos se actualizan en vivo.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Grid de Resumen del Balance de ese Día */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Resumen Físico / Discrepancias */}
+            <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                <CheckCircle size={15} /> Verificación Conteo Físico
+              </h4>
+
+              {/* CARD USD */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 font-semibold">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">
+                  Dólares Estadounidenses ($)
+                </span>
+                <div className="grid grid-cols-3 gap-2 divide-x divide-slate-200 text-center">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">Esperado</span>
+                    <span className="text-sm font-extrabold text-slate-900">{formatCurrency(rExpectedUsd)}</span>
+                  </div>
+                  <div className="space-y-1 pl-2">
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">Físico</span>
+                    <span className="text-sm font-extrabold text-slate-950">
+                      {rCurrentClosure ? formatCurrency(rCurrentClosure.actualBalanceUsd) : "---"}
+                    </span>
+                  </div>
+                  <div className="space-y-1 pl-2">
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">Diferencia</span>
+                    {rCurrentClosure ? (
+                      <span className={`text-sm font-black ${rCurrentClosure.differenceUsd === 0 ? "text-emerald-600" : rCurrentClosure.differenceUsd > 0 ? "text-blue-600" : "text-rose-600"}`}>
+                        {rCurrentClosure.differenceUsd > 0 ? "+" : ""}{formatCurrency(rCurrentClosure.differenceUsd)}
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-400">---</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD BS */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 font-semibold">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                  Bolívares Digitales (Bs)
+                </span>
+                <div className="grid grid-cols-3 gap-2 divide-x divide-slate-200 text-center">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">Esperado</span>
+                    <span className="text-xs font-extrabold text-slate-900 truncate block">{formatBs(rExpectedBs)}</span>
+                  </div>
+                  <div className="space-y-1 pl-2">
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">Físico</span>
+                    <span className="text-xs font-extrabold text-slate-950 truncate block">
+                      {rCurrentClosure ? formatBs(rCurrentClosure.actualBalanceBs) : "---"}
+                    </span>
+                  </div>
+                  <div className="space-y-1 pl-2">
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">Diferencia</span>
+                    {rCurrentClosure ? (
+                      <span className={`text-xs font-black truncate block ${rCurrentClosure.differenceBs === 0 ? "text-emerald-600" : rCurrentClosure.differenceBs > 0 ? "text-blue-600" : "text-rose-600"}`}>
+                        {rCurrentClosure.differenceBs > 0 ? "+" : ""}{formatBs(rCurrentClosure.differenceBs)}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-400 block">---</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Resumen del Movimiento de Caja del Sistema */}
+            <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                <TrendingUp size={15} /> Resumen de Actividad Sistema
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1 font-semibold">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Efectivo USD Ingresado</span>
+                  <p className="text-lg font-black text-slate-800">{formatCurrency(rIncomesUsd)}</p>
+                  <p className="text-[11px] text-slate-400 flex justify-between">
+                    <span>Ventas: {formatCurrency(rSalesIncomesUsd)}</span>
+                    <span>Abonos: {formatCurrency(rCxcIncomesUsd)}</span>
+                  </p>
+                </div>
+
+                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1 font-semibold">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Efectivo BS Ingresado</span>
+                  <p className="text-lg font-black text-slate-800">{formatBs(rIncomesBs)}</p>
+                  <p className="text-[11px] text-slate-400 flex justify-between">
+                    <span>Ventas: {formatBs(rSalesIncomesBs)}</span>
+                    <span>Abonos: {formatBs(rCxcIncomesBs)}</span>
+                  </p>
+                </div>
+
+                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1 font-semibold">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bancos BS Recibido</span>
+                  <p className="text-lg font-black text-slate-800">{formatBs(rTotalBsInBanks)}</p>
+                  <p className="text-[11px] text-slate-400">Equiv. USD: {formatCurrency(rTotalBsInBanksUsd)}</p>
+                </div>
+
+                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1 font-semibold">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bancos/Zelle/Binance USD</span>
+                  <p className="text-lg font-black text-slate-800">{formatCurrency(rTotalUsdInBanks)}</p>
+                  <p className="text-[11px] text-slate-400">Transferencias divisas directas</p>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-3 flex flex-col sm:flex-row justify-between items-center gap-4 bg-emerald-50/30 p-4 rounded-xl border border-emerald-100 font-semibold text-xs text-slate-500">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-tight">Monto Total de Ventas</span>
+                  <span className="text-xl font-black text-emerald-600 font-sans tracking-tight">{formatCurrency(rTotalSalesUsd)}</span>
+                </div>
+                <div className="text-center sm:text-right font-medium space-y-1">
+                  <div>Ventas Contado: <strong className="text-slate-800">{formatCurrency(rSalesIncomesUsd + rSalesUsdInBanks)}</strong></div>
+                  <div>Nuevos créditos (Cargos CXC): <strong className="text-slate-800">{formatCurrency(rTotalCxc)}</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed Movements List Tabs */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mt-6">
+            <div className="p-5 border-b border-slate-100 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h4 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                <FileText size={16} className="text-slate-500" /> Movimientos Desglosados del Día
+              </h4>
+
+              {/* Sub tabs pills */}
+              <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
+                <button
+                  onClick={() => setDetailSubTab("ventas")}
+                  id="tab-pills-ventas"
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    detailSubTab === "ventas"
+                      ? "bg-white text-slate-800 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Ventas Directas ({reportVentasDirectas.length})
+                </button>
+                <button
+                  onClick={() => setDetailSubTab("abonos")}
+                  id="tab-pills-abonos"
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    detailSubTab === "abonos"
+                      ? "bg-white text-slate-800 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Abonos CXC ({reportAbonosList.length})
+                </button>
+                <button
+                  onClick={() => setDetailSubTab("cargos")}
+                  id="tab-pills-cargos"
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                    detailSubTab === "cargos"
+                      ? "bg-white text-slate-800 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Cargos CXC ({reportCargosList.length})
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* Ventas Directas render table */}
+              {detailSubTab === "ventas" && (
+                <div className="overflow-x-auto border border-slate-100 rounded-xl bg-white shadow-sm">
+                  {reportVentasDirectas.length === 0 ? (
+                    <div className="p-12 text-center text-sm font-medium text-slate-400">
+                      No se registraron ventas directas el día de hoy.
+                    </div>
+                  ) : (
+                    <table className="w-full text-sm text-left border-collapse font-semibold">
+                      <thead className="bg-slate-50 border-b border-slate-100 text-[11px] font-black uppercase tracking-wider text-slate-400">
+                        <tr>
+                          <th className="px-4 py-3">Concepto</th>
+                          <th className="px-4 py-3">Cliente</th>
+                          <th className="px-4 py-3">Vendedor</th>
+                          <th className="px-4 py-3">Vía de Pago</th>
+                          <th className="px-4 py-3">Destino</th>
+                          <th className="px-4 py-3 text-right">Monto (USD)</th>
+                          <th className="px-4 py-3 text-right">Monto (Bs)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                        {reportVentasDirectas.map((t, idx) => {
+                          const isBs = isBsTransaction(t);
+                          const bsAmount = t.amountBs && t.amountBs > 0 ? t.amountBs : t.amountUsd * (t.exchangeRate || 1);
+                          return (
+                            <tr key={t.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 text-slate-900 font-black">{t.concept}</td>
+                              <td className="px-4 py-3 text-slate-500 font-bold">{t.clientName || "—"}</td>
+                              <td className="px-4 py-3 text-xs text-slate-500">{t.sellerName || "—"}</td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-800 text-[10px] uppercase font-black px-2 py-0.5 rounded">
+                                  {t.paymentMethod}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs font-mono text-slate-400">{t.destinationBank || "Efectivo"}</td>
+                              <td className="px-4 py-3 text-right font-black text-slate-900">{formatCurrency(t.amountUsd)}</td>
+                              <td className="px-4 py-3 text-right font-mono text-blue-600">
+                                {isBs ? formatBs(bsAmount) : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {/* Abonos Recibidos render table */}
+              {detailSubTab === "abonos" && (
+                <div className="overflow-x-auto border border-slate-100 rounded-xl bg-white shadow-sm">
+                  {reportAbonosList.length === 0 ? (
+                    <div className="p-12 text-center text-sm font-medium text-slate-400">
+                      No se registraron abonos a cuentas por cobrar hoy.
+                    </div>
+                  ) : (
+                    <table className="w-full text-sm text-left border-collapse font-semibold">
+                      <thead className="bg-slate-50 border-b border-slate-100 text-[11px] font-black uppercase tracking-wider text-slate-400">
+                        <tr>
+                          <th className="px-4 py-3">Cliente</th>
+                          <th className="px-4 py-3">Concepto/Pago</th>
+                          <th className="px-4 py-3">Vendedor</th>
+                          <th className="px-4 py-3">Vía de Pago</th>
+                          <th className="px-4 py-3">Banco / Destino</th>
+                          <th className="px-4 py-3 text-right">Monto (USD)</th>
+                          <th className="px-4 py-3 text-right">Monto (Bs)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                        {reportAbonosList.map((p, idx) => {
+                          const associated = cxcAccounts.find((a) => a.id === p.clientId);
+                          const clientName = associated ? associated.clientName : (p.clientId || "Desconocido");
+                          const isBs = isCxcPaymentBs(p);
+                          const bsAmount = p.amountBs && p.amountBs > 0 ? p.amountBs : (p.amountUsd || 0) * (p.exchangeRate || 1);
+                          return (
+                            <tr key={p.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 text-slate-900 font-black flex items-center gap-2">
+                                <Users size={12} className="text-blue-500" /> {clientName}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-slate-500 font-bold">{p.concept || "Abono / Pago de Cuenta"}</td>
+                              <td className="px-4 py-3 text-xs text-slate-500">{p.sellerName || "—"}</td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-800 text-[10px] uppercase font-black px-2 py-0.5 rounded">
+                                  {p.paymentMethod}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs font-mono text-slate-400">{p.destinationBank || "Efectivo"}</td>
+                              <td className="px-4 py-3 text-right font-black text-emerald-600">{formatCurrency(p.amountUsd)}</td>
+                              <td className="px-4 py-3 text-right font-mono text-blue-600">
+                                {isBs ? formatBs(bsAmount) : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {/* Cargos issued render table */}
+              {detailSubTab === "cargos" && (
+                <div className="overflow-x-auto border border-slate-100 rounded-xl bg-white shadow-sm">
+                  {reportCargosList.length === 0 ? (
+                    <div className="p-12 text-center text-sm font-medium text-slate-400">
+                      No se registraron ventas a crédito (cargos CXC) hoy.
+                    </div>
+                  ) : (
+                    <table className="w-full text-sm text-left border-collapse font-semibold">
+                      <thead className="bg-slate-50 border-b border-slate-100 text-[11px] font-black uppercase tracking-wider text-slate-400">
+                        <tr>
+                          <th className="px-4 py-3">Cliente</th>
+                          <th className="px-4 py-3">Item / Rubro</th>
+                          <th className="px-4 py-3">Nº Factura</th>
+                          <th className="px-4 py-3">Vendedor</th>
+                          <th className="px-4 py-3 text-right">Monto Crédito (USD)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                        {reportCargosList.map((p, idx) => {
+                          const associated = cxcAccounts.find((a) => a.id === p.clientId);
+                          const clientName = associated ? associated.clientName : (p.clientId || "Desconocido");
+                          return (
+                            <tr key={p.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 text-slate-900 font-black flex items-center gap-2">
+                                <Users size={12} className="text-amber-500" /> {clientName}
+                              </td>
+                              <td className="px-4 py-3 text-xs font-bold text-slate-600">{p.rubroName || p.concept || "Cargo de Compra"}</td>
+                              <td className="px-4 py-3 text-xs font-mono text-slate-400">{p.invoiceNumber || "—"}</td>
+                              <td className="px-4 py-3 text-xs text-slate-500">{p.sellerName || "—"}</td>
+                              <td className="px-4 py-3 text-right font-black text-amber-600">{formatCurrency(p.amountUsd)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

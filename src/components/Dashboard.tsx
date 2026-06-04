@@ -97,205 +97,67 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     return true;
   };
 
-  let totalBsBancoUsd = 0;
-  let totalBsBancoBs = 0;
-  let salesBsBancoUsd = 0;
-  let salesBsBancoBs = 0;
-  let cxcBsBancoUsd = 0;
-  let cxcBsBancoBs = 0;
+  // Filter transactions exactly like IncomesRegistro (the CRUD of Ingresos Caja Principal)
+  const filteredTransactions = transactions.filter(t => {
+    if (t.type !== TransactionType.SALE) return false;
+    if (t.isCXC || t.paymentMethod === PaymentMethod.CXC) return false;
+    if (startDate && t.date < startDate) return false;
+    if (endDate && t.date > endDate) return false;
+    return true;
+  });
 
-  let totalBsEfectivoUsd = 0;
-  let totalBsEfectivoBs = 0;
-  let salesBsEfectivoUsd = 0;
-  let salesBsEfectivoBs = 0;
-  let cxcBsEfectivoUsd = 0;
-  let cxcBsEfectivoBs = 0;
+  // Calculate totals matching exactly the logic in IncomesRegistro
+  const totals = filteredTransactions.reduce((acc, t) => {
+    const destClean = (t.destinationBank || '').trim().toUpperCase();
+    const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA');
+    const isBsTx = !!(t.amountBs && t.amountBs > 0);
 
-  let totalUsdBancoUsd = 0;
-  let totalUsdBancoBs = 0;
-  let salesUsdBancoUsd = 0;
-  let salesUsdBancoBs = 0;
-  let cxcUsdBancoUsd = 0;
-  let cxcUsdBancoBs = 0;
+    const rate = t.exchangeRate || exchangeRate || 1;
 
-  let totalUsdEfectivoUsd = 0;
-  let totalUsdEfectivoBs = 0;
-  let salesUsdEfectivoUsd = 0;
-  let salesUsdEfectivoBs = 0;
-  let cxcUsdEfectivoUsd = 0;
-  let cxcUsdEfectivoBs = 0;
+    if (isBsTx) {
+      if (isCashDest) {
+        acc.bsCash += t.amountBs || 0;
+        acc.bsCashUsdEq += (t.amountBs || 0) / rate;
+      } else {
+        acc.bs += t.amountBs || 0;
+        const convVal = (t.amountBs || 0) / rate;
+        acc.usdConv += convVal;
+      }
+    }
 
-  let totalVentasUsd = 0;
-  let totalVentasBs = 0;
-  let periodCxcCharges = 0;
-  let periodCxcPayments = 0;
+    acc.usdCash += t.amountUsdCash || 0;
+    acc.zelle += t.amountZelle || 0;
+    acc.cxc += t.amountCXC || 0;
+
+    const valueUsd = isBsTx ? ((t.amountUsdCash || 0) + (t.amountZelle || 0) + (t.amountCXC || 0)) : (t.totalDailySale || t.amountUsd || 0);
+    acc.ventaDiaria += valueUsd;
+    acc.ventaDiariaBs += valueUsd * rate;
+
+    return acc;
+  }, { 
+    bs: 0, 
+    usdConv: 0, 
+    usdCash: 0, 
+    zelle: 0, 
+    cxc: 0, 
+    bsCash: 0, 
+    bsCashUsdEq: 0,
+    ventaDiaria: 0, 
+    ventaDiariaBs: 0 
+  });
+
+  // Map to dashboard card variables
+  const totalUsdBancoUsd = totals.zelle; // Zelle / Binance / Bancos USD
+  const totalUsdEfectivoUsd = totals.usdCash; // Efectivo $ en caja
   
-  // 1. Process standard transactions (excluding CXC payment entries which are computed from allPayments to match the bank reports)
-  transactions
-    .filter(t => filterByDate(t.date))
-    .forEach(t => {
-       const dest = (t.destinationBank || '').toUpperCase();
-       const rate = t.exchangeRate || exchangeRate || 1;
-       
-       // SALES VOLUME: Sum all sales within period (Cash and Bank; excluding Credit/CXC)
-       if (t.type === TransactionType.SALE && !t.isCXC && t.paymentMethod !== PaymentMethod.CXC) {
-          const isBs = isBsTransaction(t);
+  const totalBsBancoBs = totals.bs; // Bolívares Banco (pago movil, etc)
+  const totalBsBancoUsd = totals.usdConv; // Convertido USD de Banco Bs
 
-          if (isBs) {
-             const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * rate);
-             totalVentasBs += amountBsVal;
-          } else {
-             totalVentasUsd += t.amountUsd;
-             totalVentasBs += t.amountUsd * rate;
-          }
-       }
+  const totalBsEfectivoBs = totals.bsCash; // Efectivo Bs en caja
+  const totalBsEfectivoUsd = totals.bsCashUsdEq; // Convertido USD de Efectivo Bs
 
-       // Track CXC movements for the period
-       if (t.isCXC && t.type === TransactionType.SALE) {
-          periodCxcCharges += t.amountUsd;
-       }
-
-       // Skip CXC payment entries in Transactions to avoid double counting
-       const conceptUpper = (t.concept || '').toUpperCase();
-       const isCXCPaymentEntry = conceptUpper.includes('ABONO CUENTAS POR COBRAR') || conceptUpper.includes('(CXC)');
-       if (isCXCPaymentEntry) {
-          return;
-       }
-
-       // CASH FLOW for direct entries (Sales / other non-CXC Abono Incomes)
-       if (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) {
-          const destClean = (t.destinationBank || '').trim().toUpperCase();
-
-          // Skip credit sale transactions (charges/CXC) from physical Cash Flow as they represent debt, not received money.
-          const isCXCField = t.isCXC || t.paymentMethod === PaymentMethod.CXC || 
-                             (t.type === TransactionType.SALE && (destClean.includes('CXC') || destClean.includes('COBRAR')));
-          if (isCXCField) return;
-          const isCashDest = destClean.includes('EFECTIVO') || destClean.includes('CAJA') || destClean === '';
-          const isBankDest = destClean.length > 0 && !isCashDest;
-
-          const isBank = isBankDest || t.paymentMethod === PaymentMethod.BS || t.paymentMethod === PaymentMethod.ZELLE || t.paymentMethod === PaymentMethod.BINANCE;
-
-          const isBs = isBsTransaction(t);
-
-          if (isBs) {
-             const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : (t.amountUsd * rate);
-             const eqUsd = rate > 0 ? amountBsVal / rate : t.amountUsd;
-
-             if (isBank) {
-                totalBsBancoUsd += eqUsd;
-                totalBsBancoBs += amountBsVal;
-                salesBsBancoUsd += eqUsd;
-                salesBsBancoBs += amountBsVal;
-             } else {
-                totalBsEfectivoUsd += eqUsd;
-                totalBsEfectivoBs += amountBsVal;
-                salesBsEfectivoUsd += eqUsd;
-                salesBsEfectivoBs += amountBsVal;
-             }
-          } else {
-             // USD Transaction
-             const usdAmount = t.amountUsd;
-             if (isBank) {
-                totalUsdBancoUsd += usdAmount;
-                totalUsdBancoBs += usdAmount * rate;
-                salesUsdBancoUsd += usdAmount;
-                salesUsdBancoBs += usdAmount * rate;
-             } else {
-                totalUsdEfectivoUsd += usdAmount;
-                totalUsdEfectivoBs += usdAmount * rate;
-                salesUsdEfectivoUsd += usdAmount;
-                salesUsdEfectivoBs += usdAmount * rate;
-             }
-          }
-       }
-    });
-
-  // 2. Process CXC payments (abonos) from source of truth allPayments
-  allPayments
-    .filter(p => filterByDate(p.date))
-    .forEach(p => {
-       if (p.type === 'charge') return; // Only process actual payments / abonos
-
-       const bankClean = (p.destinationBank || '').trim().toUpperCase();
-       if (bankClean.trim() === '') return; // Skip entries that aren't cash flow destined or logged
-
-       const pMethodUpper = (p.paymentMethod || '').trim().toUpperCase();
-       const conceptUpper = (p.concept || '').trim().toUpperCase();
-       
-       const isWarranty = bankClean.includes('GARANT') || pMethodUpper.includes('GARANT') || conceptUpper.includes('GARANT');
-       const isDonation = bankClean.includes('DONAC') || pMethodUpper.includes('DONAC') || conceptUpper.includes('DONAC') ||
-                          bankClean.includes('EXENC') || pMethodUpper.includes('EXENC') || conceptUpper.includes('EXENC') ||
-                          bankClean.includes('EXCENC') || pMethodUpper.includes('EXCENC') || conceptUpper.includes('EXCENC') ||
-                          bankClean.includes('EXENT') || pMethodUpper.includes('EXENT') || conceptUpper.includes('EXENT') ||
-                          bankClean.includes('EXCENT') || pMethodUpper.includes('EXCENT') || conceptUpper.includes('EXCENT') ||
-                          bankClean.includes('CORTES') || pMethodUpper.includes('CORTES') || conceptUpper.includes('CORTES') ||
-                          bankClean.includes('DESCUENT') || pMethodUpper.includes('DESCUENT') || conceptUpper.includes('DESCUENT') ||
-                          bankClean.includes('ANULA') || pMethodUpper.includes('ANULA') || conceptUpper.includes('ANULA') ||
-                          bankClean.includes('BONIF') || pMethodUpper.includes('BONIF') || conceptUpper.includes('BONIF');
-
-       if (isWarranty || isDonation) return;
-
-       // Track period payments
-       periodCxcPayments += p.amountUsd;
-
-       const isCashDest = bankClean.includes('EFECTIVO') || bankClean.includes('CAJA CHICA');
-       const isBankDest = !isCashDest;
-
-       const isBank = isBankDest || p.paymentMethod === PaymentMethod.BS || p.paymentMethod === PaymentMethod.ZELLE || p.paymentMethod === PaymentMethod.BINANCE;
-
-       const normalizePaymentMethod = (str?: string) => {
-         if (!str) return '';
-         return str
-           .toLowerCase()
-           .normalize('NFD')
-           .replace(/[\u0300-\u036f]/g, '')
-           .trim();
-       };
-       const normPMethod = normalizePaymentMethod(p.paymentMethod);
-       const isBs = normPMethod.includes('bs') || normPMethod.includes('bolivar') || normPMethod.includes('pago movil') || normPMethod.includes('transferencia');
-
-       const pRate = p.exchangeRate || exchangeRate || 1;
-
-       if (isBs) {
-          const amountBsVal = p.amountBs || (p.amountUsd * pRate);
-          const eqUsd = pRate > 0 ? amountBsVal / pRate : p.amountUsd;
-
-          if (isBank) {
-             totalBsBancoUsd += eqUsd;
-             totalBsBancoBs += amountBsVal;
-             cxcBsBancoUsd += eqUsd;
-             cxcBsBancoBs += amountBsVal;
-          } else {
-             totalBsEfectivoUsd += eqUsd;
-             totalBsEfectivoBs += amountBsVal;
-             cxcBsEfectivoUsd += eqUsd;
-             cxcBsEfectivoBs += amountBsVal;
-          }
-       } else {
-          const usdAmount = p.amountUsd;
-          if (isBank) {
-             totalUsdBancoUsd += usdAmount;
-             totalUsdBancoBs += usdAmount * pRate;
-             cxcUsdBancoUsd += usdAmount;
-             cxcUsdBancoBs += usdAmount * pRate;
-          } else {
-             totalUsdEfectivoUsd += usdAmount;
-             totalUsdEfectivoBs += usdAmount * pRate;
-             cxcUsdEfectivoUsd += usdAmount;
-             cxcUsdEfectivoBs += usdAmount * pRate;
-          }
-       }
-    });
-
-  // User requested CXC to only show gross sales (charges) without abonos
-  const isFiltered = !!(startDate || endDate);
-  
-  // Calculate total gross CXC charges across all time for non-filtered view
-  const totalGlobalGrossCxc = transactions
-    .filter(t => t.isCXC && t.type === TransactionType.SALE)
-    .reduce((sum, t) => sum + t.amountUsd, 0);
-
-  const displayCXCValue = isFiltered ? periodCxcCharges : totalGlobalGrossCxc;
+  // CXC accounts pending (Top Debtors cards and client distribution charts)
+  const totalCxcBalance = cxcAccounts.reduce((sum, acc) => sum + (acc.totalBalance || 0), 0);
 
   // We still calculate period expenses and withdrawals for the charts
   const periodWithdrawals = transactions
@@ -306,9 +168,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .filter(e => filterByDate(e.date))
     .reduce((sum, e) => sum + e.amountUsd, 0);
 
-  const cashBalance = (totalUsdEfectivoUsd + totalBsEfectivoUsd) - periodWithdrawals - periodExpenses;
-
-  // Chart data Preparation
+  // Chart data Preparation matching exactly "Ingresos Caja Principal" CRUD
   const getLast6MonthsData = () => {
     const data = [];
     for (let i = 5; i >= 0; i--) {
@@ -317,15 +177,15 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
       
       const income = transactions
         .filter(t => {
-          if (t.type === TransactionType.INCOME && (t.concept?.includes('ABONO CUENTAS POR COBRAR') || t.concept?.includes('(CXC)'))) {
-            return false;
-          }
-          if (t.paymentMethod === PaymentMethod.CXC) {
-            return false;
-          }
-          return (t.type === TransactionType.INCOME || t.type === TransactionType.SALE) && isWithinInterval(new Date(t.date), interval);
+          if (t.type !== TransactionType.SALE) return false;
+          if (t.isCXC || t.paymentMethod === PaymentMethod.CXC) return false;
+          return isWithinInterval(new Date(t.date), interval);
         })
-        .reduce((sum, t) => sum + t.amountUsd, 0);
+        .reduce((sum, t) => {
+          const isBsTx = !!(t.amountBs && t.amountBs > 0);
+          const valueUsd = isBsTx ? ((t.amountUsdCash || 0) + (t.amountZelle || 0) + (t.amountCXC || 0)) : (t.totalDailySale || t.amountUsd || 0);
+          return sum + valueUsd;
+        }, 0);
         
       const withdrawal = transactions
         .filter(t => t.type === 'withdrawal' && isWithinInterval(new Date(t.date), interval))
@@ -346,8 +206,6 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
 
   const chartData = getLast6MonthsData();
 
-  // PieChart CXC balance distribution calculations
-  const totalCxcBalance = cxcAccounts.reduce((sum, acc) => sum + (acc.totalBalance || 0), 0);
   const PIE_COLORS = ['#0f172a', '#2563eb', '#0d9488', '#e11d48', '#ea580c', '#64748b'];
 
   const processedCxcChartData = (() => {
@@ -378,70 +236,6 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     ];
   })();
 
-  const stats = [
-    { label: 'TOTAL VENTAS', value: totalVentasUsd, valueBs: totalVentasBs, icon: TrendingUp, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { 
-      label: 'TOTAL INGRESO BOLIVARES BANCO', 
-      value: totalBsBancoUsd, 
-      valueBs: totalBsBancoBs, 
-      icon: CreditCard, 
-      color: 'text-sky-600', 
-      bg: 'bg-sky-50',
-      breakdown: {
-        salesUsd: salesBsBancoUsd,
-        salesBs: salesBsBancoBs,
-        cxcUsd: cxcBsBancoUsd,
-        cxcBs: cxcBsBancoBs,
-        isBs: true
-      }
-    },
-    { 
-      label: 'TOTAL INGRESO BOLIVARES EFECTIVO', 
-      value: totalBsEfectivoUsd, 
-      valueBs: totalBsEfectivoBs, 
-      icon: Banknote, 
-      color: 'text-teal-600', 
-      bg: 'bg-teal-50',
-      breakdown: {
-        salesUsd: salesBsEfectivoUsd,
-        salesBs: salesBsEfectivoBs,
-        cxcUsd: cxcBsEfectivoUsd,
-        cxcBs: cxcBsEfectivoBs,
-        isBs: true
-      }
-    },
-    { 
-      label: 'TOTAL INGRESO DOLARES BANCO', 
-      value: totalUsdBancoUsd, 
-      valueBs: totalUsdBancoBs, 
-      icon: CreditCard, 
-      color: 'text-emerald-600', 
-      bg: 'bg-emerald-50',
-      breakdown: {
-        salesUsd: salesUsdBancoUsd,
-        salesBs: salesUsdBancoBs,
-        cxcUsd: cxcUsdBancoUsd,
-        cxcBs: cxcUsdBancoBs,
-        isBs: false
-      }
-    },
-    { 
-      label: 'TOTAL INGRESO DOLARES EFECTIVO', 
-      value: totalUsdEfectivoUsd, 
-      valueBs: totalUsdEfectivoBs, 
-      icon: Banknote, 
-      color: 'text-green-600', 
-      bg: 'bg-green-50',
-      breakdown: {
-        salesUsd: salesUsdEfectivoUsd,
-        salesBs: salesUsdEfectivoBs,
-        cxcUsd: cxcUsdEfectivoUsd,
-        cxcBs: cxcUsdEfectivoBs,
-        isBs: false
-      }
-    },
-  ];
-
   if (loading) {
     return <div className="flex items-center justify-center h-64">Cargando datos...</div>;
   }
@@ -450,7 +244,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-[28px] font-black text-slate-900 tracking-tight">Panel General</h2>
+          <h2 className="text-[28px] font-black text-slate-900 tracking-tight uppercase">dashboard caja principal (tienda)</h2>
           <p className="text-sm font-medium text-slate-500 mt-1">Resumen del estado financiero del negocio.</p>
         </div>
         
@@ -493,80 +287,144 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {stats.map((stat, i) => {
-          const isTotalVentas = stat.label === 'TOTAL VENTAS';
-          
-          return (
-            <div key={i} className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
-              {isTotalVentas ? (
-                <div className="w-full flex flex-col justify-between h-full">
-                  <div className="flex items-start justify-between w-full">
-                    <div>
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
-                    </div>
-                    <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color} shrink-0`}>
-                      <stat.icon size={22} strokeWidth={2.5} />
-                    </div>
-                  </div>
-                  
-                  <div className="mt-5 space-y-2.5 text-xs text-slate-600">
-                    <div className="flex justify-between items-center gap-4">
-                      <span className="font-medium text-slate-500">total ingreso bolivares banco</span>
-                      <span className="font-bold text-slate-800">{formatCurrency(salesBsBancoUsd)}</span>
-                    </div>
-                    <div className="flex justify-between items-center gap-4">
-                      <span className="font-medium text-slate-500">total ingreso bolivares</span>
-                      <span className="font-bold text-slate-800">{formatCurrency(salesBsEfectivoUsd)}</span>
-                    </div>
-                    <div className="flex justify-between items-center gap-4">
-                      <span className="font-medium text-slate-500">total binance/zelle</span>
-                      <span className="font-bold text-slate-800">{formatCurrency(salesUsdBancoUsd)}</span>
-                    </div>
-                    <div className="flex justify-between items-center gap-4">
-                      <span className="font-medium text-slate-500">total efectivo $</span>
-                      <span className="font-bold text-slate-800">{formatCurrency(salesUsdEfectivoUsd)}</span>
-                    </div>
-                    <div className="flex justify-between items-center border-t border-slate-200/60 pt-2.5 mt-2.5 font-bold text-slate-900">
-                      <span className="text-slate-800">total ventas</span>
-                      <span className="text-sm font-black text-violet-700">{formatCurrency(salesBsBancoUsd + salesBsEfectivoUsd + salesUsdBancoUsd + salesUsdEfectivoUsd)}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</p>
-                      <h3 className={`text-3xl font-black mt-2 tracking-tight ${stat.color}`}>{formatCurrency(stat.value)}</h3>
-                      <p className={`text-xs mt-1 font-bold ${stat.color} opacity-70`}>Bs. {new Intl.NumberFormat('es-VE').format(stat.valueBs)}</p>
-                    </div>
-                    <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color} shrink-0`}>
-                      <stat.icon size={22} strokeWidth={2.5} />
-                    </div>
-                  </div>
-                  {stat.breakdown && (
-                    <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-[11px]">
-                      <div className="flex justify-between items-center text-slate-500">
-                        <span>Ventas Directas:</span>
-                        <span className="font-bold text-slate-800">
-                          {formatCurrency(stat.breakdown.salesUsd)}
-                          {stat.breakdown.isBs && ` (Bs. ${new Intl.NumberFormat('es-VE').format(stat.breakdown.salesBs)})`}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center text-slate-500">
-                        <span>Abonos Recibidos (CXC):</span>
-                        <span className="font-bold text-emerald-600">
-                          {formatCurrency(stat.breakdown.cxcUsd)}
-                          {stat.breakdown.isBs && ` (Bs. ${new Intl.NumberFormat('es-VE').format(stat.breakdown.cxcBs)})`}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
+        
+        {/* Card 1: Banco $ */}
+        <div className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Banco $</p>
+              <h3 className="text-3xl font-black mt-2 tracking-tight text-blue-600">{formatCurrency(totalUsdBancoUsd)}</h3>
+              <p className="text-xs text-slate-400 mt-1 font-semibold">Zelle / Binance / Bancos USD</p>
             </div>
-          );
-        })}
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+              <CreditCard size={20} strokeWidth={2.5} />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Efectivo $ */}
+        <div className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Efectivo $</p>
+              <h3 className="text-3xl font-black mt-2 tracking-tight text-emerald-600">{formatCurrency(totalUsdEfectivoUsd)}</h3>
+              <p className="text-xs text-slate-400 mt-1 font-semibold">Divisas físicas en caja</p>
+            </div>
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+              <DollarSign size={20} strokeWidth={2.5} />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Total $ */}
+        <div className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between bg-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Total $</p>
+              <h3 className="text-3xl font-black mt-2 tracking-tight text-slate-800">{formatCurrency(totalUsdBancoUsd + totalUsdEfectivoUsd)}</h3>
+              <p className="text-xs text-slate-400 mt-1 font-semibold">Total fondos en dólares</p>
+            </div>
+            <div className="p-3 bg-slate-100 text-slate-700 rounded-2xl">
+              <TrendingUp size={20} strokeWidth={2.5} />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Banco Bs */}
+        <div className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Banco Bs</p>
+              <h3 className="text-2xl font-black mt-2 tracking-tight text-slate-800">
+                Bs. {new Intl.NumberFormat('es-VE').format(totalBsBancoBs)}
+              </h3>
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Bs conv $</span>
+                <span className="text-sm font-bold text-slate-700">{formatCurrency(totalBsBancoUsd)}</span>
+              </div>
+            </div>
+            <div className="p-3 bg-sky-50 text-sky-600 rounded-2xl">
+              <CreditCard size={20} strokeWidth={2.5} />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 5: Efectivo Bs */}
+        <div className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Efectivo Bs</p>
+              <h3 className="text-2xl font-black mt-2 tracking-tight text-slate-800">
+                Bs. {new Intl.NumberFormat('es-VE').format(totalBsEfectivoBs)}
+              </h3>
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Bs conv $</span>
+                <span className="text-sm font-bold text-slate-700">{formatCurrency(totalBsEfectivoUsd)}</span>
+              </div>
+            </div>
+            <div className="p-3 bg-teal-50 text-teal-600 rounded-2xl">
+              <Banknote size={20} strokeWidth={2.5} />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 6: Total Bs */}
+        <div className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Total Bs</p>
+              <h3 className="text-2xl font-black mt-2 tracking-tight text-slate-800">
+                Bs. {new Intl.NumberFormat('es-VE').format(totalBsBancoBs + totalBsEfectivoBs)}
+              </h3>
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Bs conv $</span>
+                <span className="text-sm font-bold text-slate-700">{formatCurrency(totalBsBancoUsd + totalBsEfectivoUsd)}</span>
+              </div>
+            </div>
+            <div className="p-3 bg-slate-100 text-slate-700 rounded-2xl">
+              <TrendingUp size={20} strokeWidth={2.5} />
+            </div>
+          </div>
+        </div>
+
+        {/* Card 7: Cuentas Por cobrar (CXC) */}
+        <div className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cuentas Por cobrar (CXC)</p>
+              <h3 className="text-3xl font-black mt-2 tracking-tight text-rose-500">{formatCurrency(totalCxcBalance)}</h3>
+              <p className="text-xs text-slate-400 mt-1 font-semibold">Bs. {new Intl.NumberFormat('es-VE').format(totalCxcBalance * exchangeRate)} equiv.</p>
+            </div>
+            <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+              <Users size={20} strokeWidth={2.5} />
+            </div>
+          </div>
+        </div>
+
+        {/* Space spacing to align Gran Total with Totals column on lg screens */}
+        <div className="hidden lg:block"></div>
+
+        {/* Card 8: Gran Total */}
+        <div className="card p-6 border-slate-200/60 hover:shadow-md transition-shadow duration-300 flex flex-col justify-between bg-slate-900 border-none shadow-lg text-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Gran Total</p>
+              <h3 className="text-3xl font-black mt-2 tracking-tight text-emerald-400">
+                {formatCurrency(totalUsdBancoUsd + totalUsdEfectivoUsd + totalCxcBalance + (totalBsBancoUsd + totalBsEfectivoUsd))}
+              </h3>
+              <div className="mt-3 pt-2.5 border-t border-slate-800">
+                <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Gran Total en Bs</span>
+                <span className="text-sm font-bold text-slate-200">
+                  Bs. {new Intl.NumberFormat('es-VE').format((totalUsdBancoUsd + totalUsdEfectivoUsd + totalCxcBalance) * exchangeRate + (totalBsBancoBs + totalBsEfectivoBs))}
+                </span>
+              </div>
+            </div>
+            <div className="p-3 bg-white/10 text-white rounded-2xl">
+              <DollarSign size={20} strokeWidth={2.5} />
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

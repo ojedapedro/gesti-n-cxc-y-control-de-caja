@@ -71,7 +71,7 @@ export default function App() {
   }
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Dashboard Caja Principal', icon: LayoutDashboard },
     { id: 'incomes', label: 'Ingresos Caja Principal', icon: Wallet },
     { id: 'cxc', label: 'Ingreso Cuentas por Cobrar (CXC)', icon: Contact },
     { id: 'sellers', label: 'Registro Vendedores', icon: PlusCircle },

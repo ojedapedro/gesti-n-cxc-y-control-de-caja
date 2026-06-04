@@ -1278,18 +1278,15 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       </div>
 
                       <div className="space-y-1">
-                        <label className="label">Método de Pago</label>
+                        <label className="label">Moneda</label>
                         <select
                           required
                           value={paymentData.paymentMethod}
                           onChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.target.value as PaymentMethod })}
                           className="input-field cursor-pointer font-bold"
                         >
-                          <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH} - Dólares Efectivo</option>
-                          <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH} - Bolívares Efectivo</option>
-                          <option value={PaymentMethod.BS}>{PaymentMethod.BS}</option>
-                          <option value={PaymentMethod.ZELLE}>{PaymentMethod.ZELLE}</option>
-                          <option value={PaymentMethod.BINANCE}>{PaymentMethod.BINANCE}</option>
+                          <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
+                          <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
                         </select>
                       </div>
 
@@ -1305,34 +1302,28 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           list="bancos-list-cxc"
                         />
                         <datalist id="bancos-list-cxc">
-                          {(parseFloat(paymentData.amountBs) || 0) > 0 ? (
+                          {paymentData.paymentMethod === PaymentMethod.BS || 
+                           paymentData.paymentMethod === PaymentMethod.BS_CASH ? (
                             <>
                               <option value="BANESCO" />
+                              <option value="BANCO DEL TESORO" />
+                              <option value="VENEZUELA" />
                               <option value="PROVINCIAL" />
                               <option value="MERCANTIL" />
-                              <option value="VENEZUELA" />
-                              <option value="BANCO DEL TESORO" />
                               <option value="BNC" />
-                              <option value="BINANCE P2P" />
-                              <option value="ZELLE" />
                               <option value="EFECTIVO" />
-                              <option value="GARANTÍA" />
-                              <option value="DONACIÓN" />
-                              <option value="CUENTAS POR COBRAR (CXC)" />
                             </>
                           ) : (
                             <>
-                              <option value="VENEZUELA" />
-                              <option value="BANESCO" />
-                              <option value="BNC" />
-                              <option value="MERCANTIL" />
-                              <option value="BANCO DEL TESORO" />
-                              <option value="BINANCE P2P" />
                               <option value="ZELLE" />
+                              <option value="BINANCE P2P" />
                               <option value="EFECTIVO" />
-                              <option value="GARANTÍA" />
-                              <option value="DONACIÓN" />
-                              <option value="CUENTAS POR COBRAR (CXC)" />
+                              <option value="BANESCO" />
+                              <option value="BANCO DEL TESORO" />
+                              <option value="VENEZUELA" />
+                              <option value="PROVINCIAL" />
+                              <option value="MERCANTIL" />
+                              <option value="BNC" />
                             </>
                           )}
                         </datalist>
@@ -1715,18 +1706,15 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="label">Método de Pago</label>
+                      <label className="label">Moneda</label>
                       <select
                         required
                         value={editingPayment.paymentMethod || PaymentMethod.BS_CASH}
                         onChange={(e) => setEditingPayment({ ...editingPayment, paymentMethod: e.target.value as PaymentMethod })}
                         className="input-field cursor-pointer font-bold text-emerald-700 bg-emerald-50/50"
                       >
-                        <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH} - Dólares Efectivo</option>
-                        <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH} - Bolívares Efectivo</option>
-                        <option value={PaymentMethod.BS}>{PaymentMethod.BS}</option>
-                        <option value={PaymentMethod.ZELLE}>{PaymentMethod.ZELLE}</option>
-                        <option value={PaymentMethod.BINANCE}>{PaymentMethod.BINANCE}</option>
+                        <option value={PaymentMethod.USD_CASH}>{PaymentMethod.USD_CASH}</option>
+                        <option value={PaymentMethod.BS_CASH}>{PaymentMethod.BS_CASH}</option>
                       </select>
                     </div>
                   </div>
@@ -1743,34 +1731,28 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         list="bancos-list-edit-cxc"
                       />
                       <datalist id="bancos-list-edit-cxc">
-                        {(parseFloat(editingPayment.amountBs) || 0) > 0 ? (
+                        {editingPayment.paymentMethod === PaymentMethod.BS || 
+                         editingPayment.paymentMethod === PaymentMethod.BS_CASH ? (
                           <>
                             <option value="BANESCO" />
+                            <option value="BANCO DEL TESORO" />
+                            <option value="VENEZUELA" />
                             <option value="PROVINCIAL" />
                             <option value="MERCANTIL" />
-                            <option value="VENEZUELA" />
-                            <option value="BANCO DEL TESORO" />
                             <option value="BNC" />
-                            <option value="BINANCE P2P" />
-                            <option value="ZELLE" />
                             <option value="EFECTIVO" />
-                            <option value="GARANTÍA" />
-                            <option value="DONACIÓN" />
-                            <option value="CUENTAS POR COBRAR (CXC)" />
                           </>
                         ) : (
                           <>
-                            <option value="VENEZUELA" />
-                            <option value="BANESCO" />
-                            <option value="BNC" />
-                            <option value="MERCANTIL" />
-                            <option value="BANCO DEL TESORO" />
-                            <option value="BINANCE P2P" />
                             <option value="ZELLE" />
+                            <option value="BINANCE P2P" />
                             <option value="EFECTIVO" />
-                            <option value="GARANTÍA" />
-                            <option value="DONACIÓN" />
-                            <option value="CUENTAS POR COBRAR (CXC)" />
+                            <option value="BANESCO" />
+                            <option value="BANCO DEL TESORO" />
+                            <option value="VENEZUELA" />
+                            <option value="PROVINCIAL" />
+                            <option value="MERCANTIL" />
+                            <option value="BNC" />
                           </>
                         )}
                       </datalist>
