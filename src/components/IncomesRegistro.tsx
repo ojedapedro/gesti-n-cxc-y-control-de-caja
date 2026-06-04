@@ -485,18 +485,20 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <datalist id="bancos-list">
                   {inBolivares ? (
                     <>
+                      <option value="GARANTIA" />
+                      <option value="DONACION" />
+                      <option value="EFECTIVO" />
                       <option value="BANESCO" />
                       <option value="BANCO DEL TESORO" />
                       <option value="VENEZUELA" />
                       <option value="PROVINCIAL" />
                       <option value="MERCANTIL" />
                       <option value="BNC" />
-                      <option value="EFECTIVO" />
-                      <option value="GARANTIA" />
-                      <option value="DONACION" />
                     </>
                   ) : (
                     <>
+                      <option value="GARANTIA" />
+                      <option value="DONACION" />
                       <option value="ZELLE" />
                       <option value="BINANCE P2P" />
                       <option value="EFECTIVO" />
@@ -506,8 +508,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <option value="PROVINCIAL" />
                       <option value="MERCANTIL" />
                       <option value="BNC" />
-                      <option value="GARANTIA" />
-                      <option value="DONACION" />
                     </>
                   )}
                 </datalist>
@@ -792,16 +792,20 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     <option value="">Seleccione...</option>
                     {editingTransaction.currency?.includes('Bolívares') ? (
                       <>
+                        <option value="GARANTIA">GARANTÍA</option>
+                        <option value="DONACION">DONACIÓN</option>
+                        <option value="EFECTIVO">EFECTIVO</option>
                         <option value="BANESCO">BANESCO</option>
                         <option value="BANCO DEL TESORO">BANCO DEL TESORO</option>
                         <option value="VENEZUELA">VENEZUELA</option>
                         <option value="PROVINCIAL">PROVINCIAL</option>
                         <option value="MERCANTIL">MERCANTIL</option>
                         <option value="BNC">BNC</option>
-                        <option value="EFECTIVO">EFECTIVO</option>
                       </>
                     ) : (
                       <>
+                        <option value="GARANTIA">GARANTÍA</option>
+                        <option value="DONACION">DONACIÓN</option>
                         <option value="ZELLE">ZELLE</option>
                         <option value="BINANCE P2P">BINANCE P2P</option>
                         <option value="EFECTIVO">EFECTIVO</option>

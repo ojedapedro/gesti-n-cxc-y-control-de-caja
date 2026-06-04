@@ -1315,18 +1315,20 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           {paymentData.paymentMethod === PaymentMethod.BS || 
                            paymentData.paymentMethod === PaymentMethod.BS_CASH ? (
                             <>
+                              <option value="GARANTIA" />
+                              <option value="DONACION" />
+                              <option value="EFECTIVO" />
                               <option value="BANESCO" />
                               <option value="BANCO DEL TESORO" />
                               <option value="VENEZUELA" />
                               <option value="PROVINCIAL" />
                               <option value="MERCANTIL" />
                               <option value="BNC" />
-                              <option value="EFECTIVO" />
-                              <option value="GARANTIA" />
-                              <option value="DONACION" />
                             </>
                           ) : (
                             <>
+                              <option value="GARANTIA" />
+                              <option value="DONACION" />
                               <option value="ZELLE" />
                               <option value="BINANCE P2P" />
                               <option value="EFECTIVO" />
@@ -1336,8 +1338,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="PROVINCIAL" />
                               <option value="MERCANTIL" />
                               <option value="BNC" />
-                              <option value="GARANTIA" />
-                              <option value="DONACION" />
                             </>
                           )}
                         </datalist>
@@ -1748,18 +1748,20 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         {editingPayment.paymentMethod === PaymentMethod.BS || 
                          editingPayment.paymentMethod === PaymentMethod.BS_CASH ? (
                           <>
+                            <option value="GARANTIA" />
+                            <option value="DONACION" />
+                            <option value="EFECTIVO" />
                             <option value="BANESCO" />
                             <option value="BANCO DEL TESORO" />
                             <option value="VENEZUELA" />
                             <option value="PROVINCIAL" />
                             <option value="MERCANTIL" />
                             <option value="BNC" />
-                            <option value="EFECTIVO" />
-                            <option value="GARANTIA" />
-                            <option value="DONACION" />
                           </>
                         ) : (
                           <>
+                            <option value="GARANTIA" />
+                            <option value="DONACION" />
                             <option value="ZELLE" />
                             <option value="BINANCE P2P" />
                             <option value="EFECTIVO" />
@@ -1769,8 +1771,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                             <option value="PROVINCIAL" />
                             <option value="MERCANTIL" />
                             <option value="BNC" />
-                            <option value="GARANTIA" />
-                            <option value="DONACION" />
                           </>
                         )}
                       </datalist>
