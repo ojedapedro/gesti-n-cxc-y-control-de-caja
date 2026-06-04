@@ -62,6 +62,7 @@ export interface CXCAccount {
 export interface CXCPayment {
   id?: string;
   clientId: string;
+  clientName?: string;
   date: string;
   amountUsd: number;
   grossAmountUsd?: number;

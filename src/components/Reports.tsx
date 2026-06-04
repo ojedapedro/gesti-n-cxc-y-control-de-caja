@@ -245,9 +245,12 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       const dest = (p.destinationBank || '').toUpperCase();
       const pMethod = (p.paymentMethod || '').toUpperCase();
       const concept = (p.concept || '').toUpperCase();
+      const seller = (p.sellerName || '').toUpperCase();
+      const client = (p.clientName || '').toUpperCase();
       
-      const isWarranty = dest.includes('GARANT') || pMethod.includes('GARANT') || concept.includes('GARANT');
+      const isWarranty = dest.includes('GARANT') || pMethod.includes('GARANT') || concept.includes('GARANT') || seller.includes('GARANT') || client.includes('GARANT');
       const isDonation = dest.includes('DONAC') || pMethod.includes('DONAC') || concept.includes('DONAC') ||
+                         seller.includes('DONAC') || client.includes('DONAC') ||
                          dest.includes('EXENC') || pMethod.includes('EXENC') || concept.includes('EXENC') ||
                          dest.includes('EXCENC') || pMethod.includes('EXCENC') || concept.includes('EXCENC') ||
                          dest.includes('EXENT') || pMethod.includes('EXENT') || concept.includes('EXENT') ||
@@ -324,9 +327,13 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
 
       const pMethodUpper = (p.paymentMethod || '').trim().toUpperCase();
       const conceptUpper = (p.concept || '').trim().toUpperCase();
+      const sellerUpper = (p.sellerName || '').trim().toUpperCase();
+      const clientNamePlaceholder = clientMap.get(p.clientId) || p.clientName || '';
+      const clientUpper = clientNamePlaceholder.trim().toUpperCase();
       
-      const isWarranty = bankClean.includes('GARANT') || pMethodUpper.includes('GARANT') || conceptUpper.includes('GARANT');
+      const isWarranty = bankClean.includes('GARANT') || pMethodUpper.includes('GARANT') || conceptUpper.includes('GARANT') || sellerUpper.includes('GARANT') || clientUpper.includes('GARANT');
       const isDonation = bankClean.includes('DONAC') || pMethodUpper.includes('DONAC') || conceptUpper.includes('DONAC') ||
+                         sellerUpper.includes('DONAC') || clientUpper.includes('DONAC') ||
                          bankClean.includes('EXENC') || pMethodUpper.includes('EXENC') || conceptUpper.includes('EXENC') ||
                          bankClean.includes('EXCENC') || pMethodUpper.includes('EXCENC') || conceptUpper.includes('EXCENC') ||
                          bankClean.includes('EXENT') || pMethodUpper.includes('EXENT') || conceptUpper.includes('EXENT') ||
@@ -551,9 +558,12 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       const dest = (p.destinationBank || '').toUpperCase();
       const pMethod = (p.paymentMethod || '').toUpperCase();
       const concept = (p.concept || '').toUpperCase();
+      const seller = (p.sellerName || '').toUpperCase();
+      const client = (p.clientName || clientMap.get(p.clientId) || '').toUpperCase();
       
-      const isWarranty = dest.includes('GARANT') || pMethod.includes('GARANT') || concept.includes('GARANT');
+      const isWarranty = dest.includes('GARANT') || pMethod.includes('GARANT') || concept.includes('GARANT') || seller.includes('GARANT') || client.includes('GARANT');
       const isDonation = dest.includes('DONAC') || pMethod.includes('DONAC') || concept.includes('DONAC') ||
+                         seller.includes('DONAC') || client.includes('DONAC') ||
                          dest.includes('EXENC') || pMethod.includes('EXENC') || concept.includes('EXENC') ||
                          dest.includes('EXCENC') || pMethod.includes('EXCENC') || concept.includes('EXCENC') ||
                          dest.includes('EXENT') || pMethod.includes('EXENT') || concept.includes('EXENT') ||
@@ -1424,9 +1434,12 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
                     const destUpper = (p.destinationBank || '').toUpperCase();
                     const pMethodUpper = (p.paymentMethod || '').toUpperCase();
                     const conceptUpper = (p.concept || '').toUpperCase();
+                    const sellerUpper = (p.sellerName || '').toUpperCase();
+                    const clientUpper = (p.clientName || clientName || '').toUpperCase();
                     
-                    const isWarranty = destUpper.includes('GARANT') || pMethodUpper.includes('GARANT') || conceptUpper.includes('GARANT');
+                    const isWarranty = destUpper.includes('GARANT') || pMethodUpper.includes('GARANT') || conceptUpper.includes('GARANT') || sellerUpper.includes('GARANT') || clientUpper.includes('GARANT');
                     const isDonation = destUpper.includes('DONAC') || pMethodUpper.includes('DONAC') || conceptUpper.includes('DONAC') ||
+                                       sellerUpper.includes('DONAC') || clientUpper.includes('DONAC') ||
                                        destUpper.includes('EXENC') || pMethodUpper.includes('EXENC') || conceptUpper.includes('EXENC') ||
                                        destUpper.includes('EXCENC') || pMethodUpper.includes('EXCENC') || conceptUpper.includes('EXCENC') ||
                                        destUpper.includes('EXENT') || pMethodUpper.includes('EXENT') || conceptUpper.includes('EXENT') ||

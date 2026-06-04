@@ -211,6 +211,7 @@ export const dbService = {
         ...data,
         type: 'charge',
         clientId: accountId,
+        clientName,
         createdAt: serverTimestamp(),
       });
 
@@ -252,15 +253,20 @@ export const dbService = {
   async addCXCPayment(clientId: string, data: Omit<CXCPayment, 'id' | 'clientId' | 'createdAt'>) {
     const path = `${CXC_ACCOUNTS_PATH}/${clientId}/payments`;
     try {
+      // Fetch the actual account first to get clientName
+      const accountRef = doc(db, CXC_ACCOUNTS_PATH, clientId);
+      const accountSnap = await getDoc(accountRef);
+      const clientName = accountSnap.exists() ? accountSnap.data().clientName || 'Desconocido' : 'Desconocido';
+
       const docAdded = await addDoc(collection(db, path), {
         ...data,
         type: data.type || 'payment', // Default to payment for backwards compatibility
         clientId,
+        clientName,
         createdAt: serverTimestamp(),
       });
+
       // Also update the account balance
-      const accountRef = doc(db, CXC_ACCOUNTS_PATH, clientId);
-      const accountSnap = await getDoc(accountRef);
       if (accountSnap.exists()) {
         const currentBalance = accountSnap.data().totalBalance || 0;
         const newBalance = data.type === 'charge' 
@@ -286,9 +292,12 @@ export const dbService = {
         const dest = normalizeText(data.destinationBank || '');
         const pMethod = normalizeText(data.paymentMethod || '');
         const concept = normalizeText(data.concept || '');
+        const seller = normalizeText(data.sellerName || '');
+        const client = normalizeText(clientName);
         
-        const isWarranty = dest.includes('GARANT') || pMethod.includes('GARANT') || concept.includes('GARANT');
+        const isWarranty = dest.includes('GARANT') || pMethod.includes('GARANT') || concept.includes('GARANT') || seller.includes('GARANT') || client.includes('GARANT');
         const isDonation = dest.includes('DONAC') || pMethod.includes('DONAC') || concept.includes('DONAC') ||
+                           seller.includes('DONAC') || client.includes('DONAC') ||
                            dest.includes('EXENC') || pMethod.includes('EXENC') || concept.includes('EXENC') ||
                            dest.includes('EXCENC') || pMethod.includes('EXCENC') || concept.includes('EXCENC') ||
                            dest.includes('EXENT') || pMethod.includes('EXENT') || concept.includes('EXENT') ||
@@ -304,7 +313,7 @@ export const dbService = {
 
           await this.addTransaction({
             date: data.date,
-            clientName: accountSnap.exists() ? accountSnap.data().clientName : 'Desconocido',
+            clientName: clientName,
             concept: `ABONO CUENTAS POR COBRAR: ${data.concept || ''} (${docAdded.id})`,
             amountUsd: data.amountUsd,
             amountBs: data.amountBs,
@@ -370,10 +379,12 @@ export const dbService = {
         } else {
           totalPayments += amt;
 
-          // Check for Warranty or Donation in payment method, destination bank, or concept
+          // Check for Warranty or Donation in payment method, destination bank, concept, seller, or client
           const dest = normalizeText(data.destinationBank);
           const pMethod = normalizeText(data.paymentMethod);
           const concept = normalizeText(data.concept);
+          const seller = normalizeText(data.sellerName);
+          const client = normalizeText(data.clientName);
           
           let isWarranty = false;
           let isDonation = false;
@@ -381,7 +392,9 @@ export const dbService = {
           if (
             dest.includes('GARANT') || 
             pMethod.includes('GARANT') || 
-            concept.includes('GARANT')
+            concept.includes('GARANT') ||
+            seller.includes('GARANT') ||
+            client.includes('GARANT')
           ) {
             totalWarranty += amt;
             isWarranty = true;
@@ -390,6 +403,8 @@ export const dbService = {
             dest.includes('DONAC') || 
             pMethod.includes('DONAC') || 
             concept.includes('DONAC') ||
+            seller.includes('DONAC') ||
+            client.includes('DONAC') ||
             dest.includes('EXENC') || 
             pMethod.includes('EXENC') || 
             concept.includes('EXENC') ||
@@ -485,6 +500,8 @@ export const dbService = {
           const dest = normalizeText(data.destinationBank);
           const pMethod = normalizeText(data.paymentMethod);
           const concept = normalizeText(data.concept);
+          const seller = normalizeText(data.sellerName);
+          const client = normalizeText(data.clientName);
           
           let isWarranty = false;
           let isDonation = false;
@@ -492,7 +509,9 @@ export const dbService = {
           if (
             dest.includes('GARANT') || 
             pMethod.includes('GARANT') || 
-            concept.includes('GARANT')
+            concept.includes('GARANT') ||
+            seller.includes('GARANT') ||
+            client.includes('GARANT')
           ) {
             totalWarranty += amt;
             isWarranty = true;
@@ -501,6 +520,8 @@ export const dbService = {
             dest.includes('DONAC') || 
             pMethod.includes('DONAC') || 
             concept.includes('DONAC') ||
+            seller.includes('DONAC') ||
+            client.includes('DONAC') ||
             dest.includes('EXENC') || 
             pMethod.includes('EXENC') || 
             concept.includes('EXENC') ||

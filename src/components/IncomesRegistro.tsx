@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 import { TransactionType, PaymentMethod, type Transaction, type Seller } from '../types';
-import { Plus, Search, Calendar, User, DollarSign, Tag, Clock, FileText, Edit, X, Percent } from 'lucide-react';
+import { Plus, Search, Calendar, User, DollarSign, Tag, Clock, FileText, Edit, X, Percent, Landmark } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -41,7 +41,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     sellerId: '',
     rubroName: '',
     exchangeRate: exchangeRate?.toString() || '0',
-    item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+    item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+    destinationBank: ''
   });
 
   // Sync sellers
@@ -196,7 +197,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         sellerName: cxcData.sellerName,
         sellerId: cxcData.sellerId,
         rubroName: cxcData.rubroName.split('|')[0],
-        type: 'charge'
+        type: 'charge',
+        destinationBank: cxcData.destinationBank || ''
       });
 
       setShowCXCModal(false);
@@ -212,7 +214,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
         sellerId: '',
         rubroName: '',
         exchangeRate: exchangeRate?.toString() || '1',
-        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+        destinationBank: ''
       });
     } catch (error) {
       console.error("Error saving Cuentas por Cobrar (CXC):", error);
@@ -489,6 +492,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <option value="MERCANTIL" />
                       <option value="BNC" />
                       <option value="EFECTIVO" />
+                      <option value="GARANTIA" />
+                      <option value="DONACION" />
                     </>
                   ) : (
                     <>
@@ -501,6 +506,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       <option value="PROVINCIAL" />
                       <option value="MERCANTIL" />
                       <option value="BNC" />
+                      <option value="GARANTIA" />
+                      <option value="DONACION" />
                     </>
                   )}
                 </datalist>
@@ -987,18 +994,45 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="label">Concepto</label>
-                <div className="relative">
-                  <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                  <input 
-                    type="text" 
-                    required
-                    value={cxcData.concept}
-                    onChange={(e) => setCxcData({...cxcData, concept: e.target.value})}
-                    className="input-field pl-10" 
-                    placeholder="Detalle de la venta/ingreso a crédito"
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Concepto</label>
+                  <div className="relative">
+                    <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      required
+                      value={cxcData.concept}
+                      onChange={(e) => setCxcData({...cxcData, concept: e.target.value})}
+                      className="input-field pl-10" 
+                      placeholder="Detalle de la venta/ingreso a crédito"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label">Banco / Destino</label>
+                  <div className="relative">
+                    <Landmark className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      value={cxcData.destinationBank || ''}
+                      onChange={(e) => setCxcData({...cxcData, destinationBank: e.target.value.toUpperCase()})}
+                      className="input-field pl-10 uppercase" 
+                      placeholder="Donacion, Garantia, etc."
+                      list="bancos-list-cargo-cxc"
+                    />
+                    <datalist id="bancos-list-cargo-cxc">
+                      <option value="GARANTIA" />
+                      <option value="DONACION" />
+                      <option value="EFECTIVO" />
+                      <option value="BANESCO" />
+                      <option value="VENEZUELA" />
+                      <option value="PROVINCIAL" />
+                      <option value="MERCANTIL" />
+                      <option value="ZELLE" />
+                    </datalist>
+                  </div>
                 </div>
               </div>
 

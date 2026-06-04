@@ -64,7 +64,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     sellerId: '',
     rubroName: '',
     exchangeRate: exchangeRate?.toString() || '0',
-    item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+    item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+    destinationBank: ''
   });
 
   // Fetch historical rate when cxcData date changes
@@ -312,10 +313,12 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       } else {
         totalPayments += amt;
 
-        // Check for Warranty or Donation in payment method, destination bank, or concept
+        // Check for Warranty or Donation in payment method, destination bank, concept, seller, or client
         const dest = normalizeText(p.destinationBank || '');
         const pMethod = normalizeText(p.paymentMethod || '');
         const concept = normalizeText(p.concept || '');
+        const seller = normalizeText(p.sellerName || '');
+        const client = normalizeText(p.clientName || selectedAccount?.clientName || '');
         
         let isWarranty = false;
         let isDonation = false;
@@ -323,7 +326,9 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         if (
           dest.includes('GARANT') || 
           pMethod.includes('GARANT') || 
-          concept.includes('GARANT')
+          concept.includes('GARANT') ||
+          seller.includes('GARANT') ||
+          client.includes('GARANT')
         ) {
           totalWarranty += amt;
           isWarranty = true;
@@ -332,6 +337,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
           dest.includes('DONAC') || 
           pMethod.includes('DONAC') || 
           concept.includes('DONAC') ||
+          seller.includes('DONAC') ||
+          client.includes('DONAC') ||
           dest.includes('EXENC') || 
           pMethod.includes('EXENC') || 
           concept.includes('EXENC') ||
@@ -483,7 +490,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         sellerName: cxcData.sellerName,
         sellerId: cxcData.sellerId,
         rubroName: cxcData.rubroName.split('|')[0],
-        type: 'charge'
+        type: 'charge',
+        destinationBank: cxcData.destinationBank || ''
       });
 
       setShowCXCModal(false);
@@ -499,7 +507,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         sellerId: '',
         rubroName: '',
         exchangeRate: exchangeRate?.toString() || '1',
-        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+        destinationBank: ''
       });
 
       if (selectedAccount && selectedAccount.clientName === cxcData.clientName.trim().toUpperCase()) {
@@ -1156,7 +1165,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         sellerId: '',
                         rubroName: '',
                         exchangeRate: exchangeRate?.toString() || '1',
-                        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`
+                        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+                        destinationBank: ''
                       });
                       setShowCXCModal(true);
                     }}
@@ -1312,6 +1322,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="MERCANTIL" />
                               <option value="BNC" />
                               <option value="EFECTIVO" />
+                              <option value="GARANTIA" />
+                              <option value="DONACION" />
                             </>
                           ) : (
                             <>
@@ -1324,6 +1336,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                               <option value="PROVINCIAL" />
                               <option value="MERCANTIL" />
                               <option value="BNC" />
+                              <option value="GARANTIA" />
+                              <option value="DONACION" />
                             </>
                           )}
                         </datalist>
@@ -1741,6 +1755,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                             <option value="MERCANTIL" />
                             <option value="BNC" />
                             <option value="EFECTIVO" />
+                            <option value="GARANTIA" />
+                            <option value="DONACION" />
                           </>
                         ) : (
                           <>
@@ -1753,6 +1769,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                             <option value="PROVINCIAL" />
                             <option value="MERCANTIL" />
                             <option value="BNC" />
+                            <option value="GARANTIA" />
+                            <option value="DONACION" />
                           </>
                         )}
                       </datalist>
@@ -1911,18 +1929,45 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="label">Concepto</label>
-                <div className="relative">
-                  <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                  <input 
-                    type="text" 
-                    required
-                    value={cxcData.concept}
-                    onChange={(e) => setCxcData({...cxcData, concept: e.target.value})}
-                    className="input-field pl-10" 
-                    placeholder="Detalle de la venta/ingreso a crédito"
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Concepto</label>
+                  <div className="relative">
+                    <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      required
+                      value={cxcData.concept}
+                      onChange={(e) => setCxcData({...cxcData, concept: e.target.value})}
+                      className="input-field pl-10" 
+                      placeholder="Detalle de la venta/ingreso a crédito"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label">Banco / Destino</label>
+                  <div className="relative">
+                    <Landmark className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      value={cxcData.destinationBank || ''}
+                      onChange={(e) => setCxcData({...cxcData, destinationBank: e.target.value.toUpperCase()})}
+                      className="input-field pl-10 uppercase" 
+                      placeholder="Donacion, Garantia, etc."
+                      list="bancos-list-cargo-cxc"
+                    />
+                    <datalist id="bancos-list-cargo-cxc">
+                      <option value="GARANTIA" />
+                      <option value="DONACION" />
+                      <option value="EFECTIVO" />
+                      <option value="BANESCO" />
+                      <option value="VENEZUELA" />
+                      <option value="PROVINCIAL" />
+                      <option value="MERCANTIL" />
+                      <option value="ZELLE" />
+                    </datalist>
+                  </div>
                 </div>
               </div>
 
