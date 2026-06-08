@@ -1023,18 +1023,13 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       value={cxcData.destinationBank || ''}
                       onChange={(e) => setCxcData({...cxcData, destinationBank: e.target.value.toUpperCase()})}
                       className="input-field pl-10 uppercase" 
-                      placeholder="Donacion, Garantia, etc."
+                      placeholder="Garantía, Donación, Cuenta por Cobrar (CXC)"
                       list="bancos-list-cargo-cxc"
                     />
                     <datalist id="bancos-list-cargo-cxc">
                       <option value="GARANTIA" />
                       <option value="DONACION" />
-                      <option value="EFECTIVO" />
-                      <option value="BANESCO" />
-                      <option value="VENEZUELA" />
-                      <option value="PROVINCIAL" />
-                      <option value="MERCANTIL" />
-                      <option value="ZELLE" />
+                      <option value="CUENTA POR COBRAR (CXC)" />
                     </datalist>
                   </div>
                 </div>
