@@ -494,18 +494,24 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
   const handleSubmitCXC = async (e: React.FormEvent) => {
     e.preventDefault();
-    const clientName = cxcData.clientName.trim() || 'CLIENTE S/N';
+    const clientName = cxcData.clientName.trim();
     const concept = cxcData.concept.trim() || 'VENTA A CRÉDITO';
     const invoiceNumber = cxcData.invoiceNumber.trim() || 'S/N';
-    const sellerName = cxcData.sellerName.trim() || 'S/V';
+    const sellerName = cxcData.sellerName.trim();
+    const sellerId = cxcData.sellerId;
+    const rubroName = cxcData.rubroName;
+    const gross = parseFloat(cxcData.grossAmountUsd);
+
+    if (!cxcData.date || !clientName || !sellerId || !rubroName || isNaN(gross) || gross <= 0) {
+      return;
+    }
 
     try {
-      const gross = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
       const net = parseFloat(cxcData.amountUsd) || 0;
       const commissionAmount = gross - net;
 
       await dbService.addCXCCharge(clientName.toUpperCase(), {
-        date: cxcData.date || format(new Date(), 'yyyy-MM-dd'),
+        date: cxcData.date,
         amountUsd: net,
         grossAmountUsd: gross,
         commissionAmountUsd: commissionAmount,
@@ -515,8 +521,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         item: cxcData.item || `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
         invoiceNumber: invoiceNumber,
         sellerName: sellerName,
-        sellerId: cxcData.sellerId || '',
-        rubroName: cxcData.rubroName ? cxcData.rubroName.split('|')[0] : '',
+        sellerId: sellerId,
+        rubroName: rubroName.split('|')[0],
         type: 'charge',
         destinationBank: cxcData.destinationBank || ''
       });
@@ -1949,9 +1955,10 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             <form onSubmit={handleSubmitCXC} className="p-6 space-y-4 overflow-y-auto max-h-[80vh] custom-scrollbar">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="label">Fecha</label>
+                  <label className="label">Fecha *</label>
                   <input 
                     type="date" 
+                    required
                     value={cxcData.date}
                     onChange={(e) => setCxcData({...cxcData, date: e.target.value})}
                     className="input-field" 
@@ -1969,11 +1976,12 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               </div>
 
               <div className="space-y-1">
-                <label className="label">Cliente (Nombre y Apellido)</label>
+                <label className="label">Cliente (Nombre y Apellido) *</label>
                 <div className="relative">
                   <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
                   <input 
                     type="text" 
+                    required
                     value={cxcData.clientName}
                     onChange={(e) => setCxcData({...cxcData, clientName: e.target.value})}
                     className="input-field pl-10 uppercase font-medium" 
@@ -2033,10 +2041,11 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                 </div>
 
                 <div className="space-y-1">
-                  <label className="label">Vendedor / Perfil</label>
+                  <label className="label">Vendedor / Perfil *</label>
                   <div className="relative">
                     <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <select 
+                      required
                       value={cxcData.sellerId}
                       onChange={(e) => {
                         const sId = e.target.value;
@@ -2072,7 +2081,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
               <div className="space-y-1">
                 <label className="label flex items-center justify-between">
-                  <span>Rubro / Categoría de Venta</span>
+                  <span>Rubro / Categoría de Venta *</span>
                   {cxcData.rubroName && (
                     <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-black uppercase">
                       {cxcData.rubroName.includes('|') ? cxcData.rubroName.split('|')[1] : '0'}% Comis.
@@ -2082,6 +2091,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                 <div className="relative">
                   <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
                   <select 
+                    required
                     value={cxcData.rubroName}
                     onChange={(e) => {
                       const rValue = e.target.value;
@@ -2118,13 +2128,14 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="label">Monto Bruto (USD)</label>
+                  <label className="label">Monto Bruto (USD) *</label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <input 
                       type="number" 
                       step="0.01"
                       min="0.01"
+                      required
                       placeholder="0.00"
                       value={cxcData.grossAmountUsd}
                       onChange={(e) => {
