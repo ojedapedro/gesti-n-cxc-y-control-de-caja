@@ -1307,7 +1307,15 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                           required
                           placeholder="Ej: Banesco, Zelle, etc."
                           value={paymentData.destinationBank}
-                          onChange={(e) => setPaymentData({ ...paymentData, destinationBank: e.target.value.toUpperCase() })}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            const isUsdDefault = val === 'DONACION' || val === 'GARANTIA';
+                            setPaymentData({
+                              ...paymentData,
+                              destinationBank: val,
+                              paymentMethod: isUsdDefault ? PaymentMethod.USD_CASH : paymentData.paymentMethod
+                            });
+                          }}
                           className="input-field uppercase"
                           list="bancos-list-cxc"
                         />
@@ -1740,7 +1748,15 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                         type="text"
                         required
                         value={editingPayment.destinationBank || ''}
-                        onChange={(e) => setEditingPayment({ ...editingPayment, destinationBank: e.target.value.toUpperCase() })}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase();
+                          const isUsdDefault = val === 'DONACION' || val === 'GARANTIA';
+                          setEditingPayment({
+                            ...editingPayment,
+                            destinationBank: val,
+                            paymentMethod: isUsdDefault ? PaymentMethod.USD_CASH : editingPayment.paymentMethod
+                          });
+                        }}
                         className="input-field uppercase"
                         list="bancos-list-edit-cxc"
                       />

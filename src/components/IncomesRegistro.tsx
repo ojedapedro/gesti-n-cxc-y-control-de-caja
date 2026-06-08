@@ -478,7 +478,15 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   required
                   placeholder="Ej: Banesco, Provincial, Caja Fuerte, etc."
                   value={formData.destinationBank}
-                  onChange={(e) => setFormData({...formData, destinationBank: e.target.value.toUpperCase()})}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    const isUsdDefault = val === 'DONACION' || val === 'GARANTIA';
+                    setFormData({
+                      ...formData,
+                      destinationBank: val,
+                      paymentMethod: isUsdDefault ? PaymentMethod.USD_CASH : formData.paymentMethod
+                    });
+                  }}
                   className="input-field uppercase" 
                   list="bancos-list"
                 />
@@ -786,7 +794,15 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <select 
                     required
                     value={editingTransaction.destinationBank || ''}
-                    onChange={(e) => setEditingTransaction({...editingTransaction, destinationBank: e.target.value.toUpperCase()})}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      const isUsdDefault = val === 'DONACION' || val === 'GARANTIA';
+                      setEditingTransaction({
+                        ...editingTransaction,
+                        destinationBank: val,
+                        currency: isUsdDefault ? 'Dólares ($)' : editingTransaction.currency
+                      });
+                    }}
                     className="input-field uppercase cursor-pointer" 
                   >
                     <option value="">Seleccione...</option>
