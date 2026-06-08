@@ -1078,6 +1078,27 @@ export const dbService = {
     }, (error) => handleFirestoreError(error, OperationType.GET, 'settings'));
   },
 
+  subscribeToMonthlyGoals(callback: (data: Record<string, number>) => void) {
+    return onSnapshot(doc(db, 'settings', 'goals'), (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data() as Record<string, number>);
+      } else {
+        callback({});
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'settings/goals'));
+  },
+
+  async updateMonthlyGoal(monthKey: string, goalAmount: number) {
+    try {
+      const docRef = doc(db, 'settings', 'goals');
+      await setDoc(docRef, {
+        [monthKey]: goalAmount
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'settings/goals');
+    }
+  },
+
   subscribeToAllPayments(callback: (data: CXCPayment[]) => void) {
     const q = query(collectionGroup(db, 'payments'));
     return onSnapshot(q, (snapshot) => {

@@ -146,6 +146,10 @@
       "schema": "Settings",
       "description": "Global configuration."
     },
+    "/settings/goals": {
+      "schema": { "type": "object" },
+      "description": "Monthly sales and income goals target values keyed by YYYY-MM."
+    },
     "/exchange_rates": {
       "schema": "ExchangeRateEntry",
       "description": "Historical exchange rates record."

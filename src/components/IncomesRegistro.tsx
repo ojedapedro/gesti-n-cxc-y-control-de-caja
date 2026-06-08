@@ -177,26 +177,29 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
 
   const handleSubmitCXC = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cxcData.clientName.trim() || !cxcData.amountUsd || !cxcData.concept.trim() || !cxcData.sellerName.trim() || !cxcData.invoiceNumber.trim()) return;
+    const clientName = cxcData.clientName.trim() || 'CLIENTE S/N';
+    const concept = cxcData.concept.trim() || 'VENTA A CRÉDITO';
+    const invoiceNumber = cxcData.invoiceNumber.trim() || 'S/N';
+    const sellerName = cxcData.sellerName.trim() || 'S/V';
 
     try {
       const gross = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
       const net = parseFloat(cxcData.amountUsd) || 0;
       const commissionAmount = gross - net;
 
-      await dbService.addCXCCharge(cxcData.clientName.trim().toUpperCase(), {
-        date: cxcData.date,
+      await dbService.addCXCCharge(clientName.toUpperCase(), {
+        date: cxcData.date || format(new Date(), 'yyyy-MM-dd'),
         amountUsd: net,
         grossAmountUsd: gross,
         commissionAmountUsd: commissionAmount,
         amountBs: parseFloat(cxcData.amountBs) || 0,
         exchangeRate: parseFloat(cxcData.exchangeRate) || parseFloat(exchangeRate?.toString() || '1'),
-        concept: cxcData.concept,
-        item: cxcData.item,
-        invoiceNumber: cxcData.invoiceNumber,
-        sellerName: cxcData.sellerName,
-        sellerId: cxcData.sellerId,
-        rubroName: cxcData.rubroName.split('|')[0],
+        concept: concept,
+        item: cxcData.item || `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+        invoiceNumber: invoiceNumber,
+        sellerName: sellerName,
+        sellerId: cxcData.sellerId || '',
+        rubroName: cxcData.rubroName ? cxcData.rubroName.split('|')[0] : '',
         type: 'charge',
         destinationBank: cxcData.destinationBank || ''
       });
@@ -982,7 +985,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <label className="label">Fecha</label>
                   <input 
                     type="date" 
-                    required
                     value={cxcData.date}
                     onChange={(e) => setCxcData({...cxcData, date: e.target.value})}
                     className="input-field" 
@@ -1005,7 +1007,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
                   <input 
                     type="text" 
-                    required
                     value={cxcData.clientName}
                     onChange={(e) => setCxcData({...cxcData, clientName: e.target.value})}
                     className="input-field pl-10 uppercase font-medium" 
@@ -1021,7 +1022,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <input 
                       type="text" 
-                      required
                       value={cxcData.concept}
                       onChange={(e) => setCxcData({...cxcData, concept: e.target.value})}
                       className="input-field pl-10" 
@@ -1039,13 +1039,12 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       value={cxcData.destinationBank || ''}
                       onChange={(e) => setCxcData({...cxcData, destinationBank: e.target.value.toUpperCase()})}
                       className="input-field pl-10 uppercase" 
-                      placeholder="Garantía, Donación, Cuenta por Cobrar (CXC)"
+                      placeholder="Garantía, Donación, etc."
                       list="bancos-list-cargo-cxc"
                     />
                     <datalist id="bancos-list-cargo-cxc">
                       <option value="GARANTIA" />
                       <option value="DONACION" />
-                      <option value="CUENTA POR COBRAR (CXC)" />
                     </datalist>
                   </div>
                 </div>
@@ -1058,7 +1057,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                     <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <input 
                       type="text" 
-                      required
                       value={cxcData.invoiceNumber}
                       onChange={(e) => setCxcData({...cxcData, invoiceNumber: e.target.value})}
                       className="input-field pl-10" 
@@ -1072,7 +1070,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                   <div className="relative">
                     <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <select 
-                      required
                       value={cxcData.sellerId}
                       onChange={(e) => {
                         const sId = e.target.value;
@@ -1118,7 +1115,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 <div className="relative">
                   <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
                   <select 
-                    required
                     value={cxcData.rubroName}
                     onChange={(e) => {
                       const rValue = e.target.value;
@@ -1162,7 +1158,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       type="number" 
                       step="0.01"
                       min="0.01"
-                      required
                       placeholder="0.00"
                       value={cxcData.grossAmountUsd}
                       onChange={(e) => {

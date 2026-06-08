@@ -8,7 +8,13 @@ import {
   ArrowDownRight,
   Calendar,
   Banknote,
-  CreditCard
+  CreditCard,
+  Target,
+  Award,
+  Edit,
+  Check,
+  X,
+  Sparkles
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -75,6 +81,12 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
   const [allPayments, setAllPayments] = useState<CXCPayment[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // States for Monthly Goals
+  const [monthlyGoals, setMonthlyGoals] = useState<Record<string, number>>({});
+  const [selectedGoalMonth, setSelectedGoalMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [tempGoalValue, setTempGoalValue] = useState('');
+
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -85,6 +97,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     const unsubT = dbService.subscribeToTransactions(setTransactions);
     const unsubE = dbService.subscribeToExpenses(setExpenses);
     const unsubP = dbService.subscribeToAllPayments(setAllPayments);
+    const unsubG = dbService.subscribeToMonthlyGoals(setMonthlyGoals);
     const unsubC = dbService.subscribeToCXCAccounts((accounts) => {
       setCXCAccounts(accounts);
       setLoading(false);
@@ -94,6 +107,7 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
       unsubT();
       unsubE();
       unsubP();
+      unsubG();
       unsubC();
     };
   }, []);
@@ -297,6 +311,61 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     return null;
   };
 
+  // Helper to dynamically calculate total sales for an arbitrarily requested month in 'yyyy-MM' format
+  const getSalesForMonth = (monthKey: string) => {
+    if (!monthKey) return 0;
+    const [year, month] = monthKey.split('-').map(Number);
+    if (!year || !month) return 0;
+    
+    const startOfTarget = startOfMonth(new Date(year, month - 1, 1));
+    const endOfTarget = endOfMonth(new Date(year, month - 1, 1));
+    const interval = { start: startOfTarget, end: endOfTarget };
+
+    return transactions
+      .filter(t => {
+        if (t.type !== TransactionType.SALE) return false;
+        if (t.isCXC || t.paymentMethod === PaymentMethod.CXC) return false;
+        try {
+          return isWithinInterval(new Date(t.date), interval);
+        } catch {
+          return false;
+        }
+      })
+      .reduce((sum, t) => {
+        const isBsTx = !!(t.amountBs && t.amountBs > 0);
+        const valueUsd = isBsTx ? ((t.amountUsdCash || 0) + (t.amountZelle || 0) + (t.amountCXC || 0)) : (t.totalDailySale || t.amountUsd || 0);
+        return sum + valueUsd;
+      }, 0);
+  };
+
+  // Pre-generate recent months
+  const recentGoalMonths = React.useMemo(() => {
+    const list = [];
+    for (let i = 0; i < 4; i++) {
+      const d = subMonths(new Date(), i);
+      list.push({
+        key: format(d, 'yyyy-MM'),
+        label: format(d, 'MMMM yyyy', { locale: es }).toUpperCase(),
+        shortLabel: format(d, 'MMM yyyy', { locale: es }).toUpperCase()
+      });
+    }
+    return list;
+  }, []);
+
+  // Sync edit mode input when selected goal month changes
+  useEffect(() => {
+    const currentGoal = monthlyGoals[selectedGoalMonth] || 0;
+    setTempGoalValue(currentGoal > 0 ? currentGoal.toString() : '');
+  }, [selectedGoalMonth, monthlyGoals]);
+
+  // Save changes to db
+  const handleSaveGoal = async () => {
+    const value = parseFloat(tempGoalValue);
+    if (isNaN(value) || value < 0) return;
+    await dbService.updateMonthlyGoal(selectedGoalMonth, value);
+    setIsEditingGoal(false);
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">Cargando datos...</div>;
   }
@@ -486,6 +555,211 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
           </div>
         </div>
 
+      </div>
+
+      {/* Seccion de Metas de Ingresos Mensuales */}
+      <div className="card p-6 border-slate-200/60 shadow-sm relative overflow-hidden bg-white mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-4 mb-6 gap-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <Target className="text-blue-600" size={18} />
+              Metas de Ingresos Mensuales
+            </h3>
+            <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Establece objetivos de ventas y monitorea el progreso en tiempo real</p>
+          </div>
+          
+          {/* Month Selection */}
+          <div className="flex items-center gap-2 shrink-0">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ver Mes:</label>
+            <select
+              value={selectedGoalMonth}
+              onChange={(e) => {
+                setSelectedGoalMonth(e.target.value);
+                setIsEditingGoal(false);
+              }}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 outline-none cursor-pointer hover:bg-slate-100 transition-colors"
+            >
+              {recentGoalMonths.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Col 1 & 2: Tracker progress */}
+          <div className="md:col-span-2 space-y-6">
+            {isEditingGoal ? (
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-left">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Definir Meta para {recentGoalMonths.find(m => m.key === selectedGoalMonth)?.label}</h4>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="relative w-full">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">$</span>
+                    <input
+                      type="number"
+                      placeholder="Ej. 15000"
+                      value={tempGoalValue}
+                      onChange={(e) => setTempGoalValue(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl py-2 pl-8 pr-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 transition-colors"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={handleSaveGoal}
+                      className="w-full sm:w-auto shrink-0 bg-blue-600 text-white rounded-xl px-4 py-2 text-xs font-bold hover:bg-blue-700 active:transform active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Check size={14} /> Guardar
+                    </button>
+                    <button
+                      onClick={() => setIsEditingGoal(false)}
+                      className="w-full sm:w-auto shrink-0 bg-slate-200 text-slate-700 rounded-xl px-4 py-2 text-xs font-bold hover:bg-slate-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <X size={14} /> Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-left">
+                {(monthlyGoals[selectedGoalMonth] || 0) > 0 ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-start sm:items-center gap-2 flex-wrap">
+                        <span className="text-2xl font-black text-slate-800 tracking-tight">{formatCurrency(getSalesForMonth(selectedGoalMonth))}</span>
+                        <span className="text-xs text-slate-400 font-semibold md:inline-block">logrados de una meta de</span>
+                        <span className="text-sm font-black text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg">{formatCurrency(monthlyGoals[selectedGoalMonth])}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setTempGoalValue((monthlyGoals[selectedGoalMonth] || 0).toString());
+                          setIsEditingGoal(true);
+                        }}
+                        className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg px-2.5 py-1.5 transition-colors self-start sm:self-auto cursor-pointer"
+                      >
+                        <Edit size={12} /> Modificar Meta
+                      </button>
+                    </div>
+
+                    {/* Progress bar container */}
+                    <div className="space-y-2 mt-4">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-500">Progreso del objetivo</span>
+                        <span className={`font-black uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1.5 text-[10px] ${getSalesForMonth(selectedGoalMonth) >= (monthlyGoals[selectedGoalMonth] || 0) ? 'text-emerald-700 bg-emerald-50' : 'text-blue-750 bg-blue-50'}`}>
+                          {getSalesForMonth(selectedGoalMonth) >= (monthlyGoals[selectedGoalMonth] || 0) && <Sparkles size={12} className="text-amber-500" />}
+                          {(monthlyGoals[selectedGoalMonth] || 0) > 0 ? (getSalesForMonth(selectedGoalMonth) / (monthlyGoals[selectedGoalMonth] || 0) * 105).toFixed(1) : '0.0'}% {getSalesForMonth(selectedGoalMonth) >= (monthlyGoals[selectedGoalMonth] || 0) ? '¡Alcanzada!' : ''}
+                        </span>
+                      </div>
+
+                      {/* Aesthetic bar wrapper */}
+                      <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner relative border border-slate-100/60">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-700 ease-out flex items-center justify-end pr-2 ${getSalesForMonth(selectedGoalMonth) >= (monthlyGoals[selectedGoalMonth] || 0) ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600' : 'bg-gradient-to-r from-blue-500 to-indigo-600'}`}
+                          style={{ width: `${Math.min((monthlyGoals[selectedGoalMonth] || 0) > 0 ? (getSalesForMonth(selectedGoalMonth) / (monthlyGoals[selectedGoalMonth] || 0) * 100) : 0, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Feedback message cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/50">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Restante para Meta</span>
+                        <span className={`text-lg font-black block mt-1 ${getSalesForMonth(selectedGoalMonth) >= (monthlyGoals[selectedGoalMonth] || 0) ? 'text-emerald-600' : 'text-slate-800'}`}>
+                          {getSalesForMonth(selectedGoalMonth) >= (monthlyGoals[selectedGoalMonth] || 0) ? '$0.00' : formatCurrency((monthlyGoals[selectedGoalMonth] || 0) - getSalesForMonth(selectedGoalMonth))}
+                        </span>
+                        <p className="text-[10px] text-slate-500 font-semibold mt-1">
+                          {getSalesForMonth(selectedGoalMonth) >= (monthlyGoals[selectedGoalMonth] || 0) 
+                            ? '¡Excelente rendimiento de ventas!' 
+                            : `Equivalente en Bs: Bs. ${new Intl.NumberFormat('es-VE').format(Math.max(0, (monthlyGoals[selectedGoalMonth] || 0) - getSalesForMonth(selectedGoalMonth)) * exchangeRate)}`
+                          }
+                        </p>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/50 flex flex-col justify-between">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-bold">Estado del Objetivo</span>
+                          <div className="flex items-start gap-2.5 mt-1.5">
+                            <Award size={18} className={`shrink-0 mt-0.5 ${getSalesForMonth(selectedGoalMonth) >= (monthlyGoals[selectedGoalMonth] || 0) ? 'text-amber-500' : 'text-blue-500'}`} />
+                            <span className="text-xs font-bold text-slate-600 leading-tight">
+                              {getSalesForMonth(selectedGoalMonth) >= (monthlyGoals[selectedGoalMonth] || 0) 
+                                ? '¡Felicitaciones! Has consolidado mayores ventas de lo planificado para este mes. ¡Sigue rompiendo récords!' 
+                                : (getSalesForMonth(selectedGoalMonth) / (monthlyGoals[selectedGoalMonth] || 1) * 100) >= 75 
+                                ? 'Estás en la recta final de tu meta. ¡Mantén el esfuerzo y asiste tus clientes clave!'
+                                : (getSalesForMonth(selectedGoalMonth) / (monthlyGoals[selectedGoalMonth] || 1) * 100) >= 50
+                                ? 'Has alcanzado la mitad del recorrido. ¡Excelente avance!'
+                                : 'Establecido y avanzando de forma consistente.'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <Target size={36} className="text-slate-300 mb-2 animate-bounce" />
+                    <p className="text-sm font-bold text-slate-800">No se ha establecido una meta para {recentGoalMonths.find(m => m.key === selectedGoalMonth)?.label}</p>
+                    <p className="text-xs text-slate-500 mt-1 mb-4">Define un objetivo de ventas para motivar e impulsar el rendimiento mensual.</p>
+                    <button
+                      onClick={() => {
+                        setTempGoalValue('');
+                        setIsEditingGoal(true);
+                      }}
+                      className="bg-blue-600 text-white font-bold text-xs rounded-xl px-4 py-2 hover:bg-blue-700 shadow-sm active:transform active:scale-95 transition-all cursor-pointer"
+                    >
+                      Establecer Meta de Ventas
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Col 3: Quick history / selectors list */}
+          <div className="border-t md:border-t-0 md:border-l border-slate-100 pt-6 md:pt-0 md:pl-6 text-left">
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Historial y Selección</h4>
+            <div className="space-y-2">
+              {recentGoalMonths.map((m) => {
+                const mGoal = monthlyGoals[m.key] || 0;
+                const mSales = getSalesForMonth(m.key);
+                const mPercent = mGoal > 0 ? (mSales / mGoal) * 100 : 0;
+                const isMSelected = selectedGoalMonth === m.key;
+                
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => {
+                      setSelectedGoalMonth(m.key);
+                      setIsEditingGoal(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer border text-left ${
+                      isMSelected 
+                        ? 'bg-blue-50 border-blue-200 shadow-xs font-bold text-blue-900' 
+                        : 'bg-white hover:bg-slate-50 border-slate-100 text-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-[10px] font-bold block uppercase tracking-wide leading-none">{m.shortLabel}</span>
+                      <span className="text-[10px] text-slate-400 font-semibold block mt-1.5">
+                        {mGoal > 0 ? `Meta: ${formatCurrency(mGoal)}` : 'Sin meta definida'}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-mono font-black block">
+                        {formatCurrency(mSales)}
+                      </span>
+                      {mGoal > 0 && (
+                        <span className={`text-[9px] font-bold block mt-0.5 ${mSales >= mGoal ? 'text-emerald-600 font-black' : 'text-slate-500'}`}>
+                          {mPercent.toFixed(0)}% logrados
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -290,6 +290,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     let totalCharges = 0;
     let totalPayments = 0;
     let totalPaymentsUsd = 0;
+    let totalPaymentsUsdCash = 0;
+    let totalPaymentsUsdBank = 0;
     let totalPaymentsBs = 0;
     let totalPaymentsBsUsd = 0;
     let totalGrossCharges = 0;
@@ -379,6 +381,21 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             totalPaymentsBsUsd += amt;
           } else {
             totalPaymentsUsd += amt;
+            const pmText = (p.paymentMethod || '').toUpperCase();
+            const destText = (p.destinationBank || '').toUpperCase();
+            const isCashUsd = 
+              pmText === '$' || 
+              pmText.includes('EFECTIVO') || 
+              pmText.includes('CASH') || 
+              destText.includes('EFECTIVO') || 
+              destText.includes('CAJA CHICA') ||
+              (!pmText.includes('ZELLE') && !pmText.includes('BINANCE') && !pmText.includes('TRANSFERENCIA') && !pmText.includes('BANC') && !pmText.includes('PAGO'));
+            
+            if (isCashUsd) {
+              totalPaymentsUsdCash += amt;
+            } else {
+              totalPaymentsUsdBank += amt;
+            }
           }
         }
       }
@@ -388,6 +405,8 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       totalCharges,
       totalPayments: totalPaymentsUsd + totalPaymentsBsUsd,
       totalPaymentsUsd,
+      totalPaymentsUsdCash,
+      totalPaymentsUsdBank,
       totalPaymentsBs,
       totalPaymentsBsUsd,
       balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd) - totalWarranty - totalDonation,
@@ -400,7 +419,12 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
   const activeGlobalStats = (dashStartDate || dashEndDate)
     ? computeActiveStats(allPayments, dashStartDate, dashEndDate)
-    : globalStats;
+    : {
+        totalPaymentsUsdCash: 0,
+        totalPaymentsUsdBank: 0,
+        ...globalStats,
+        ...computeActiveStats(allPayments, '', '')
+      };
 
 
 
@@ -470,26 +494,29 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
 
   const handleSubmitCXC = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cxcData.clientName.trim() || !cxcData.amountUsd || !cxcData.concept.trim() || !cxcData.sellerName.trim() || !cxcData.invoiceNumber.trim()) return;
+    const clientName = cxcData.clientName.trim() || 'CLIENTE S/N';
+    const concept = cxcData.concept.trim() || 'VENTA A CRÉDITO';
+    const invoiceNumber = cxcData.invoiceNumber.trim() || 'S/N';
+    const sellerName = cxcData.sellerName.trim() || 'S/V';
 
     try {
       const gross = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
       const net = parseFloat(cxcData.amountUsd) || 0;
       const commissionAmount = gross - net;
 
-      await dbService.addCXCCharge(cxcData.clientName.trim().toUpperCase(), {
-        date: cxcData.date,
+      await dbService.addCXCCharge(clientName.toUpperCase(), {
+        date: cxcData.date || format(new Date(), 'yyyy-MM-dd'),
         amountUsd: net,
         grossAmountUsd: gross,
         commissionAmountUsd: commissionAmount,
         amountBs: parseFloat(cxcData.amountBs) || 0,
         exchangeRate: parseFloat(cxcData.exchangeRate) || parseFloat(exchangeRate?.toString() || '1'),
-        concept: cxcData.concept,
-        item: cxcData.item,
-        invoiceNumber: cxcData.invoiceNumber,
-        sellerName: cxcData.sellerName,
-        sellerId: cxcData.sellerId,
-        rubroName: cxcData.rubroName.split('|')[0],
+        concept: concept,
+        item: cxcData.item || `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+        invoiceNumber: invoiceNumber,
+        sellerName: sellerName,
+        sellerId: cxcData.sellerId || '',
+        rubroName: cxcData.rubroName ? cxcData.rubroName.split('|')[0] : '',
         type: 'charge',
         destinationBank: cxcData.destinationBank || ''
       });
@@ -840,16 +867,28 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
           <CheckCircle size={14} className="text-slate-400" /> Flujos de Abonos y Ajustes Recibidos
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
           <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <CheckCircle size={60} className="text-emerald-600" />
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en USD ($)</p>
-            <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalPaymentsUsd)}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalPaymentsUsd * exchangeRate)}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en $ (Efectivo)</p>
+            <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalPaymentsUsdCash || 0)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format((activeGlobalStats.totalPaymentsUsdCash || 0) * exchangeRate)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[9px] font-bold text-emerald-650 uppercase tracking-wider bg-emerald-50 px-1.5 py-0.5 rounded">Afecta Caja Activa</span>
+              <span className="text-[9px] font-bold text-emerald-650 uppercase tracking-wider bg-emerald-50 px-1.5 py-0.5 rounded">Efectivo $ en Caja</span>
+            </div>
+          </div>
+
+          <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <Landmark size={60} className="text-blue-600" />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en $ (Bancos/Zelle)</p>
+            <p className="text-2xl font-black text-blue-600 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalPaymentsUsdBank || 0)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format((activeGlobalStats.totalPaymentsUsdBank || 0) * exchangeRate)}</p>
+            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[9px] font-bold text-blue-650 uppercase tracking-wider bg-blue-50 px-1.5 py-0.5 rounded">Zelle / Divisa Banco</span>
             </div>
           </div>
 
@@ -1913,7 +1952,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                   <label className="label">Fecha</label>
                   <input 
                     type="date" 
-                    required
                     value={cxcData.date}
                     onChange={(e) => setCxcData({...cxcData, date: e.target.value})}
                     className="input-field" 
@@ -1936,7 +1974,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                   <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
                   <input 
                     type="text" 
-                    required
                     value={cxcData.clientName}
                     onChange={(e) => setCxcData({...cxcData, clientName: e.target.value})}
                     className="input-field pl-10 uppercase font-medium" 
@@ -1952,7 +1989,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <input 
                       type="text" 
-                      required
                       value={cxcData.concept}
                       onChange={(e) => setCxcData({...cxcData, concept: e.target.value})}
                       className="input-field pl-10" 
@@ -1970,13 +2006,12 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       value={cxcData.destinationBank || ''}
                       onChange={(e) => setCxcData({...cxcData, destinationBank: e.target.value.toUpperCase()})}
                       className="input-field pl-10 uppercase" 
-                      placeholder="Garantía, Donación, Cuenta por Cobrar (CXC)"
+                      placeholder="Garantía, Donación, etc."
                       list="bancos-list-cargo-cxc"
                     />
                     <datalist id="bancos-list-cargo-cxc">
                       <option value="GARANTIA" />
                       <option value="DONACION" />
-                      <option value="CUENTA POR COBRAR (CXC)" />
                     </datalist>
                   </div>
                 </div>
@@ -1989,7 +2024,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                     <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <input 
                       type="text" 
-                      required
                       value={cxcData.invoiceNumber}
                       onChange={(e) => setCxcData({...cxcData, invoiceNumber: e.target.value})}
                       className="input-field pl-10" 
@@ -2003,7 +2037,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                   <div className="relative">
                     <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
                     <select 
-                      required
                       value={cxcData.sellerId}
                       onChange={(e) => {
                         const sId = e.target.value;
@@ -2049,7 +2082,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                 <div className="relative">
                   <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
                   <select 
-                    required
                     value={cxcData.rubroName}
                     onChange={(e) => {
                       const rValue = e.target.value;
@@ -2093,7 +2125,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       type="number" 
                       step="0.01"
                       min="0.01"
-                      required
                       placeholder="0.00"
                       value={cxcData.grossAmountUsd}
                       onChange={(e) => {
