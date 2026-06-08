@@ -78,6 +78,31 @@ const checkIsBsMethod = (paymentMethod?: string, currency?: string, amountBs?: n
   return isBsMethod || (!isUsdMethod && !!amountBs && amountBs > 0);
 };
 
+const getPaymentClassification = (p: CXCPayment, exchangeRate: number): 'cash_usd' | 'cash_bs' | 'bank' => {
+  const isBs = checkIsBsMethod(p.paymentMethod, undefined, p.amountBs);
+  const pMethod = (p.paymentMethod || '').toUpperCase();
+  const dest = (p.destinationBank || '').toUpperCase();
+  
+  if (!isBs) {
+    const isCashUsd = 
+      pMethod.includes('EFECTIVO') || 
+      pMethod.includes('CASH') || 
+      dest.includes('EFECTIVO') || 
+      dest.includes('CAJA CHICA') ||
+      (!pMethod.includes('ZELLE') && !pMethod.includes('BINANCE') && !pMethod.includes('TRANSFERENCIA') && !pMethod.includes('BANC') && !pMethod.includes('PAGO'));
+    if (isCashUsd) return 'cash_usd';
+  } else {
+    const isCashBs = 
+      pMethod.includes('EFECTIVO') || 
+      pMethod.includes('CASH') || 
+      dest.includes('EFECTIVO') || 
+      dest.includes('CAJA CHICA') ||
+      (!pMethod.includes('TRANSFERENCIA') && !pMethod.includes('PAGO MOVIL') && !pMethod.includes('BANCO') && !pMethod.includes('BANC') && !dest.includes('BANC') && !dest.includes('TRANSFERENCIA') && !dest.includes('BOD') && !dest.includes('PROVINCIAL') && !dest.includes('MERCANTIL') && !dest.includes('BANESCO') && !dest.includes('BDV') && !dest.includes('VENEZUELA'));
+    if (isCashBs) return 'cash_bs';
+  }
+  return 'bank';
+};
+
 export default function Reports({ exchangeRate = 1 }: ReportsProps) {
   const [activeReport, setActiveReport] = useState<ReportType>('cxc_detail');
   
@@ -98,6 +123,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
   const [selectedCurrency, setSelectedCurrency] = useState('');
   const [selectedEgresoType, setSelectedEgresoType] = useState('all'); // 'all' | 'expense' | 'vale'
   const [selectedCategoryOrRecipient, setSelectedCategoryOrRecipient] = useState('');
+  const [selectedPaymentMethodFilter, setSelectedPaymentMethodFilter] = useState(''); // '' | 'bank' | 'cash_usd' | 'cash_bs'
 
   // Subscriptions
   useEffect(() => {
@@ -154,6 +180,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
     setSelectedCurrency('');
     setSelectedEgresoType('all');
     setSelectedCategoryOrRecipient('');
+    setSelectedPaymentMethodFilter('');
   }, [activeReport]);
 
   const uniqueSellersFromDBAndPayments = useMemo(() => {
@@ -231,9 +258,16 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       if (endDate && p.date > endDate) return false;
       if (selectedClient && p.clientId !== selectedClient) return false;
       if (selectedSeller && (!p.sellerName || p.sellerName.trim().toUpperCase() !== selectedSeller.toUpperCase())) return false;
+      
+      // Filter by Banco, efectivo $, efectivo Bs
+      if (selectedPaymentMethodFilter) {
+        const classification = getPaymentClassification(p, exchangeRate);
+        if (classification !== selectedPaymentMethodFilter) return false;
+      }
+      
       return true;
     });
-  }, [allPayments, startDate, endDate, selectedClient, selectedSeller]);
+  }, [allPayments, startDate, endDate, selectedClient, selectedSeller, selectedPaymentMethodFilter, exchangeRate]);
 
   const abonosSummary = useMemo(() => {
     let totalUsd = 0;
@@ -1118,7 +1152,7 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
           Filtros de Búsqueda
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 ${activeReport === 'abonos' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
           {/* General Date From Selector */}
           <div className="flex flex-col">
             <label className="label">Desde</label>
@@ -1183,6 +1217,25 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
                   </select>
                 </div>
               </div>
+
+              {activeReport === 'abonos' && (
+                <div className="flex flex-col">
+                  <label className="label">Caja / Recaudación</label>
+                  <div className="relative">
+                    <ListFilter className="absolute left-3 top-3.5 text-slate-400" size={16} />
+                    <select
+                      value={selectedPaymentMethodFilter}
+                      onChange={(e) => setSelectedPaymentMethodFilter(e.target.value)}
+                      className="input-field pl-10 cursor-pointer text-xs"
+                    >
+                      <option value="">TODOS (SIN FILTRAR)</option>
+                      <option value="bank">BANCOS Y TRANSFERENCIAS</option>
+                      <option value="cash_usd">EFECTIVO $ (DÓLARES)</option>
+                      <option value="cash_bs">EFECTIVO Bs (BOLÍVARES)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
