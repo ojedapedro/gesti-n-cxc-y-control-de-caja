@@ -13,6 +13,8 @@ import {
 import { formatCurrency } from "../lib/utils";
 import { format, isValid } from "date-fns";
 import { es } from "date-fns/locale";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   Calendar,
   Lock,
@@ -773,6 +775,309 @@ export default function IncomesCierre({
   const reportAbonosList = reportPaymentsList.filter((p) => p.type !== "charge");
   const reportCargosList = reportPaymentsList.filter((p) => p.type === "charge");
 
+  const handleDownloadReportPDF = () => {
+    const doc = new jsPDF("p", "mm", "a4");
+    
+    // Header section decoration - White background with thin minimal separator line (ink-saver)
+    doc.setDrawColor(226, 232, 240); // slate 200
+    doc.setLineWidth(0.4);
+    doc.line(14, 28, 196, 28);
+    
+    // Header text
+    doc.setTextColor(15, 23, 42); // slate 900
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("INVEPINCA C.A.", 14, 14);
+    
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(100, 116, 139); // slate 500
+    doc.text("COMPROBANTE DE CIERRE Y REPORTE DETALLADO DE CAJA DIARIA", 14, 20);
+    
+    // Header metadata on the right side
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105); // slate 600
+    doc.text(`Fecha de Caja: ${reportDate}`, 196, 14, { align: "right" });
+    doc.text(`Impresión: ${format(new Date(), "dd/MM/yyyy h:mm a")}`, 196, 19, { align: "right" });
+    
+    const statusText = rIsClosed ? "Caja Cerrada y Asegurada" : "Cierre Físico Pendiente";
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Estado: ${statusText.toUpperCase()}`, 196, 25, { align: "right" });
+    
+    let currentY = 38;
+    
+    // Section 1: Auditoria sementes (Conteo fisico vs esperado)
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("1. AUDITORÍA DE SALDOS FÍSICOS (CUADRE DE EFECTIVO)", 14, currentY);
+    currentY += 4;
+    
+    const expectedUsdFormatted = formatCurrency(rExpectedUsd);
+    const expectedBsFormatted = formatBs(rExpectedBs);
+    
+    const physicalUsdFormatted = rCurrentClosure ? formatCurrency(rCurrentClosure.actualBalanceUsd) : "---";
+    const physicalBsFormatted = rCurrentClosure ? formatBs(rCurrentClosure.actualBalanceBs) : "---";
+    
+    const diffUsdFormatted = rCurrentClosure ? `${rCurrentClosure.differenceUsd > 0 ? "+" : ""}${formatCurrency(rCurrentClosure.differenceUsd)}` : "---";
+    const diffBsFormatted = rCurrentClosure ? `${rCurrentClosure.differenceBs > 0 ? "+" : ""}${formatBs(rCurrentClosure.differenceBs)}` : "---";
+    
+    let statusUsd = "---";
+    if (rCurrentClosure) {
+      statusUsd = rCurrentClosure.differenceUsd === 0 ? "CUADRADO" : rCurrentClosure.differenceUsd > 0 ? "SOBRANTE" : "FALTANTE";
+    }
+    let statusBs = "---";
+    if (rCurrentClosure) {
+      statusBs = rCurrentClosure.differenceBs === 0 ? "CUADRADO" : rCurrentClosure.differenceBs > 0 ? "SOBRANTE" : "FALTANTE";
+    }
+
+    const verificationRows = [
+      ["EFECTIVO DÓLARES ($)", expectedUsdFormatted, physicalUsdFormatted, diffUsdFormatted, statusUsd],
+      ["EFECTIVO BOLÍVARES (Bs)", expectedBsFormatted, physicalBsFormatted, diffBsFormatted, statusBs]
+    ];
+    
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Caja / Moneda", "Dato Sistema (Esperado)", "Saldo Conteo Físico", "Diferencia", "Diagnóstico"]],
+      body: verificationRows,
+      theme: "grid",
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
+      styles: { fontSize: 8.5, fontStyle: "bold", lineColor: [226, 232, 240], lineWidth: 0.1 },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 32 },
+        4: { cellWidth: 30 }
+      }
+    });
+    
+    currentY = (doc as any).lastAutoTable.finalY + 6;
+    
+    // Notes / Observations if present
+    if (rCurrentClosure?.observations) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.text("Observaciones del Cierre Físico:", 14, currentY);
+      currentY += 4;
+      
+      doc.setFont("helvetica", "oblique");
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      
+      const splitText = doc.splitTextToSize(`"${rCurrentClosure.observations}"`, 182);
+      doc.text(splitText, 14, currentY);
+      
+      currentY += splitText.length * 4 + 4;
+    }
+    
+    // Section 2: Resumen de actividad
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("2. RESUMEN DE ACTIVIDAD EN SISTEMA (FLUJO AUTOMÁTICO)", 14, currentY);
+    currentY += 4;
+    
+    const bimonetaryRows = [
+      ["Efectivo USD (Caja)", formatCurrency(rIncomesUsd), `Ventas Directas: ${formatCurrency(rSalesIncomesUsd)} | Abonos CXC: ${formatCurrency(rCxcIncomesUsd)}`],
+      ["Efectivo Bolívares (Caja)", formatBs(rIncomesBs), `Ventas Directas: ${formatBs(rSalesIncomesBs)} | Abonos CXC: ${formatBs(rCxcIncomesBs)}`],
+      ["Bancos Nacionales (Bs)", formatBs(rTotalBsInBanks), `Equiv. USD: ${formatCurrency(rTotalBsInBanksUsd)}`],
+      ["Bancos Internacionales (USD/Zelle/Binance)", formatCurrency(rTotalUsdInBanks), "Transferencias de divisas directas (electronic)"]
+    ];
+    
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Vía de Recaudación", "Monto Registrado Período", "Desglose Operativo Internado"]],
+      body: bimonetaryRows,
+      theme: "grid",
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
+      styles: { fontSize: 8, fontStyle: "normal", lineColor: [226, 232, 240], lineWidth: 0.1 },
+      columnStyles: {
+        0: { cellWidth: 55, fontStyle: "bold" },
+        1: { cellWidth: 40, fontStyle: "bold" },
+        2: { cellWidth: 87 }
+      }
+    });
+    
+    currentY = (doc as any).lastAutoTable.finalY + 5;
+
+    // Integrated financial metrics box (Border representation, no colored ink fill)
+    doc.setDrawColor(203, 213, 225); // slate 300
+    doc.rect(14, currentY, 182, 24, "S");
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Monto Total de Ventas Registradas: ${formatCurrency(rTotalSalesUsd)}`, 18, currentY + 6);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`- Ventas al Contado (Efectivo + Electrónico recibido): ${formatCurrency(rSalesIncomesUsd + rSalesUsdInBanks)}`, 18, currentY + 11);
+    doc.text(`- Ventas a Crédito Emitidas (Nuevos Cargos CXC hoy): ${formatCurrency(rTotalCxc)}`, 18, currentY + 16);
+    doc.text(`- Total General Abonos de Clientes CXC Recibidos: ${formatCurrency(rTotalCxcPaymentsUsd)}`, 18, currentY + 21);
+    
+    currentY += 31;
+
+    // Trigger a new page if remaining vertical space is tight (less than 85mm)
+    if (currentY > 190) {
+      doc.addPage();
+      currentY = 20;
+    }
+    
+    // Section 3: Ventas Directas
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("3. MOVIMIENTOS DESGOSADOS: VENTAS DIRECTAS", 14, currentY);
+    currentY += 4;
+
+    const salesTableBody = reportVentasDirectas.map((t) => {
+      const isBs = isBsTransaction(t);
+      const bsAmount = t.amountBs && t.amountBs > 0 ? t.amountBs : t.amountUsd * (t.exchangeRate || 1);
+      return [
+        t.concept || "Venta Directa",
+        t.clientName || "—",
+        t.sellerName || "—",
+        t.paymentMethod || "—",
+        t.destinationBank || "Efectivo",
+        formatCurrency(t.amountUsd),
+        isBs ? formatBs(bsAmount) : "—"
+      ];
+    });
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Concepto", "Cliente", "Vendedor", "Vía Pago", "Destino", "Monto USD", "Monto BS"]],
+      body: salesTableBody.length > 0 ? salesTableBody : [["No se registraron ventas directas el día de hoy.", "", "", "", "", "", ""]],
+      theme: "grid",
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold" },
+      styles: { fontSize: 7.5, lineColor: [226, 232, 240], lineWidth: 0.1 },
+      columnStyles: {
+        0: { cellWidth: 42 },
+        1: { cellWidth: 26 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 24 },
+        5: { cellWidth: 21, halign: "right" },
+        6: { cellWidth: 21, halign: "right" }
+      }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 8;
+
+    // Section 4: Abonos Recibidos
+    if (currentY > 190) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("4. MOVIMIENTOS DESGLOSADOS: ABONOS CXC RECIBIDOS", 14, currentY);
+    currentY += 4;
+
+    const abonosTableBody = reportAbonosList.map((p) => {
+      const associated = cxcAccounts.find((a) => a.id === p.clientId);
+      const clientName = associated ? associated.clientName : (p.clientId || "Desconocido");
+      const isBs = isCxcPaymentBs(p);
+      const bsAmount = p.amountBs && p.amountBs > 0 ? p.amountBs : (p.amountUsd || 0) * (p.exchangeRate || 1);
+      return [
+        clientName,
+        p.concept || "Abono / Pago de Cuenta",
+        p.sellerName || "—",
+        p.paymentMethod || "—",
+        p.destinationBank || "Efectivo",
+        formatCurrency(p.amountUsd || 0),
+        isBs ? formatBs(bsAmount) : "—"
+      ];
+    });
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Cliente", "Concepto de Pago", "Cobrador", "Vía Pago", "Banco/Destino", "Abono USD", "Abono BS"]],
+      body: abonosTableBody.length > 0 ? abonosTableBody : [["No se registraron abonos a cuentas por cobrar hoy.", "", "", "", "", "", ""]],
+      theme: "grid",
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold" },
+      styles: { fontSize: 7.5, lineColor: [226, 232, 240], lineWidth: 0.1 },
+      columnStyles: {
+        0: { cellWidth: 42 },
+        1: { cellWidth: 26 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 24 },
+        5: { cellWidth: 21, halign: "right" },
+        6: { cellWidth: 21, halign: "right" }
+      }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 8;
+
+    // Section 5: Cargos Emitidos
+    if (currentY > 200) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("5. MOVIMIENTOS DESGLOSADOS: NUEVOS CARGOS CXC (PROVEÍDOS A CRÉDITO)", 14, currentY);
+    currentY += 4;
+
+    const cargosTableBody = reportCargosList.map((p) => {
+      const associated = cxcAccounts.find((a) => a.id === p.clientId);
+      const clientName = associated ? associated.clientName : (p.clientId || "Desconocido");
+      return [
+        clientName,
+        p.rubroName || p.concept || "Cargo de Compra",
+        p.invoiceNumber || "—",
+        p.sellerName || "—",
+        formatCurrency(p.amountUsd || 0)
+      ];
+    });
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Cliente de Cargo", "Item / Rubro de Crédito", "Factura Nº", "Cargador/Vendedor", "Importe Crédito USD"]],
+      body: cargosTableBody.length > 0 ? cargosTableBody : [["No se registraron ventas a crédito el día de hoy.", "", "", "", ""]],
+      theme: "grid",
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold" },
+      styles: { fontSize: 7.5, lineColor: [226, 232, 240], lineWidth: 0.1 },
+      columnStyles: {
+        0: { cellWidth: 45 },
+        1: { cellWidth: 45 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 35 },
+        4: { cellWidth: 32, halign: "right" }
+      }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 12;
+
+    // Signatures block
+    if (currentY > 230) {
+      doc.addPage();
+      currentY = 30;
+    }
+
+    doc.setDrawColor(203, 213, 225); // slate 300
+    
+    // Line and signature placeholders
+    doc.line(20, currentY + 15, 85, currentY + 15);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Firma de Gerencia de Caja", 34, currentY + 19);
+    
+    doc.line(125, currentY + 15, 190, currentY + 15);
+    doc.text("Firma de Auditoría General", 137, currentY + 19);
+
+    // Save and download PDF
+    doc.save(`Reporte_Caja_Detallado_${reportDate}.pdf`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -1402,10 +1707,10 @@ export default function IncomesCierre({
               </p>
             </div>
 
-            <div className="flex items-center gap-2 font-semibold">
+            <div className="flex flex-wrap items-center gap-2 font-semibold">
               <button
                 onClick={() => jumpDate(-1)}
-                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-600 font-bold border border-slate-200 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider"
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-600 font-bold border border-slate-200 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider cursor-pointer"
                 title="Día Anterior"
               >
                 &larr; Anterior
@@ -1421,10 +1726,18 @@ export default function IncomesCierre({
               </div>
               <button
                 onClick={() => jumpDate(1)}
-                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-600 font-bold border border-slate-200 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider"
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-600 font-bold border border-slate-200 rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider cursor-pointer"
                 title="Día Siguiente"
               >
                 Siguiente &rarr;
+              </button>
+              <button
+                onClick={handleDownloadReportPDF}
+                className="ml-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all shadow-sm text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer border border-blue-600"
+                title="Descargar PDF de Caja Diaria"
+              >
+                <FileText size={14} />
+                <span>Exportar PDF</span>
               </button>
             </div>
           </div>

@@ -22,7 +22,11 @@ import {
   Line,
   Cell,
   PieChart,
-  Pie
+  Pie,
+  AreaChart,
+  Area,
+  Legend,
+  ComposedChart
 } from 'recharts';
 import { dbService } from '../services/db';
 import { TransactionType, PaymentMethod, type Transaction, type Expense, type CXCAccount, type CXCPayment } from '../types';
@@ -73,6 +77,9 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  const [chartMonths, setChartMonths] = useState(6);
+  const [chartStyle, setChartStyle] = useState<'bar' | 'composed'>('composed');
 
   useEffect(() => {
     const unsubT = dbService.subscribeToTransactions(setTransactions);
@@ -169,9 +176,9 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
     .reduce((sum, e) => sum + e.amountUsd, 0);
 
   // Chart data Preparation matching exactly "Ingresos Caja Principal" CRUD
-  const getLast6MonthsData = () => {
+  const getMonthlyChartData = (monthsCountCount: number) => {
     const data = [];
-    for (let i = 5; i >= 0; i--) {
+    for (let i = monthsCountCount - 1; i >= 0; i--) {
       const monthDate = subMonths(new Date(), i);
       const interval = { start: startOfMonth(monthDate), end: endOfMonth(monthDate) };
       
@@ -195,16 +202,27 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
         .filter(e => isWithinInterval(new Date(e.date), interval))
         .reduce((sum, e) => sum + e.amountUsd, 0);
 
+      const totalEgress = expense + withdrawal;
+      const netProfit = income - totalEgress;
+      const savingsRate = income > 0 ? (netProfit / income) * 100 : 0;
+
       data.push({
-        name: format(monthDate, 'MMM', { locale: es }),
+        name: format(monthDate, 'MMM', { locale: es }).toUpperCase(),
+        fullName: format(monthDate, 'MMMM yyyy', { locale: es }),
         ingresos: income,
-        egresos: expense + withdrawal,
+        egresos: totalEgress,
+        neto: netProfit,
+        tasaAhorro: savingsRate
       });
     }
     return data;
   };
 
-  const chartData = getLast6MonthsData();
+  const selectedChartData = getMonthlyChartData(chartMonths);
+  const totalChartIncomes = selectedChartData.reduce((sum, d) => sum + d.ingresos, 0);
+  const totalChartExpenses = selectedChartData.reduce((sum, d) => sum + d.egresos, 0);
+  const totalChartNet = totalChartIncomes - totalChartExpenses;
+  const avgChartSavingsRate = totalChartIncomes > 0 ? (totalChartNet / totalChartIncomes) * 100 : 0;
 
   const PIE_COLORS = ['#0f172a', '#2563eb', '#0d9488', '#e11d48', '#ea580c', '#64748b'];
 
@@ -235,6 +253,49 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
       { name: 'Otros Clientes', value: othersValue, percentage: othersPercentage }
     ];
   })();
+
+  const CustomChartTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-100 shadow-xl max-w-xs text-left">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono mb-2">{data.fullName}</p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-6">
+              <span className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                Ingresos:
+              </span>
+              <span className="text-xs font-black text-slate-900">{formatCurrency(data.ingresos)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                Egresos/Retiros:
+              </span>
+              <span className="text-xs font-black text-slate-900">{formatCurrency(data.egresos)}</span>
+            </div>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-6">
+              <span className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                <span className={`w-2.5 h-2.5 rounded-full ${data.neto >= 0 ? 'bg-blue-600' : 'bg-amber-600'}`}></span>
+                Sobrante Neto:
+              </span>
+              <span className={`text-xs font-black ${data.neto >= 0 ? 'text-blue-600' : 'text-amber-600'}`}>
+                {formatCurrency(data.neto)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span className="text-[10px] font-bold text-slate-500">Margen de Ahorro:</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${data.neto >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                {data.tasaAhorro.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   if (loading) {
     return <div className="flex items-center justify-center h-64">Cargando datos...</div>;
@@ -430,32 +491,126 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Chart */}
         <div className="lg:col-span-2 card p-6 border-slate-200/60">
-          <h3 className="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-4">
-            Desempeño Últimos 6 Meses
-          </h3>
-          <div className="h-80 w-full mt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4 mb-4 gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                <TrendingUp size={16} className="text-blue-600" />
+                Análisis de Salud Financiera
+              </h3>
+              <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Distribución mensual de ingresos vs egresos</p>
+            </div>
+            
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              {/* Type Switcher */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-xs text-[10px] font-semibold">
+                <button
+                  onClick={() => setChartStyle('composed')}
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${chartStyle === 'composed' ? 'bg-white shadow-xs text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Áreas
+                </button>
+                <button
+                  onClick={() => setChartStyle('bar')}
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${chartStyle === 'bar' ? 'bg-white shadow-xs text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Barras
+                </button>
+              </div>
+
+              {/* Month selector */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-xs text-[10px] font-semibold">
+                <button
+                  onClick={() => setChartMonths(6)}
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${chartMonths === 6 ? 'bg-white shadow-xs text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  6 Meses
+                </button>
+                <button
+                  onClick={() => setChartMonths(12)}
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${chartMonths === 12 ? 'bg-white shadow-xs text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  12 Meses
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stats Header */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 mb-4 text-left">
+            <div>
+              <span className="text-[9px] font-black text-slate-400 block uppercase tracking-wider">Ingresos Totales (Período)</span>
+              <span className="text-xs font-black text-slate-800 leading-tight block mt-0.5">{formatCurrency(totalChartIncomes)}</span>
+            </div>
+            <div>
+              <span className="text-[9px] font-black text-slate-400 block uppercase tracking-wider">Egresos / Retiros</span>
+              <span className="text-xs font-black text-slate-800 leading-tight block mt-0.5">{formatCurrency(totalChartExpenses)}</span>
+            </div>
+            <div>
+              <span className="text-[9px] font-black text-slate-400 block uppercase tracking-wider">Ahorro Neto</span>
+              <span className={`text-xs font-black leading-tight block mt-0.5 ${totalChartNet >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {formatCurrency(totalChartNet)}
+              </span>
+            </div>
+            <div>
+              <span className="text-[9px] font-black text-slate-400 block uppercase tracking-wider">Margen Promedio</span>
+              <span className="text-xs font-black text-slate-800 leading-tight block mt-0.5">
+                {avgChartSavingsRate.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          <div className="h-72 w-full mt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
-                />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  cursor={{ fill: '#f8fafc' }}
-                />
-                <Bar dataKey="ingresos" name="Ingresos" fill="#0f172a" radius={[6, 6, 0, 0]} barSize={28} />
-                <Bar dataKey="egresos" name="Egresos" fill="#94a3b8" radius={[6, 6, 0, 0]} barSize={28} />
-              </BarChart>
+              {chartStyle === 'composed' ? (
+                <ComposedChart data={selectedChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.01}/>
+                    </linearGradient>
+                    <linearGradient id="colorEgresos" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0.01}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} 
+                    dy={5}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} 
+                  />
+                  <Tooltip content={<CustomChartTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }} />
+                  <Area type="monotone" dataKey="ingresos" name="Ingresos" stroke="#10b981" strokeWidth={2} fill="url(#colorIngresos)" />
+                  <Area type="monotone" dataKey="egresos" name="Egresos" stroke="#ef4444" strokeWidth={2} fill="url(#colorEgresos)" />
+                  <Line type="monotone" dataKey="neto" name="Neto" stroke="#2563eb" strokeWidth={3} dot={{ r: 3, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 5 }} />
+                </ComposedChart>
+              ) : (
+                <BarChart data={selectedChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} 
+                    dy={5}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} 
+                  />
+                  <Tooltip content={<CustomChartTooltip />} cursor={{ fill: '#f8fafc' }} />
+                  <Bar dataKey="ingresos" name="Ingresos" fill="#0f172a" radius={[4, 4, 0, 0]} barSize={chartMonths === 6 ? 24 : 14} />
+                  <Bar dataKey="egresos" name="Egresos" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={chartMonths === 6 ? 24 : 14} />
+                </BarChart>
+              )}
             </ResponsiveContainer>
           </div>
         </div>
