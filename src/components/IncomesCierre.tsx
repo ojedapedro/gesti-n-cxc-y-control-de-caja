@@ -265,20 +265,12 @@ export default function IncomesCierre({
     }
   });
 
-  // Calculate CXC charges and CXC payments (abonos) directly from All Payments subcollection group
+  // Calculate CXC charges directly from All Payments subcollection group
   const periodPaymentsList = allPayments.filter(
     (p) => p.date >= startDate && p.date <= endDate
   );
 
   let totalCxc = 0;
-  let totalCxcPaymentsUsd = 0;
-
-  let cxcIncomesUsd = 0;
-  let cxcIncomesBs = 0;
-  let cxcIncomesBsUsd = 0;
-  let cxcBsInBanks = 0;
-  let cxcBsInBanksUsd = 0;
-  let cxcUsdInBanks = 0;
 
   periodPaymentsList.forEach((p) => {
     const dest = (p.destinationBank || "").toUpperCase();
@@ -325,55 +317,16 @@ export default function IncomesCierre({
       concept.includes("BONIF");
 
     if (p.type === "charge") {
-      // Balance to accounts receivable, we match the Monto Bruto of reports
-      totalCxc += p.grossAmountUsd || p.amountUsd || 0;
-    } else {
-      // Must be a payment (not a charge)
       if (!isWarranty && !isDonation) {
-        const isBs = isCxcPaymentBs(p);
-
-        const isCashDest =
-          dest.includes("EFECTIVO") ||
-          dest.includes("CAJA") ||
-          dest === "";
-        const isBankDest = dest.length > 0 && !isCashDest;
-        const isBank =
-          isBankDest ||
-          p.paymentMethod === PaymentMethod.BS ||
-          p.paymentMethod === PaymentMethod.ZELLE ||
-          p.paymentMethod === PaymentMethod.BINANCE ||
-          pMethod.includes("ZELLE") ||
-          pMethod.includes("BINANCE");
-
-        if (isBs) {
-          const payRate = p.exchangeRate || exchangeRate || 1;
-          const amountBsVal = p.amountBs && p.amountBs > 0 ? p.amountBs : (p.amountUsd || 0) * payRate;
-          const eqUsd = payRate > 0 ? amountBsVal / payRate : p.amountUsd || 0;
-
-          if (isBank) {
-            cxcBsInBanks += amountBsVal;
-            cxcBsInBanksUsd += eqUsd;
-          } else {
-            cxcIncomesBs += amountBsVal;
-            cxcIncomesBsUsd += eqUsd;
-          }
-          totalCxcPaymentsUsd += eqUsd;
-        } else {
-          const eqUsd = p.amountUsd || 0;
-          if (isBank) {
-            cxcUsdInBanks += eqUsd;
-          } else {
-            cxcIncomesUsd += eqUsd;
-          }
-          totalCxcPaymentsUsd += eqUsd;
-        }
+        // Balance to accounts receivable, we match the Monto Bruto of reports
+        totalCxc += p.grossAmountUsd || p.amountUsd || 0;
       }
     }
   });
 
-  // Group BS banks (incorporating both direct sales and CXC credit payments)
+  // Group BS banks for standard direct sales
   const bsBanksMap: { [bankName: string]: { amountBs: number; amountUsd: number } } = {};
-  // Group USD banks (incorporating both direct sales and CXC credit payments)
+  // Group USD banks for standard direct sales
   const usdBanksMap: { [bankName: string]: number } = {};
 
   // 1. Process standard transactions (direct sales)
@@ -471,100 +424,14 @@ export default function IncomesCierre({
     }
   });
 
-  // 2. Process CXC payments (abonos cxcs) that were sent to bank or cash
-  periodPaymentsList.forEach((p) => {
-    if (p.type === "charge") return;
+  // Re-aggregate incomes and total balances for system box tracking (strictly standard direct sales coming from the main cash registry (caja principal))
+  const incomesUsd = salesIncomesUsd;
+  const incomesBs = salesIncomesBs;
+  const incomesBsUsd = salesIncomesBsUsd;
 
-    const dest = (p.destinationBank || "").toUpperCase();
-    const pMethod = (p.paymentMethod || "").toUpperCase();
-    const concept = (p.concept || "").toUpperCase();
-    const seller = (p.sellerName || "").toUpperCase();
-    const client = (p.clientName || "").toUpperCase();
-
-    const isWarranty =
-      dest.includes("GARANT") ||
-      pMethod.includes("GARANT") ||
-      concept.includes("GARANT") ||
-      seller.includes("GARANT") ||
-      client.includes("GARANT");
-    const isDonation =
-      dest.includes("DONAC") ||
-      pMethod.includes("DONAC") ||
-      concept.includes("DONAC") ||
-      seller.includes("DONAC") ||
-      client.includes("DONAC") ||
-      dest.includes("EXENC") ||
-      pMethod.includes("EXENC") ||
-      concept.includes("EXENC") ||
-      dest.includes("EXCENC") ||
-      pMethod.includes("EXCENC") ||
-      concept.includes("EXCENC") ||
-      dest.includes("EXENT") ||
-      pMethod.includes("EXENT") ||
-      concept.includes("EXENT") ||
-      dest.includes("EXCENT") ||
-      pMethod.includes("EXCENT") ||
-      concept.includes("EXCENT") ||
-      dest.includes("CORTES") ||
-      pMethod.includes("CORTES") ||
-      concept.includes("CORTES") ||
-      dest.includes("DESCUENT") ||
-      pMethod.includes("DESCUENT") ||
-      concept.includes("DESCUENT") ||
-      dest.includes("ANULA") ||
-      pMethod.includes("ANULA") ||
-      concept.includes("ANULA") ||
-      dest.includes("BONIF") ||
-      pMethod.includes("BONIF") ||
-      concept.includes("BONIF");
-
-    if (isWarranty || isDonation) return;
-
-    const isCashDest =
-      dest.includes("EFECTIVO") ||
-      dest.includes("CAJA") ||
-      dest === "";
-    const isBankDest = dest.length > 0 && !isCashDest;
-    const isBank =
-      isBankDest ||
-      p.paymentMethod === PaymentMethod.BS ||
-      p.paymentMethod === PaymentMethod.ZELLE ||
-      p.paymentMethod === PaymentMethod.BINANCE ||
-      pMethod.includes("ZELLE") ||
-      pMethod.includes("BINANCE");
-
-    const amtUsd = p.amountUsd || 0;
-    const payRate = p.exchangeRate || exchangeRate || 1;
-    const amountBsVal = p.amountBs && p.amountBs > 0 ? p.amountBs : amtUsd * payRate;
-    const eqUsd = payRate > 0 ? amountBsVal / payRate : amtUsd;
-
-    if (isBank) {
-      const isBs = isCxcPaymentBs(p);
-      const bankName = (p.destinationBank || p.paymentMethod || "OTRO BANCO").trim().toUpperCase();
-
-      if (isBs) {
-        if (!bsBanksMap[bankName]) {
-          bsBanksMap[bankName] = { amountBs: 0, amountUsd: 0 };
-        }
-        bsBanksMap[bankName].amountBs += amountBsVal;
-        bsBanksMap[bankName].amountUsd += eqUsd;
-      } else {
-        if (!usdBanksMap[bankName]) {
-          usdBanksMap[bankName] = 0;
-        }
-        usdBanksMap[bankName] += amtUsd;
-      }
-    }
-  });
-
-  // Re-aggregate incomes and total balances for system box tracking (combining standard direct sales and CXC payments received)
-  const incomesUsd = salesIncomesUsd + cxcIncomesUsd;
-  const incomesBs = salesIncomesBs + cxcIncomesBs;
-  const incomesBsUsd = salesIncomesBsUsd + cxcIncomesBsUsd;
-
-  const totalBsInBanks = salesBsInBanks + cxcBsInBanks;
-  const totalBsInBanksUsd = salesBsInBanksUsd + cxcBsInBanksUsd;
-  const totalUsdInBanks = salesUsdInBanks + cxcUsdInBanks;
+  const totalBsInBanks = salesBsInBanks;
+  const totalBsInBanksUsd = salesBsInBanksUsd;
+  const totalUsdInBanks = salesUsdInBanks;
 
   // Let's compute the Total of Direct Sales in USD
   const totalVentasDirectasUsd = salesIncomesUsd + salesIncomesBsUsd + salesBsInBanksUsd + salesUsdInBanks;
@@ -804,14 +671,6 @@ export default function IncomesCierre({
   const reportCargosList = reportPaymentsList.filter((p) => p.type === "charge");
 
   let rTotalCxc = 0;
-  let rTotalCxcPaymentsUsd = 0;
-
-  let rCxcIncomesUsd = 0;
-  let rCxcIncomesBs = 0;
-  let rCxcIncomesBsUsd = 0;
-  let rCxcBsInBanks = 0;
-  let rCxcBsInBanksUsd = 0;
-  let rCxcUsdInBanks = 0;
 
   reportPaymentsList.forEach((p) => {
     const dest = (p.destinationBank || "").toUpperCase();
@@ -858,53 +717,15 @@ export default function IncomesCierre({
       concept.includes("BONIF");
 
     if (p.type === "charge") {
-      rTotalCxc += p.grossAmountUsd || p.amountUsd || 0;
-    } else {
       if (!isWarranty && !isDonation) {
-        const isBs = isCxcPaymentBs(p);
-
-        const isCashDest =
-          dest.includes("EFECTIVO") ||
-          dest.includes("CAJA") ||
-          dest === "";
-        const isBankDest = dest.length > 0 && !isCashDest;
-        const isBank =
-          isBankDest ||
-          p.paymentMethod === PaymentMethod.BS ||
-          p.paymentMethod === PaymentMethod.ZELLE ||
-          p.paymentMethod === PaymentMethod.BINANCE ||
-          pMethod.includes("ZELLE") ||
-          pMethod.includes("BINANCE");
-
-        if (isBs) {
-          const payRate = p.exchangeRate || exchangeRate || 1;
-          const amountBsVal = p.amountBs && p.amountBs > 0 ? p.amountBs : (p.amountUsd || 0) * payRate;
-          const eqUsd = payRate > 0 ? amountBsVal / payRate : p.amountUsd || 0;
-
-          if (isBank) {
-            rCxcBsInBanks += amountBsVal;
-            rCxcBsInBanksUsd += eqUsd;
-          } else {
-            rCxcIncomesBs += amountBsVal;
-            rCxcIncomesBsUsd += eqUsd;
-          }
-          rTotalCxcPaymentsUsd += eqUsd;
-        } else {
-          const eqUsd = p.amountUsd || 0;
-          if (isBank) {
-            rCxcUsdInBanks += eqUsd;
-          } else {
-            rCxcIncomesUsd += eqUsd;
-          }
-          rTotalCxcPaymentsUsd += eqUsd;
-        }
+        rTotalCxc += p.grossAmountUsd || p.amountUsd || 0;
       }
     }
   });
 
-  // Group BS banks for report (incorporating both direct sales and CXC credit payments)
+  // Group BS banks for report
   const rBsBanksMap: { [bankName: string]: { amountBs: number; amountUsd: number } } = {};
-  // Group USD banks for report (incorporating both direct sales and CXC credit payments)
+  // Group USD banks for report
   const rUsdBanksMap: { [bankName: string]: number } = {};
 
   // 1. Process report transactions (direct sales)
@@ -1002,100 +823,17 @@ export default function IncomesCierre({
     }
   });
 
-  // 2. Process CXC payments (abonos cxcs) for the report period
-  reportAbonosList.forEach((p) => {
-    const dest = (p.destinationBank || "").toUpperCase();
-    const pMethod = (p.paymentMethod || "").toUpperCase();
-    const concept = (p.concept || "").toUpperCase();
-    const seller = (p.sellerName || "").toUpperCase();
-    const client = (p.clientName || "").toUpperCase();
+  // Re-aggregate report incomes and total balances from standard sales
+  const rIncomesUsd = rSalesIncomesUsd;
+  const rIncomesBs = rSalesIncomesBs;
+  const rIncomesBsUsd = rSalesIncomesBsUsd;
 
-    const isWarranty =
-      dest.includes("GARANT") ||
-      pMethod.includes("GARANT") ||
-      concept.includes("GARANT") ||
-      seller.includes("GARANT") ||
-      client.includes("GARANT");
-    const isDonation =
-      dest.includes("DONAC") ||
-      pMethod.includes("DONAC") ||
-      concept.includes("DONAC") ||
-      seller.includes("DONAC") ||
-      client.includes("DONAC") ||
-      dest.includes("EXENC") ||
-      pMethod.includes("EXENC") ||
-      concept.includes("EXENC") ||
-      dest.includes("EXCENC") ||
-      pMethod.includes("EXCENC") ||
-      concept.includes("EXCENC") ||
-      dest.includes("EXENT") ||
-      pMethod.includes("EXENT") ||
-      concept.includes("EXENT") ||
-      dest.includes("EXCENT") ||
-      pMethod.includes("EXCENT") ||
-      concept.includes("EXCENT") ||
-      dest.includes("CORTES") ||
-      pMethod.includes("CORTES") ||
-      concept.includes("CORTES") ||
-      dest.includes("DESCUENT") ||
-      pMethod.includes("DESCUENT") ||
-      concept.includes("DESCUENT") ||
-      dest.includes("ANULA") ||
-      pMethod.includes("ANULA") ||
-      concept.includes("ANULA") ||
-      dest.includes("BONIF") ||
-      pMethod.includes("BONIF") ||
-      concept.includes("BONIF");
-
-    if (isWarranty || isDonation) return;
-
-    const isCashDest =
-      dest.includes("EFECTIVO") ||
-      dest.includes("CAJA") ||
-      dest === "";
-    const isBankDest = dest.length > 0 && !isCashDest;
-    const isBank =
-      isBankDest ||
-      p.paymentMethod === PaymentMethod.BS ||
-      p.paymentMethod === PaymentMethod.ZELLE ||
-      p.paymentMethod === PaymentMethod.BINANCE ||
-      pMethod.includes("ZELLE") ||
-      pMethod.includes("BINANCE");
-
-    const amtUsd = p.amountUsd || 0;
-    const payRate = p.exchangeRate || exchangeRate || 1;
-    const amountBsVal = p.amountBs && p.amountBs > 0 ? p.amountBs : amtUsd * payRate;
-    const eqUsd = payRate > 0 ? amountBsVal / payRate : amtUsd;
-
-    if (isBank) {
-      const isBs = isCxcPaymentBs(p);
-      const bankName = (p.destinationBank || p.paymentMethod || "OTRO BANCO").trim().toUpperCase();
-
-      if (isBs) {
-        if (!rBsBanksMap[bankName]) {
-          rBsBanksMap[bankName] = { amountBs: 0, amountUsd: 0 };
-        }
-        rBsBanksMap[bankName].amountBs += amountBsVal;
-        rBsBanksMap[bankName].amountUsd += eqUsd;
-      } else {
-        if (!rUsdBanksMap[bankName]) {
-          rUsdBanksMap[bankName] = 0;
-        }
-        rUsdBanksMap[bankName] += amtUsd;
-      }
-    }
-  });
-
-  const rIncomesUsd = rSalesIncomesUsd + rCxcIncomesUsd;
-  const rIncomesBs = rSalesIncomesBs + rCxcIncomesBs;
-  const rIncomesBsUsd = rSalesIncomesBsUsd + rCxcIncomesBsUsd;
-
-  const rTotalBsInBanks = rSalesBsInBanks + rCxcBsInBanks;
-  const rTotalBsInBanksUsd = rSalesBsInBanksUsd + rCxcBsInBanksUsd;
-  const rTotalUsdInBanks = rSalesUsdInBanks + rCxcUsdInBanks;
+  const rTotalBsInBanks = rSalesBsInBanks;
+  const rTotalBsInBanksUsd = rSalesBsInBanksUsd;
+  const rTotalUsdInBanks = rSalesUsdInBanks;
 
   // Let's compute the Total of Direct Sales in USD for reports
-  const rTotalVentasDirectasUsd = rSalesIncomesUsd + rSalesIncomesBsUsd + rTotalBsInBanksUsd + rTotalUsdInBanks;
+  const rTotalVentasDirectasUsd = rSalesIncomesUsd + rSalesIncomesBsUsd + rSalesBsInBanksUsd + rSalesUsdInBanks;
 
   // Total Resumen de operaciones = Ventas Directas + Cuentas por Cobrar (Nuevos Cargos CXC hoy)
   const rTotalSalesUsd = rTotalVentasDirectasUsd + rTotalCxc;
@@ -1253,9 +991,9 @@ export default function IncomesCierre({
     currentY += 4;
     
     const bimonetaryRows: any[] = [
-      ["Efectivo USD (Caja)", formatCurrency(rIncomesUsd), "Efectivo USD Recaudado (Ventas + Abonos CXC)"],
-      ["Efectivo Bolívares (Caja)", formatBs(rIncomesBs), "Efectivo Bs Recaudado (Ventas + Abonos CXC)"],
-      ["Ingresos en Bancos Nacionales (Bs)", "Desglose de Recaudación por Banco (Ventas + Abonos CXC)", ""]
+      ["Efectivo USD (Caja)", formatCurrency(rIncomesUsd), "Ventas Directas (Efectivo)"],
+      ["Efectivo Bolívares (Caja)", formatBs(rIncomesBs), "Ventas Directas (Efectivo Bs)"],
+      ["Ingresos en Bancos Nacionales (Bs)", "Desglose de Ventas Directas por Banco", ""]
     ];
 
     Object.entries(rBsBanksMap).forEach(([bank, val]) => {
@@ -1263,7 +1001,7 @@ export default function IncomesCierre({
     });
     bimonetaryRows.push(["TOTAL BANCOS BS (Totalizado)", formatBs(rTotalBsInBanks), `Equiv. USD: ${formatCurrency(rTotalBsInBanksUsd)}`]);
 
-    bimonetaryRows.push(["Ingresos en Bancos Divisas (USD)", "Desglose de Recaudación por Banco (Ventas + Abonos CXC)", ""]);
+    bimonetaryRows.push(["Ingresos en Bancos Divisas (USD)", "Desglose de Ventas Directas por Banco", ""]);
     Object.entries(rUsdBanksMap).forEach(([bank, val]) => {
       bimonetaryRows.push([`  - ${bank}`, formatCurrency(val), ""]);
     });
