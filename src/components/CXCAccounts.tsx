@@ -268,6 +268,10 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     totalPaymentsUsd: 0,
     totalPaymentsBs: 0,
     totalPaymentsBsUsd: 0,
+    totalPaymentsBsCash: 0,
+    totalPaymentsBsCashUsd: 0,
+    totalPaymentsBsBank: 0,
+    totalPaymentsBsBankUsd: 0,
     balance: 0,
     totalGrossCharges: 0,
     totalCommissions: 0,
@@ -294,6 +298,10 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     let totalPaymentsUsdBank = 0;
     let totalPaymentsBs = 0;
     let totalPaymentsBsUsd = 0;
+    let totalPaymentsBsCash = 0;
+    let totalPaymentsBsCashUsd = 0;
+    let totalPaymentsBsBank = 0;
+    let totalPaymentsBsBankUsd = 0;
     let totalGrossCharges = 0;
     let totalCommissions = 0;
     let totalWarranty = 0;
@@ -377,8 +385,27 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                        pm === PaymentMethod.BS || 
                        pm === PaymentMethod.BS_CASH;
           if (isBs) {
-            totalPaymentsBs += Number(p.amountBs) || (amt * (Number(p.exchangeRate) || 1));
+            const amountBsVal = Number(p.amountBs) || (amt * (Number(p.exchangeRate) || 1));
+            totalPaymentsBs += amountBsVal;
             totalPaymentsBsUsd += amt;
+
+            const pmText = (p.paymentMethod || '').toUpperCase();
+            const destText = (p.destinationBank || '').toUpperCase();
+            const isCashBs = pm === 'Bs' || 
+                             pm === PaymentMethod.BS_CASH ||
+                             pmText === 'BS' || 
+                             pmText.includes('EFECTIVO') || 
+                             pmText.includes('CASH') ||
+                             destText.includes('EFECTIVO') ||
+                             destText.includes('CAJA');
+
+            if (isCashBs) {
+              totalPaymentsBsCash += amountBsVal;
+              totalPaymentsBsCashUsd += amt;
+            } else {
+              totalPaymentsBsBank += amountBsVal;
+              totalPaymentsBsBankUsd += amt;
+            }
           } else {
             totalPaymentsUsd += amt;
             const pmText = (p.paymentMethod || '').toUpperCase();
@@ -409,6 +436,10 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
       totalPaymentsUsdBank,
       totalPaymentsBs,
       totalPaymentsBsUsd,
+      totalPaymentsBsCash,
+      totalPaymentsBsCashUsd,
+      totalPaymentsBsBank,
+      totalPaymentsBsBankUsd,
       balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd) - totalWarranty - totalDonation,
       totalGrossCharges,
       totalCommissions,
@@ -422,6 +453,10 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     : {
         totalPaymentsUsdCash: 0,
         totalPaymentsUsdBank: 0,
+        totalPaymentsBsCash: 0,
+        totalPaymentsBsCashUsd: 0,
+        totalPaymentsBsBank: 0,
+        totalPaymentsBsBankUsd: 0,
         ...globalStats,
         ...computeActiveStats(allPayments, '', '')
       };
@@ -873,7 +908,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
         <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
           <CheckCircle size={14} className="text-slate-400" /> Flujos de Abonos y Ajustes Recibidos
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <CheckCircle size={60} className="text-emerald-600" />
@@ -902,11 +937,23 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <CheckCircle size={60} className="text-teal-600" />
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en Bs</p>
-            <p className="text-2xl font-black text-teal-650 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalPaymentsBs)}</p>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(activeGlobalStats.totalPaymentsBsUsd)}</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en Bs (Efectivo)</p>
+            <p className="text-2xl font-black text-teal-650 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalPaymentsBsCash)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(activeGlobalStats.totalPaymentsBsCashUsd)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[9px] font-bold text-teal-600 uppercase tracking-wider bg-teal-50 px-1.5 py-0.5 rounded">Afecta Caja Activa</span>
+              <span className="text-[9px] font-bold text-teal-600 uppercase tracking-wider bg-teal-50 px-1.5 py-0.5 rounded">Efectivo Bs en Caja</span>
+            </div>
+          </div>
+
+          <div className="card p-5 bg-white border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <Landmark size={60} className="text-cyan-600" />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en Bs (Bancos)</p>
+            <p className="text-2xl font-black text-cyan-650 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalPaymentsBsBank)}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(activeGlobalStats.totalPaymentsBsBankUsd)}</p>
+            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[9px] font-bold text-cyan-600 uppercase tracking-wider bg-cyan-50 px-1.5 py-0.5 rounded">Banco / Pago Móvil</span>
             </div>
           </div>
 

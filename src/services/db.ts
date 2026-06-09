@@ -340,6 +340,10 @@ export const dbService = {
     totalPaymentsUsd: number,
     totalPaymentsBs: number,
     totalPaymentsBsUsd: number,
+    totalPaymentsBsCash: number,
+    totalPaymentsBsCashUsd: number,
+    totalPaymentsBsBank: number,
+    totalPaymentsBsBankUsd: number,
     balance: number, 
     totalGrossCharges: number, 
     totalCommissions: number,
@@ -361,6 +365,10 @@ export const dbService = {
       let totalPaymentsUsd = 0;
       let totalPaymentsBs = 0;
       let totalPaymentsBsUsd = 0;
+      let totalPaymentsBsCash = 0;
+      let totalPaymentsBsCashUsd = 0;
+      let totalPaymentsBsBank = 0;
+      let totalPaymentsBsBankUsd = 0;
       let totalGrossCharges = 0;
       let totalCommissions = 0;
       let totalWarranty = 0;
@@ -435,13 +443,33 @@ export const dbService = {
           }
 
           if (!isWarranty && !isDonation) {
-            const isBs = data.paymentMethod === 'Transferencia Bs / Pago Móvil' || 
-                         data.paymentMethod === 'Bs' || 
-                         data.paymentMethod === PaymentMethod.BS || 
-                         data.paymentMethod === PaymentMethod.BS_CASH;
+            const pmText = (data.paymentMethod || '').trim();
+            const isBs = pmText === 'Transferencia Bs / Pago Móvil' || 
+                         pmText === 'Bs' || 
+                         pmText === PaymentMethod.BS || 
+                         pmText === PaymentMethod.BS_CASH;
             if (isBs) {
-              totalPaymentsBs += Number(data.amountBs) || (amt * (Number(data.exchangeRate) || 1));
+              const amountBsVal = Number(data.amountBs) || (amt * (Number(data.exchangeRate) || 1));
+              totalPaymentsBs += amountBsVal;
               totalPaymentsBsUsd += amt;
+
+              const pmUpper = pmText.toUpperCase();
+              const destUpper = (data.destinationBank || '').toUpperCase();
+              const isCashBs = pmText === 'Bs' || 
+                               pmText === PaymentMethod.BS_CASH ||
+                               pmUpper === 'BS' || 
+                               pmUpper.includes('EFECTIVO') || 
+                               pmUpper.includes('CASH') ||
+                               destUpper.includes('EFECTIVO') ||
+                               destUpper.includes('CAJA');
+
+              if (isCashBs) {
+                totalPaymentsBsCash += amountBsVal;
+                totalPaymentsBsCashUsd += amt;
+              } else {
+                totalPaymentsBsBank += amountBsVal;
+                totalPaymentsBsBankUsd += amt;
+              }
             } else {
               totalPaymentsUsd += amt;
             }
@@ -454,6 +482,10 @@ export const dbService = {
         totalPaymentsUsd,
         totalPaymentsBs,
         totalPaymentsBsUsd,
+        totalPaymentsBsCash,
+        totalPaymentsBsCashUsd,
+        totalPaymentsBsBank,
+        totalPaymentsBsBankUsd,
         balance: totalCharges - (totalPaymentsUsd + totalPaymentsBsUsd) - totalWarranty - totalDonation,
         totalGrossCharges,
         totalCommissions,

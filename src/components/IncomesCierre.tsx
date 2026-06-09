@@ -105,7 +105,7 @@ export default function IncomesCierre({
 }) {
   const [activeTab, setActiveTab] = useState<"cierre" | "reporte">("cierre");
   const [reportDate, setReportDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [detailSubTab, setDetailSubTab] = useState<"ventas" | "abonos" | "cargos">("ventas");
+  const [detailSubTab, setDetailSubTab] = useState<"ventas" | "cargos">("ventas");
 
   const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -371,7 +371,193 @@ export default function IncomesCierre({
     }
   });
 
-  // Re-aggregate incomes and total balances for the system boxes (matching what's physical/bank)
+  // Group BS banks (incorporating both direct sales and CXC credit payments)
+  const bsBanksMap: { [bankName: string]: { amountBs: number; amountUsd: number } } = {};
+  // Group USD banks (incorporating both direct sales and CXC credit payments)
+  const usdBanksMap: { [bankName: string]: number } = {};
+
+  // 1. Process standard transactions (direct sales)
+  dailyTransactions.forEach((t) => {
+    const rate = t.exchangeRate || exchangeRate || 1;
+    const amtUsd = t.amountUsd || 0;
+    const destClean = (t.destinationBank || "").trim().toUpperCase();
+    const conceptUpper = (t.concept || "").toUpperCase();
+    const pMethodUpper = (t.paymentMethod || "").toUpperCase();
+    const sellerUpper = (t.sellerName || "").toUpperCase();
+    const clientUpper = (t.clientName || "").toUpperCase();
+
+    const isWarranty =
+      destClean.includes("GARANT") ||
+      pMethodUpper.includes("GARANT") ||
+      conceptUpper.includes("GARANT") ||
+      sellerUpper.includes("GARANT") ||
+      clientUpper.includes("GARANT");
+    const isDonation =
+      destClean.includes("DONAC") ||
+      pMethodUpper.includes("DONAC") ||
+      conceptUpper.includes("DONAC") ||
+      sellerUpper.includes("DONAC") ||
+      clientUpper.includes("DONAC") ||
+      destClean.includes("EXENC") ||
+      pMethodUpper.includes("EXENC") ||
+      conceptUpper.includes("EXENC") ||
+      destClean.includes("EXCENC") ||
+      pMethodUpper.includes("EXCENC") ||
+      conceptUpper.includes("EXCENC") ||
+      destClean.includes("EXENT") ||
+      pMethodUpper.includes("EXENT") ||
+      conceptUpper.includes("EXENT") ||
+      destClean.includes("EXCENT") ||
+      pMethodUpper.includes("EXCENT") ||
+      conceptUpper.includes("EXCENT") ||
+      destClean.includes("CORTES") ||
+      pMethodUpper.includes("CORTES") ||
+      conceptUpper.includes("CORTES") ||
+      destClean.includes("DESCUENT") ||
+      pMethodUpper.includes("DESCUENT") ||
+      conceptUpper.includes("DESCUENT") ||
+      destClean.includes("ANULA") ||
+      pMethodUpper.includes("ANULA") ||
+      conceptUpper.includes("ANULA") ||
+      destClean.includes("BONIF") ||
+      pMethodUpper.includes("BONIF") ||
+      conceptUpper.includes("BONIF");
+
+    if (isWarranty || isDonation) return;
+
+    const isCXCPayment =
+      t.type === TransactionType.INCOME &&
+      (conceptUpper.includes("ABONO CUENTAS POR COBRAR") ||
+        conceptUpper.includes("(CXC)"));
+
+    const isCXCField =
+      t.isCXC ||
+      t.paymentMethod === PaymentMethod.CXC ||
+      destClean.includes("CXC") ||
+      destClean.includes("COBRAR");
+
+    if (isCXCField || isCXCPayment) return;
+
+    const isCashDest =
+      destClean.includes("EFECTIVO") ||
+      destClean.includes("CAJA") ||
+      destClean === "";
+    const isBankDest = destClean.length > 0 && !isCashDest;
+
+    const isBank =
+      isBankDest ||
+      t.paymentMethod === PaymentMethod.BS ||
+      t.paymentMethod === PaymentMethod.ZELLE ||
+      t.paymentMethod === PaymentMethod.BINANCE;
+
+    if (isBank) {
+      const isBs = isBsTransaction(t);
+      const bankName = (t.destinationBank || t.paymentMethod || "OTRO BANCO").trim().toUpperCase();
+
+      if (isBs) {
+        const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : amtUsd * rate;
+        const eqUsd = rate > 0 ? amountBsVal / rate : amtUsd;
+        if (!bsBanksMap[bankName]) {
+          bsBanksMap[bankName] = { amountBs: 0, amountUsd: 0 };
+        }
+        bsBanksMap[bankName].amountBs += amountBsVal;
+        bsBanksMap[bankName].amountUsd += eqUsd;
+      } else {
+        if (!usdBanksMap[bankName]) {
+          usdBanksMap[bankName] = 0;
+        }
+        usdBanksMap[bankName] += amtUsd;
+      }
+    }
+  });
+
+  // 2. Process CXC payments (abonos cxcs) that were sent to bank or cash
+  periodPaymentsList.forEach((p) => {
+    if (p.type === "charge") return;
+
+    const dest = (p.destinationBank || "").toUpperCase();
+    const pMethod = (p.paymentMethod || "").toUpperCase();
+    const concept = (p.concept || "").toUpperCase();
+    const seller = (p.sellerName || "").toUpperCase();
+    const client = (p.clientName || "").toUpperCase();
+
+    const isWarranty =
+      dest.includes("GARANT") ||
+      pMethod.includes("GARANT") ||
+      concept.includes("GARANT") ||
+      seller.includes("GARANT") ||
+      client.includes("GARANT");
+    const isDonation =
+      dest.includes("DONAC") ||
+      pMethod.includes("DONAC") ||
+      concept.includes("DONAC") ||
+      seller.includes("DONAC") ||
+      client.includes("DONAC") ||
+      dest.includes("EXENC") ||
+      pMethod.includes("EXENC") ||
+      concept.includes("EXENC") ||
+      dest.includes("EXCENC") ||
+      pMethod.includes("EXCENC") ||
+      concept.includes("EXCENC") ||
+      dest.includes("EXENT") ||
+      pMethod.includes("EXENT") ||
+      concept.includes("EXENT") ||
+      dest.includes("EXCENT") ||
+      pMethod.includes("EXCENT") ||
+      concept.includes("EXCENT") ||
+      dest.includes("CORTES") ||
+      pMethod.includes("CORTES") ||
+      concept.includes("CORTES") ||
+      dest.includes("DESCUENT") ||
+      pMethod.includes("DESCUENT") ||
+      concept.includes("DESCUENT") ||
+      dest.includes("ANULA") ||
+      pMethod.includes("ANULA") ||
+      concept.includes("ANULA") ||
+      dest.includes("BONIF") ||
+      pMethod.includes("BONIF") ||
+      concept.includes("BONIF");
+
+    if (isWarranty || isDonation) return;
+
+    const isCashDest =
+      dest.includes("EFECTIVO") ||
+      dest.includes("CAJA") ||
+      dest === "";
+    const isBankDest = dest.length > 0 && !isCashDest;
+    const isBank =
+      isBankDest ||
+      p.paymentMethod === PaymentMethod.BS ||
+      p.paymentMethod === PaymentMethod.ZELLE ||
+      p.paymentMethod === PaymentMethod.BINANCE ||
+      pMethod.includes("ZELLE") ||
+      pMethod.includes("BINANCE");
+
+    const amtUsd = p.amountUsd || 0;
+    const payRate = p.exchangeRate || exchangeRate || 1;
+    const amountBsVal = p.amountBs && p.amountBs > 0 ? p.amountBs : amtUsd * payRate;
+    const eqUsd = payRate > 0 ? amountBsVal / payRate : amtUsd;
+
+    if (isBank) {
+      const isBs = isCxcPaymentBs(p);
+      const bankName = (p.destinationBank || p.paymentMethod || "OTRO BANCO").trim().toUpperCase();
+
+      if (isBs) {
+        if (!bsBanksMap[bankName]) {
+          bsBanksMap[bankName] = { amountBs: 0, amountUsd: 0 };
+        }
+        bsBanksMap[bankName].amountBs += amountBsVal;
+        bsBanksMap[bankName].amountUsd += eqUsd;
+      } else {
+        if (!usdBanksMap[bankName]) {
+          usdBanksMap[bankName] = 0;
+        }
+        usdBanksMap[bankName] += amtUsd;
+      }
+    }
+  });
+
+  // Re-aggregate incomes and total balances for system box tracking (combining standard direct sales and CXC payments received)
   const incomesUsd = salesIncomesUsd + cxcIncomesUsd;
   const incomesBs = salesIncomesBs + cxcIncomesBs;
   const incomesBsUsd = salesIncomesBsUsd + cxcIncomesBsUsd;
@@ -380,14 +566,14 @@ export default function IncomesCierre({
   const totalBsInBanksUsd = salesBsInBanksUsd + cxcBsInBanksUsd;
   const totalUsdInBanks = salesUsdInBanks + cxcUsdInBanks;
 
-  // Total sales includes regular cash/bank sales in USD + the CXC charges (from the report!)
-  const totalSalesUsd = salesIncomesUsd + salesUsdInBanks + totalCxc;
-
   // Let's compute the Total of Direct Sales in USD
   const totalVentasDirectasUsd = salesIncomesUsd + salesIncomesBsUsd + salesBsInBanksUsd + salesUsdInBanks;
 
-  // Total Resumen de operaciones = Cuentas por Cobrar (CXC) + Total Abonos CXC Recibidos + Total Ventas Directas
-  const totalResumenOperaciones = totalCxc + totalCxcPaymentsUsd + totalVentasDirectasUsd;
+  // Total Resumen de operaciones = Ventas Directas + Cuentas por Cobrar (Nuevos Cargos CXC hoy)
+  const totalResumenOperaciones = totalVentasDirectasUsd + totalCxc;
+
+  // Total sales includes regular cash/bank sales in USD + the CXC charges (from the report!)
+  const totalSalesUsd = totalResumenOperaciones;
 
   // Expected balances based on the startDate
   const previousClosure = closures
@@ -614,6 +800,8 @@ export default function IncomesCierre({
   });
 
   const reportPaymentsList = allPayments.filter((p) => p.date === reportDate);
+  const reportAbonosList = reportPaymentsList.filter((p) => p.type !== "charge");
+  const reportCargosList = reportPaymentsList.filter((p) => p.type === "charge");
 
   let rTotalCxc = 0;
   let rTotalCxcPaymentsUsd = 0;
@@ -714,6 +902,190 @@ export default function IncomesCierre({
     }
   });
 
+  // Group BS banks for report (incorporating both direct sales and CXC credit payments)
+  const rBsBanksMap: { [bankName: string]: { amountBs: number; amountUsd: number } } = {};
+  // Group USD banks for report (incorporating both direct sales and CXC credit payments)
+  const rUsdBanksMap: { [bankName: string]: number } = {};
+
+  // 1. Process report transactions (direct sales)
+  reportTransactions.forEach((t) => {
+    const rate = t.exchangeRate || exchangeRate || 1;
+    const amtUsd = t.amountUsd || 0;
+    const destClean = (t.destinationBank || "").trim().toUpperCase();
+    const conceptUpper = (t.concept || "").toUpperCase();
+    const pMethodUpper = (t.paymentMethod || "").toUpperCase();
+    const sellerUpper = (t.sellerName || "").toUpperCase();
+    const clientUpper = (t.clientName || "").toUpperCase();
+
+    const isWarranty =
+      destClean.includes("GARANT") ||
+      pMethodUpper.includes("GARANT") ||
+      conceptUpper.includes("GARANT") ||
+      sellerUpper.includes("GARANT") ||
+      clientUpper.includes("GARANT");
+    const isDonation =
+      destClean.includes("DONAC") ||
+      pMethodUpper.includes("DONAC") ||
+      conceptUpper.includes("DONAC") ||
+      sellerUpper.includes("DONAC") ||
+      clientUpper.includes("DONAC") ||
+      destClean.includes("EXENC") ||
+      pMethodUpper.includes("EXENC") ||
+      conceptUpper.includes("EXENC") ||
+      destClean.includes("EXCENC") ||
+      pMethodUpper.includes("EXCENC") ||
+      conceptUpper.includes("EXCENC") ||
+      destClean.includes("EXENT") ||
+      pMethodUpper.includes("EXENT") ||
+      conceptUpper.includes("EXENT") ||
+      destClean.includes("EXCENT") ||
+      pMethodUpper.includes("EXCENT") ||
+      conceptUpper.includes("EXCENT") ||
+      destClean.includes("CORTES") ||
+      pMethodUpper.includes("CORTES") ||
+      conceptUpper.includes("CORTES") ||
+      destClean.includes("DESCUENT") ||
+      pMethodUpper.includes("DESCUENT") ||
+      conceptUpper.includes("DESCUENT") ||
+      destClean.includes("ANULA") ||
+      pMethodUpper.includes("ANULA") ||
+      conceptUpper.includes("ANULA") ||
+      destClean.includes("BONIF") ||
+      pMethodUpper.includes("BONIF") ||
+      conceptUpper.includes("BONIF");
+
+    if (isWarranty || isDonation) return;
+
+    const isCXCPayment =
+      t.type === TransactionType.INCOME &&
+      (conceptUpper.includes("ABONO CUENTAS POR COBRAR") ||
+        conceptUpper.includes("(CXC)"));
+
+    const isCXCField =
+      t.isCXC ||
+      t.paymentMethod === PaymentMethod.CXC ||
+      destClean.includes("CXC") ||
+      destClean.includes("COBRAR");
+
+    if (isCXCField || isCXCPayment) return;
+
+    const isCashDest =
+      destClean.includes("EFECTIVO") ||
+      destClean.includes("CAJA") ||
+      destClean === "";
+    const isBankDest = destClean.length > 0 && !isCashDest;
+
+    const isBank =
+      isBankDest ||
+      t.paymentMethod === PaymentMethod.BS ||
+      t.paymentMethod === PaymentMethod.ZELLE ||
+      t.paymentMethod === PaymentMethod.BINANCE;
+
+    if (isBank) {
+      const isBs = isBsTransaction(t);
+      const bankName = (t.destinationBank || t.paymentMethod || "OTRO BANCO").trim().toUpperCase();
+
+      if (isBs) {
+        const amountBsVal = t.amountBs && t.amountBs > 0 ? t.amountBs : amtUsd * rate;
+        const eqUsd = rate > 0 ? amountBsVal / rate : amtUsd;
+        if (!rBsBanksMap[bankName]) {
+          rBsBanksMap[bankName] = { amountBs: 0, amountUsd: 0 };
+        }
+        rBsBanksMap[bankName].amountBs += amountBsVal;
+        rBsBanksMap[bankName].amountUsd += eqUsd;
+      } else {
+        if (!rUsdBanksMap[bankName]) {
+          rUsdBanksMap[bankName] = 0;
+        }
+        rUsdBanksMap[bankName] += amtUsd;
+      }
+    }
+  });
+
+  // 2. Process CXC payments (abonos cxcs) for the report period
+  reportAbonosList.forEach((p) => {
+    const dest = (p.destinationBank || "").toUpperCase();
+    const pMethod = (p.paymentMethod || "").toUpperCase();
+    const concept = (p.concept || "").toUpperCase();
+    const seller = (p.sellerName || "").toUpperCase();
+    const client = (p.clientName || "").toUpperCase();
+
+    const isWarranty =
+      dest.includes("GARANT") ||
+      pMethod.includes("GARANT") ||
+      concept.includes("GARANT") ||
+      seller.includes("GARANT") ||
+      client.includes("GARANT");
+    const isDonation =
+      dest.includes("DONAC") ||
+      pMethod.includes("DONAC") ||
+      concept.includes("DONAC") ||
+      seller.includes("DONAC") ||
+      client.includes("DONAC") ||
+      dest.includes("EXENC") ||
+      pMethod.includes("EXENC") ||
+      concept.includes("EXENC") ||
+      dest.includes("EXCENC") ||
+      pMethod.includes("EXCENC") ||
+      concept.includes("EXCENC") ||
+      dest.includes("EXENT") ||
+      pMethod.includes("EXENT") ||
+      concept.includes("EXENT") ||
+      dest.includes("EXCENT") ||
+      pMethod.includes("EXCENT") ||
+      concept.includes("EXCENT") ||
+      dest.includes("CORTES") ||
+      pMethod.includes("CORTES") ||
+      concept.includes("CORTES") ||
+      dest.includes("DESCUENT") ||
+      pMethod.includes("DESCUENT") ||
+      concept.includes("DESCUENT") ||
+      dest.includes("ANULA") ||
+      pMethod.includes("ANULA") ||
+      concept.includes("ANULA") ||
+      dest.includes("BONIF") ||
+      pMethod.includes("BONIF") ||
+      concept.includes("BONIF");
+
+    if (isWarranty || isDonation) return;
+
+    const isCashDest =
+      dest.includes("EFECTIVO") ||
+      dest.includes("CAJA") ||
+      dest === "";
+    const isBankDest = dest.length > 0 && !isCashDest;
+    const isBank =
+      isBankDest ||
+      p.paymentMethod === PaymentMethod.BS ||
+      p.paymentMethod === PaymentMethod.ZELLE ||
+      p.paymentMethod === PaymentMethod.BINANCE ||
+      pMethod.includes("ZELLE") ||
+      pMethod.includes("BINANCE");
+
+    const amtUsd = p.amountUsd || 0;
+    const payRate = p.exchangeRate || exchangeRate || 1;
+    const amountBsVal = p.amountBs && p.amountBs > 0 ? p.amountBs : amtUsd * payRate;
+    const eqUsd = payRate > 0 ? amountBsVal / payRate : amtUsd;
+
+    if (isBank) {
+      const isBs = isCxcPaymentBs(p);
+      const bankName = (p.destinationBank || p.paymentMethod || "OTRO BANCO").trim().toUpperCase();
+
+      if (isBs) {
+        if (!rBsBanksMap[bankName]) {
+          rBsBanksMap[bankName] = { amountBs: 0, amountUsd: 0 };
+        }
+        rBsBanksMap[bankName].amountBs += amountBsVal;
+        rBsBanksMap[bankName].amountUsd += eqUsd;
+      } else {
+        if (!rUsdBanksMap[bankName]) {
+          rUsdBanksMap[bankName] = 0;
+        }
+        rUsdBanksMap[bankName] += amtUsd;
+      }
+    }
+  });
+
   const rIncomesUsd = rSalesIncomesUsd + rCxcIncomesUsd;
   const rIncomesBs = rSalesIncomesBs + rCxcIncomesBs;
   const rIncomesBsUsd = rSalesIncomesBsUsd + rCxcIncomesBsUsd;
@@ -722,7 +1094,11 @@ export default function IncomesCierre({
   const rTotalBsInBanksUsd = rSalesBsInBanksUsd + rCxcBsInBanksUsd;
   const rTotalUsdInBanks = rSalesUsdInBanks + rCxcUsdInBanks;
 
-  const rTotalSalesUsd = rSalesIncomesUsd + rSalesUsdInBanks + rTotalCxc;
+  // Let's compute the Total of Direct Sales in USD for reports
+  const rTotalVentasDirectasUsd = rSalesIncomesUsd + rSalesIncomesBsUsd + rTotalBsInBanksUsd + rTotalUsdInBanks;
+
+  // Total Resumen de operaciones = Ventas Directas + Cuentas por Cobrar (Nuevos Cargos CXC hoy)
+  const rTotalSalesUsd = rTotalVentasDirectasUsd + rTotalCxc;
 
   // Expected balances
   const reportPreviousClosure = closures
@@ -771,9 +1147,6 @@ export default function IncomesCierre({
 
     return !isCXCField && !isCXCPayment;
   });
-
-  const reportAbonosList = reportPaymentsList.filter((p) => p.type !== "charge");
-  const reportCargosList = reportPaymentsList.filter((p) => p.type === "charge");
 
   const handleDownloadReportPDF = () => {
     const doc = new jsPDF("p", "mm", "a4");
@@ -879,12 +1252,22 @@ export default function IncomesCierre({
     doc.text("2. RESUMEN DE ACTIVIDAD EN SISTEMA (FLUJO AUTOMÁTICO)", 14, currentY);
     currentY += 4;
     
-    const bimonetaryRows = [
-      ["Efectivo USD (Caja)", formatCurrency(rIncomesUsd), `Ventas Directas: ${formatCurrency(rSalesIncomesUsd)} | Abonos CXC: ${formatCurrency(rCxcIncomesUsd)}`],
-      ["Efectivo Bolívares (Caja)", formatBs(rIncomesBs), `Ventas Directas: ${formatBs(rSalesIncomesBs)} | Abonos CXC: ${formatBs(rCxcIncomesBs)}`],
-      ["Bancos Nacionales (Bs)", formatBs(rTotalBsInBanks), `Equiv. USD: ${formatCurrency(rTotalBsInBanksUsd)}`],
-      ["Bancos Internacionales (USD/Zelle/Binance)", formatCurrency(rTotalUsdInBanks), "Transferencias de divisas directas (electronic)"]
+    const bimonetaryRows: any[] = [
+      ["Efectivo USD (Caja)", formatCurrency(rIncomesUsd), "Efectivo USD Recaudado (Ventas + Abonos CXC)"],
+      ["Efectivo Bolívares (Caja)", formatBs(rIncomesBs), "Efectivo Bs Recaudado (Ventas + Abonos CXC)"],
+      ["Ingresos en Bancos Nacionales (Bs)", "Desglose de Recaudación por Banco (Ventas + Abonos CXC)", ""]
     ];
+
+    Object.entries(rBsBanksMap).forEach(([bank, val]) => {
+      bimonetaryRows.push([`  - ${bank}`, formatBs(val.amountBs), `Equiv. USD: ${formatCurrency(val.amountUsd)}`]);
+    });
+    bimonetaryRows.push(["TOTAL BANCOS BS (Totalizado)", formatBs(rTotalBsInBanks), `Equiv. USD: ${formatCurrency(rTotalBsInBanksUsd)}`]);
+
+    bimonetaryRows.push(["Ingresos en Bancos Divisas (USD)", "Desglose de Recaudación por Banco (Ventas + Abonos CXC)", ""]);
+    Object.entries(rUsdBanksMap).forEach(([bank, val]) => {
+      bimonetaryRows.push([`  - ${bank}`, formatCurrency(val), ""]);
+    });
+    bimonetaryRows.push(["TOTAL BANCOS USD (Totalizado)", formatCurrency(rTotalUsdInBanks), ""]);
     
     autoTable(doc, {
       startY: currentY,
@@ -904,21 +1287,20 @@ export default function IncomesCierre({
 
     // Integrated financial metrics box (Border representation, no colored ink fill)
     doc.setDrawColor(203, 213, 225); // slate 300
-    doc.rect(14, currentY, 182, 24, "S");
+    doc.rect(14, currentY, 182, 20, "S");
     
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
     doc.setTextColor(15, 23, 42);
-    doc.text(`Monto Total de Ventas Registradas: ${formatCurrency(rTotalSalesUsd)}`, 18, currentY + 6);
+    doc.text(`Monto Total de Ventas Registradas (Ventas Directas + CXC): ${formatCurrency(rTotalSalesUsd)}`, 18, currentY + 6);
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(71, 85, 105);
-    doc.text(`- Ventas al Contado (Efectivo + Electrónico recibido): ${formatCurrency(rSalesIncomesUsd + rSalesUsdInBanks)}`, 18, currentY + 11);
-    doc.text(`- Ventas a Crédito Emitidas (Nuevos Cargos CXC hoy): ${formatCurrency(rTotalCxc)}`, 18, currentY + 16);
-    doc.text(`- Total General Abonos de Clientes CXC Recibidos: ${formatCurrency(rTotalCxcPaymentsUsd)}`, 18, currentY + 21);
+    doc.text(`- Ventas Directas Totales (Efectivo + Bancos): ${formatCurrency(rTotalVentasDirectasUsd)}`, 18, currentY + 11);
+    doc.text(`- Ventas a Crédito (Nuevos Cargos CXC hoy): ${formatCurrency(rTotalCxc)}`, 18, currentY + 16);
     
-    currentY += 31;
+    currentY += 27;
 
     // Trigger a new page if remaining vertical space is tight (less than 85mm)
     if (currentY > 190) {
@@ -967,55 +1349,7 @@ export default function IncomesCierre({
 
     currentY = (doc as any).lastAutoTable.finalY + 8;
 
-    // Section 4: Abonos Recibidos
-    if (currentY > 190) {
-      doc.addPage();
-      currentY = 20;
-    }
-
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("4. MOVIMIENTOS DESGLOSADOS: ABONOS CXC RECIBIDOS", 14, currentY);
-    currentY += 4;
-
-    const abonosTableBody = reportAbonosList.map((p) => {
-      const associated = cxcAccounts.find((a) => a.id === p.clientId);
-      const clientName = associated ? associated.clientName : (p.clientId || "Desconocido");
-      const isBs = isCxcPaymentBs(p);
-      const bsAmount = p.amountBs && p.amountBs > 0 ? p.amountBs : (p.amountUsd || 0) * (p.exchangeRate || 1);
-      return [
-        clientName,
-        p.concept || "Abono / Pago de Cuenta",
-        p.sellerName || "—",
-        p.paymentMethod || "—",
-        p.destinationBank || "Efectivo",
-        formatCurrency(p.amountUsd || 0),
-        isBs ? formatBs(bsAmount) : "—"
-      ];
-    });
-
-    autoTable(doc, {
-      startY: currentY,
-      head: [["Cliente", "Concepto de Pago", "Cobrador", "Vía Pago", "Banco/Destino", "Abono USD", "Abono BS"]],
-      body: abonosTableBody.length > 0 ? abonosTableBody : [["No se registraron abonos a cuentas por cobrar hoy.", "", "", "", "", "", ""]],
-      theme: "grid",
-      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold" },
-      styles: { fontSize: 7.5, lineColor: [226, 232, 240], lineWidth: 0.1 },
-      columnStyles: {
-        0: { cellWidth: 42 },
-        1: { cellWidth: 26 },
-        2: { cellWidth: 26 },
-        3: { cellWidth: 22 },
-        4: { cellWidth: 24 },
-        5: { cellWidth: 21, halign: "right" },
-        6: { cellWidth: 21, halign: "right" }
-      }
-    });
-
-    currentY = (doc as any).lastAutoTable.finalY + 8;
-
-    // Section 5: Cargos Emitidos
+    // Section 4: Cargos Emitidos
     if (currentY > 200) {
       doc.addPage();
       currentY = 20;
@@ -1024,7 +1358,7 @@ export default function IncomesCierre({
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.text("5. MOVIMIENTOS DESGLOSADOS: NUEVOS CARGOS CXC (PROVEÍDOS A CRÉDITO)", 14, currentY);
+    doc.text("4. MOVIMIENTOS DESGLOSADOS: NUEVOS CARGOS CXC (PROVEÍDOS A CRÉDITO)", 14, currentY);
     currentY += 4;
 
     const cargosTableBody = reportCargosList.map((p) => {
@@ -1349,10 +1683,6 @@ export default function IncomesCierre({
                         <span>Ventas Directas (Efectivo):</span>
                         <span className="font-medium text-slate-500">{formatCurrency(salesIncomesUsd)}</span>
                       </div>
-                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
-                        <span>Abonos CXC (Efectivo):</span>
-                        <span className="font-medium text-slate-500">{formatCurrency(cxcIncomesUsd)}</span>
-                      </div>
                     </div>
 
                     {/* Caja Efectivo BS */}
@@ -1375,61 +1705,69 @@ export default function IncomesCierre({
                           <span className="text-[10px] text-slate-400">({formatCurrency(salesIncomesBsUsd)})</span>
                         </span>
                       </div>
-                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
-                        <span>Abonos CXC (Efectivo BS):</span>
-                        <span className="font-medium text-slate-500">
-                          {formatBs(cxcIncomesBs)}{" "}
-                          <span className="text-[10px] text-slate-400">({formatCurrency(cxcIncomesBsUsd)})</span>
-                        </span>
-                      </div>
                     </div>
 
-                    {/* Ingresos en Bancos BS */}
+                    {/* Ingresos en Bancos BS desglosado */}
                     <div className="space-y-1 py-1 border-t border-slate-100/50">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-slate-700 ml-2">
-                          &bull; Ingresos en Bancos BS{" "}
-                          <span className="text-[10px] font-bold text-slate-400">
-                            ({formatCurrency(totalBsInBanksUsd)})
-                          </span>
+                          &bull; Ingresos en Bancos BS
                         </span>
-                        <span className="font-bold text-slate-800">
-                          {formatBs(totalBsInBanks)}
+                        <span className="font-bold text-slate-400 text-[10px] uppercase">
+                          Desglose por Banco
                         </span>
                       </div>
-                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
-                        <span>Ventas Directas (Bancos BS):</span>
-                        <span className="font-medium text-slate-500">
-                          {formatBs(salesBsInBanks)}{" "}
-                          <span className="text-[10px] text-slate-400">({formatCurrency(salesBsInBanksUsd)})</span>
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
-                        <span>Abonos CXC (Bancos BS):</span>
-                        <span className="font-medium text-slate-500">
-                          {formatBs(cxcBsInBanks)}{" "}
-                          <span className="text-[10px] text-slate-400">({formatCurrency(cxcBsInBanksUsd)})</span>
+                      
+                      {Object.keys(bsBanksMap).length === 0 ? (
+                        <div className="text-[11px] text-slate-400 pl-6 italic">No se registraron transferencias en Bs</div>
+                      ) : (
+                        Object.entries(bsBanksMap).map(([bank, data]) => (
+                          <div key={bank} className="flex justify-between text-[11px] text-slate-500 pl-6 border-b border-dashed border-slate-100 py-0.5">
+                            <span className="font-medium text-slate-600">{bank}:</span>
+                            <span className="font-mono text-slate-700">
+                              {formatBs(data.amountBs)}{" "}
+                              <span className="text-[10px] text-slate-400">({formatCurrency(data.amountUsd)})</span>
+                            </span>
+                          </div>
+                        ))
+                      )}
+
+                      {/* Totalización de Bancos BS */}
+                      <div className="flex justify-between text-xs font-bold text-slate-700 pl-6 pt-1">
+                        <span>Total Bancos BS:</span>
+                        <span>
+                          {formatBs(totalBsInBanks)}{" "}
+                          <span className="text-[10px] text-slate-400">({formatCurrency(totalBsInBanksUsd)})</span>
                         </span>
                       </div>
                     </div>
 
-                    {/* Ingresos en Bancos USD */}
+                    {/* Ingresos en Bancos USD desglosado */}
                     <div className="space-y-1 py-1 border-t border-slate-100/50">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-slate-700 ml-2">
                           &bull; Ingresos en Bancos USD
                         </span>
-                        <span className="font-bold text-slate-800">
-                          {formatCurrency(totalUsdInBanks)}
+                        <span className="font-bold text-slate-400 text-[10px] uppercase">
+                          Desglose por Banco
                         </span>
                       </div>
-                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
-                        <span>Ventas Directas (Zelle/Binance/Bancos USD):</span>
-                        <span className="font-medium text-slate-500">{formatCurrency(salesUsdInBanks)}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
-                        <span>Abonos CXC (Zelle/Binance/Bancos USD):</span>
-                        <span className="font-medium text-slate-500">{formatCurrency(cxcUsdInBanks)}</span>
+
+                      {Object.keys(usdBanksMap).length === 0 ? (
+                        <div className="text-[11px] text-slate-400 pl-6 italic">No se registraron transferencias en USD</div>
+                      ) : (
+                        Object.entries(usdBanksMap).map(([bank, amt]) => (
+                          <div key={bank} className="flex justify-between text-[11px] text-slate-500 pl-6 border-b border-dashed border-slate-100 py-0.5">
+                            <span className="font-medium text-slate-600">{bank}:</span>
+                            <span className="font-mono text-slate-700">{formatCurrency(amt)}</span>
+                          </div>
+                        ))
+                      )}
+
+                      {/* Totalización de Bancos USD */}
+                      <div className="flex justify-between text-xs font-bold text-slate-700 pl-6 pt-1 border-t border-dashed border-slate-100">
+                        <span>Total Bancos USD:</span>
+                        <span>{formatCurrency(totalUsdInBanks)}</span>
                       </div>
                     </div>
 
@@ -1450,16 +1788,6 @@ export default function IncomesCierre({
                       </span>
                       <span className="font-bold text-slate-800">
                         {formatCurrency(totalCxc)}
-                      </span>
-                    </div>
-
-                    {/* Abonos CXC Recibidos Total */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-700 ml-2">
-                        &bull; Total Abonos CXC Recibidos
-                      </span>
-                      <span className="font-bold text-emerald-600">
-                        {formatCurrency(totalCxcPaymentsUsd)}
                       </span>
                     </div>
                   </div>
@@ -1860,44 +2188,71 @@ export default function IncomesCierre({
               </h4>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1 font-semibold">
+                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1.5 font-semibold">
                   <span className="text-[10px] font-bold text-slate-400 uppercase">Efectivo USD Ingresado</span>
                   <p className="text-lg font-black text-slate-800">{formatCurrency(rIncomesUsd)}</p>
-                  <p className="text-[11px] text-slate-400 flex justify-between">
-                    <span>Ventas: {formatCurrency(rSalesIncomesUsd)}</span>
-                    <span>Abonos: {formatCurrency(rCxcIncomesUsd)}</span>
+                  <p className="text-[11px] text-slate-400">
+                    <span>Ventas Directas: {formatCurrency(rSalesIncomesUsd)}</span>
                   </p>
                 </div>
 
-                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1 font-semibold">
+                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1.5 font-semibold">
                   <span className="text-[10px] font-bold text-slate-400 uppercase">Efectivo BS Ingresado</span>
                   <p className="text-lg font-black text-slate-800">{formatBs(rIncomesBs)}</p>
-                  <p className="text-[11px] text-slate-400 flex justify-between">
-                    <span>Ventas: {formatBs(rSalesIncomesBs)}</span>
-                    <span>Abonos: {formatBs(rCxcIncomesBs)}</span>
+                  <p className="text-[11px] text-slate-400">
+                    <span>Ventas Directas: {formatBs(rSalesIncomesBs)}</span>
                   </p>
                 </div>
 
-                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1 font-semibold">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bancos BS Recibido</span>
-                  <p className="text-lg font-black text-slate-800">{formatBs(rTotalBsInBanks)}</p>
-                  <p className="text-[11px] text-slate-400">Equiv. USD: {formatCurrency(rTotalBsInBanksUsd)}</p>
+                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1.5 font-semibold">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bancos BS Desglosado</span>
+                  <div className="space-y-1 pt-1">
+                    {Object.keys(rBsBanksMap).length === 0 ? (
+                      <p className="text-xs text-slate-400 italic font-medium">No se registraron transferencias en Bs</p>
+                    ) : (
+                      Object.entries(rBsBanksMap).map(([bank, data]) => (
+                        <div key={bank} className="flex justify-between text-[11px] text-slate-500 border-b border-dashed border-slate-200/50 pb-0.5">
+                          <span>{bank}:</span>
+                          <span className="font-mono text-slate-700">{formatBs(data.amountBs)}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-sm font-black text-slate-800 pt-1 border-t border-slate-200 flex justify-between">
+                    <span>Total BS:</span>
+                    <span>{formatBs(rTotalBsInBanks)}</span>
+                  </p>
+                  <p className="text-[10px] text-slate-450 font-bold">Equiv. USD: {formatCurrency(rTotalBsInBanksUsd)}</p>
                 </div>
 
-                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1 font-semibold">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bancos/Zelle/Binance USD</span>
-                  <p className="text-lg font-black text-slate-800">{formatCurrency(rTotalUsdInBanks)}</p>
-                  <p className="text-[11px] text-slate-400">Transferencias divisas directas</p>
+                <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-1.5 font-semibold">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bancos USD Desglosado</span>
+                  <div className="space-y-1 pt-1">
+                    {Object.keys(rUsdBanksMap).length === 0 ? (
+                      <p className="text-xs text-slate-400 italic font-medium">No se registraron transferencias en USD</p>
+                    ) : (
+                      Object.entries(rUsdBanksMap).map(([bank, amt]) => (
+                        <div key={bank} className="flex justify-between text-[11px] text-slate-500 border-b border-dashed border-slate-200/50 pb-0.5">
+                          <span>{bank}:</span>
+                          <span className="font-mono text-slate-700">{formatCurrency(amt)}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-sm font-black text-slate-800 pt-1 border-t border-slate-200 flex justify-between">
+                    <span>Total USD:</span>
+                    <span>{formatCurrency(rTotalUsdInBanks)}</span>
+                  </p>
                 </div>
               </div>
 
               <div className="border-t border-slate-100 pt-3 flex flex-col sm:flex-row justify-between items-center gap-4 bg-emerald-50/30 p-4 rounded-xl border border-emerald-100 font-semibold text-xs text-slate-500">
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-tight">Monto Total de Ventas</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block leading-tight">Monto Total de Ventas (Directas + CXC)</span>
                   <span className="text-xl font-black text-emerald-600 font-sans tracking-tight">{formatCurrency(rTotalSalesUsd)}</span>
                 </div>
                 <div className="text-center sm:text-right font-medium space-y-1">
-                  <div>Ventas Contado: <strong className="text-slate-800">{formatCurrency(rSalesIncomesUsd + rSalesUsdInBanks)}</strong></div>
+                  <div>Ventas Directas Totales: <strong className="text-slate-800">{formatCurrency(rTotalVentasDirectasUsd)}</strong></div>
                   <div>Nuevos créditos (Cargos CXC): <strong className="text-slate-800">{formatCurrency(rTotalCxc)}</strong></div>
                 </div>
               </div>
@@ -1923,17 +2278,6 @@ export default function IncomesCierre({
                   }`}
                 >
                   Ventas Directas ({reportVentasDirectas.length})
-                </button>
-                <button
-                  onClick={() => setDetailSubTab("abonos")}
-                  id="tab-pills-abonos"
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
-                    detailSubTab === "abonos"
-                      ? "bg-white text-slate-800 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  Abonos CXC ({reportAbonosList.length})
                 </button>
                 <button
                   onClick={() => setDetailSubTab("cargos")}
@@ -1986,58 +2330,6 @@ export default function IncomesCierre({
                               </td>
                               <td className="px-4 py-3 text-xs font-mono text-slate-400">{t.destinationBank || "Efectivo"}</td>
                               <td className="px-4 py-3 text-right font-black text-slate-900">{formatCurrency(t.amountUsd)}</td>
-                              <td className="px-4 py-3 text-right font-mono text-blue-600">
-                                {isBs ? formatBs(bsAmount) : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
-
-              {/* Abonos Recibidos render table */}
-              {detailSubTab === "abonos" && (
-                <div className="overflow-x-auto border border-slate-100 rounded-xl bg-white shadow-sm">
-                  {reportAbonosList.length === 0 ? (
-                    <div className="p-12 text-center text-sm font-medium text-slate-400">
-                      No se registraron abonos a cuentas por cobrar hoy.
-                    </div>
-                  ) : (
-                    <table className="w-full text-sm text-left border-collapse font-semibold">
-                      <thead className="bg-slate-50 border-b border-slate-100 text-[11px] font-black uppercase tracking-wider text-slate-400">
-                        <tr>
-                          <th className="px-4 py-3">Cliente</th>
-                          <th className="px-4 py-3">Concepto/Pago</th>
-                          <th className="px-4 py-3">Vendedor</th>
-                          <th className="px-4 py-3">Vía de Pago</th>
-                          <th className="px-4 py-3">Banco / Destino</th>
-                          <th className="px-4 py-3 text-right">Monto (USD)</th>
-                          <th className="px-4 py-3 text-right">Monto (Bs)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
-                        {reportAbonosList.map((p, idx) => {
-                          const associated = cxcAccounts.find((a) => a.id === p.clientId);
-                          const clientName = associated ? associated.clientName : (p.clientId || "Desconocido");
-                          const isBs = isCxcPaymentBs(p);
-                          const bsAmount = p.amountBs && p.amountBs > 0 ? p.amountBs : (p.amountUsd || 0) * (p.exchangeRate || 1);
-                          return (
-                            <tr key={p.id || idx} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-4 py-3 text-slate-900 font-black flex items-center gap-2">
-                                <Users size={12} className="text-blue-500" /> {clientName}
-                              </td>
-                              <td className="px-4 py-3 text-xs text-slate-500 font-bold">{p.concept || "Abono / Pago de Cuenta"}</td>
-                              <td className="px-4 py-3 text-xs text-slate-500">{p.sellerName || "—"}</td>
-                              <td className="px-4 py-3">
-                                <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-800 text-[10px] uppercase font-black px-2 py-0.5 rounded">
-                                  {p.paymentMethod}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-xs font-mono text-slate-400">{p.destinationBank || "Efectivo"}</td>
-                              <td className="px-4 py-3 text-right font-black text-emerald-600">{formatCurrency(p.amountUsd)}</td>
                               <td className="px-4 py-3 text-right font-mono text-blue-600">
                                 {isBs ? formatBs(bsAmount) : "—"}
                               </td>
