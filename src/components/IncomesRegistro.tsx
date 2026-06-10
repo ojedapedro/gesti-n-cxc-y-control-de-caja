@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 import { TransactionType, PaymentMethod, type Transaction, type Seller } from '../types';
-import { Plus, Search, Calendar, User, DollarSign, Tag, Clock, FileText, Edit, X, Percent, Landmark } from 'lucide-react';
+import { Plus, Search, Calendar, User, DollarSign, Tag, Clock, FileText, Edit, X, Percent, Landmark, Gift } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -29,6 +29,8 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
 
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [showCXCModal, setShowCXCModal] = useState(false);
+  const [showDonationWarrantyModal, setShowDonationWarrantyModal] = useState(false);
+  const [dwType, setDwType] = useState<'DONACION' | 'GARANTIA'>('DONACION');
   const [cxcData, setCxcData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     clientName: '',
@@ -54,7 +56,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
   // Fetch historical rate when cxcData date changes
   useEffect(() => {
     const fetchCxcRate = async (dateStr: string) => {
-      if (!dateStr || !showCXCModal) return;
+      if (!dateStr || (!showCXCModal && !showDonationWarrantyModal)) return;
       setFetchingRate(true);
       const historicalRate = await dbService.getExchangeRateForDate(dateStr);
       if (historicalRate) {
@@ -65,7 +67,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
       setFetchingRate(false);
     };
     fetchCxcRate(cxcData.date);
-  }, [cxcData.date, showCXCModal, exchangeRate]);
+  }, [cxcData.date, showCXCModal, showDonationWarrantyModal, exchangeRate]);
 
   // Handle automatic amountBs calculation for CXC
   useEffect(() => {
@@ -228,6 +230,62 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
       });
     } catch (error) {
       console.error("Error saving Cuentas por Cobrar (CXC):", error);
+    }
+  };
+
+  const handleSubmitDonationWarranty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clientName = cxcData.clientName.trim();
+    const concept = cxcData.concept.trim() || dwType;
+    const invoiceNumber = cxcData.invoiceNumber.trim() || 'S/N';
+    const sellerName = cxcData.sellerName.trim();
+    const sellerId = cxcData.sellerId;
+    const rubroName = cxcData.rubroName;
+    const gross = parseFloat(cxcData.grossAmountUsd);
+
+    if (!cxcData.date || !clientName || !sellerId || !rubroName || isNaN(gross) || gross <= 0) {
+      return;
+    }
+
+    try {
+      const net = parseFloat(cxcData.amountUsd) || 0;
+      const commissionAmount = gross - net;
+
+      await dbService.addCXCCharge(clientName.toUpperCase(), {
+        date: cxcData.date,
+        amountUsd: net,
+        grossAmountUsd: gross,
+        commissionAmountUsd: commissionAmount,
+        amountBs: parseFloat(cxcData.amountBs) || 0,
+        exchangeRate: parseFloat(cxcData.exchangeRate) || parseFloat(exchangeRate?.toString() || '1'),
+        concept: concept,
+        item: cxcData.item || `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+        invoiceNumber: invoiceNumber,
+        sellerName: sellerName,
+        sellerId: sellerId,
+        rubroName: rubroName.split('|')[0],
+        type: 'charge',
+        destinationBank: dwType
+      });
+
+      setShowDonationWarrantyModal(false);
+      setCxcData({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        clientName: '',
+        concept: '',
+        amountUsd: '',
+        grossAmountUsd: '',
+        amountBs: '',
+        invoiceNumber: '',
+        sellerName: '',
+        sellerId: '',
+        rubroName: '',
+        exchangeRate: exchangeRate?.toString() || '1',
+        item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+        destinationBank: ''
+      });
+    } catch (error) {
+      console.error("Error saving Donation/Warranty Cargo:", error);
     }
   };
 
@@ -444,6 +502,32 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
           >
             <Plus size={16} />
             <span>Registrar Cargo (CXC)</span>
+          </button>
+
+          <button 
+            onClick={() => {
+              setCxcData({
+                date: format(new Date(), 'yyyy-MM-dd'),
+                clientName: '',
+                concept: 'DONACIÓN',
+                amountUsd: '',
+                grossAmountUsd: '',
+                amountBs: '',
+                invoiceNumber: '',
+                sellerName: '',
+                sellerId: '',
+                rubroName: '',
+                exchangeRate: exchangeRate?.toString() || '1',
+                item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
+                destinationBank: 'DONACION'
+              });
+              setDwType('DONACION');
+              setShowDonationWarrantyModal(true);
+            }}
+            className="bg-violet-600 hover:bg-violet-700 text-white font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition-colors text-sm h-10"
+          >
+            <Gift size={16} />
+            <span>Reg. Donación / Garantía</span>
           </button>
         </div>
       </div>
@@ -1016,7 +1100,7 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2">
                   <label className="label">Concepto</label>
                   <div className="relative">
                     <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
@@ -1027,25 +1111,6 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                       className="input-field pl-10" 
                       placeholder="Detalle de la venta/ingreso a crédito"
                     />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="label">Banco / Destino</label>
-                  <div className="relative">
-                    <Landmark className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                    <input 
-                      type="text" 
-                      value={cxcData.destinationBank || ''}
-                      onChange={(e) => setCxcData({...cxcData, destinationBank: e.target.value.toUpperCase()})}
-                      className="input-field pl-10 uppercase" 
-                      placeholder="Garantía, Donación, etc."
-                      list="bancos-list-cargo-cxc"
-                    />
-                    <datalist id="bancos-list-cargo-cxc">
-                      <option value="GARANTIA" />
-                      <option value="DONACION" />
-                    </datalist>
                   </div>
                 </div>
               </div>
@@ -1206,6 +1271,276 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
                 </button>
                 <button type="submit" className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-6 rounded-xl transition-all shadow-sm text-sm">
                   Registrar Cargo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showDonationWarrantyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col animate-scale-up">
+            <div className="p-4 border-b border-slate-100 bg-violet-50/50 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <Gift className="text-violet-600" size={20} />
+                Registrar Donación / Garantía
+              </h3>
+              <button 
+                onClick={() => setShowDonationWarrantyModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl leading-none"
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmitDonationWarranty} className="p-6 space-y-4 overflow-y-auto max-h-[80vh] custom-scrollbar">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Fecha *</label>
+                  <input 
+                    type="date" 
+                    required
+                    value={cxcData.date}
+                    onChange={(e) => setCxcData({...cxcData, date: e.target.value})}
+                    className="input-field" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Item (Autogenerado)</label>
+                  <input 
+                    type="text" 
+                    readOnly
+                    value={cxcData.item}
+                    className="input-field bg-slate-50 text-slate-500 font-mono" 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label">Cliente (Nombre y Apellido) *</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    required
+                    value={cxcData.clientName}
+                    onChange={(e) => setCxcData({...cxcData, clientName: e.target.value})}
+                    className="input-field pl-10 uppercase font-medium" 
+                    placeholder="Escriba el nombre exacto del cliente"
+                  />
+                </div>
+              </div>
+
+              {/* TIPO DE REGISTRO */}
+              <div className="space-y-2 pb-1">
+                <label className="label">Tipo de Registro *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDwType('DONACION');
+                      setCxcData(prev => ({ ...prev, concept: 'DONACIÓN' }));
+                    }}
+                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border text-sm font-bold transition-all ${
+                      dwType === 'DONACION'
+                        ? 'border-violet-600 bg-violet-50 text-violet-700 ring-2 ring-violet-600/20'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Gift size={16} />
+                    Donación
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDwType('GARANTIA');
+                      setCxcData(prev => ({ ...prev, concept: 'GARANTÍA' }));
+                    }}
+                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border text-sm font-bold transition-all ${
+                      dwType === 'GARANTIA'
+                        ? 'border-blue-600 bg-blue-50 text-blue-700 ring-2 ring-blue-600/20'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Landmark size={16} />
+                    Garantía
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Concepto / Detalle</label>
+                  <div className="relative">
+                    <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      value={cxcData.concept}
+                      onChange={(e) => setCxcData({...cxcData, concept: e.target.value})}
+                      className="input-field pl-10" 
+                      placeholder="Detalle o descripción de la donación/garantía"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Número de Factura</label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      value={cxcData.invoiceNumber}
+                      onChange={(e) => setCxcData({...cxcData, invoiceNumber: e.target.value})}
+                      className="input-field pl-10" 
+                      placeholder="Ej: FAC-00123 / S/N"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label">Vendedor / Perfil *</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <select 
+                      required
+                      value={cxcData.sellerId}
+                      onChange={(e) => {
+                        const sId = e.target.value;
+                        const seller = sellers.find(s => s.id === sId);
+                        if (seller) {
+                          const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
+                          const commission = 0;
+                          const finalUsd = baseUsd * (1 - commission);
+                          const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
+                          setCxcData({
+                            ...cxcData, 
+                            sellerId: sId, 
+                            sellerName: seller.name,
+                            rubroName: '', 
+                            grossAmountUsd: baseUsd.toString(),
+                            amountUsd: finalUsd.toFixed(2),
+                            amountBs: finalBs.toFixed(2)
+                          });
+                        } else {
+                          setCxcData({...cxcData, sellerId: sId, sellerName: '', rubroName: ''});
+                        }
+                      }}
+                      className="input-field pl-10 cursor-pointer text-sm"
+                    >
+                      <option value="">Seleccione Vendedor...</option>
+                      {sellers.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="label flex items-center justify-between">
+                  <span>Rubro / Categoría de Venta *</span>
+                  {cxcData.rubroName && (
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-black uppercase">
+                      {cxcData.rubroName.includes('|') ? cxcData.rubroName.split('|')[1] : '0'}% Comis.
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                  <select 
+                    required
+                    value={cxcData.rubroName}
+                    onChange={(e) => {
+                      const rValue = e.target.value;
+                      const [rName, rComm] = rValue.split('|');
+                      const commission = rComm ? (parseFloat(rComm) / 100) : 0;
+                      
+                      const baseUsd = parseFloat(cxcData.grossAmountUsd) || parseFloat(cxcData.amountUsd) || 0;
+                      const finalUsd = baseUsd * (1 - commission);
+                      const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
+                      
+                      setCxcData({
+                        ...cxcData,
+                        rubroName: rValue,
+                        amountUsd: finalUsd.toFixed(2),
+                        amountBs: finalBs.toFixed(2)
+                      });
+                    }}
+                    className="input-field pl-10 cursor-pointer disabled:bg-slate-50 disabled:text-slate-400 text-sm"
+                    disabled={!cxcData.sellerId}
+                  >
+                    <option value="">Seleccione Rubro...</option>
+                    {cxcData.sellerId && sellers.find(s => s.id === cxcData.sellerId)?.rubros?.map((r, index) => {
+                      const optVal = `${r.name}|${r.commissionPercentage}`;
+                      return (
+                        <option key={`${r.name}-${r.commissionPercentage}-${index}`} value={optVal}>
+                          {r.name} ({r.commissionPercentage}%)
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                {!cxcData.sellerId && <p className="text-[10px] text-amber-600 font-bold mt-1">Seleccione un vendedor para ver sus rubros.</p>}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">Monto Bruto (USD) *</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      min="0.01"
+                      required
+                      placeholder="0.00"
+                      value={cxcData.grossAmountUsd}
+                      onChange={(e) => {
+                        const usd = parseFloat(e.target.value) || 0;
+                        const [rName, rComm] = cxcData.rubroName.split('|');
+                        const commission = rComm ? (parseFloat(rComm) / 100) : 0;
+                        
+                        const finalUsd = usd * (1 - commission);
+                        const finalBs = finalUsd * (parseFloat(cxcData.exchangeRate) || 1);
+                        setCxcData({
+                          ...cxcData, 
+                          grossAmountUsd: e.target.value,
+                          amountUsd: finalUsd.toFixed(2), 
+                          amountBs: finalBs.toFixed(2)
+                        });
+                      }}
+                      className="input-field pl-10 font-bold" 
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400">Monto antes de comisión.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="label text-violet-600 font-bold">Monto Neto (USD)</label>
+                  <div className="input-field bg-violet-50 text-violet-700 font-bold border-dashed flex items-center justify-between h-[38px] px-3">
+                    <span>{formatCurrency(parseFloat(cxcData.amountUsd) || 0)}</span>
+                    {cxcData.sellerId && (
+                      <span className="text-[10px] bg-violet-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <Percent size={10} /> {(() => {
+                        const rComm = cxcData.rubroName.includes('|') ? cxcData.rubroName.split('|')[1] : '0';
+                          return rComm;
+                        })()}% Comis.
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400">Monto neto a registrar.</p>
+                </div>
+              </div>
+              
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
+                <button type="button" onClick={() => setShowDonationWarrantyModal(false)} className="px-5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 font-medium transition-colors text-sm">
+                  Cancelar
+                </button>
+                <button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white font-bold py-2 px-6 rounded-xl transition-all shadow-sm text-sm">
+                  Registrar {dwType === 'DONACION' ? 'Donación' : 'Garantía'}
                 </button>
               </div>
             </form>

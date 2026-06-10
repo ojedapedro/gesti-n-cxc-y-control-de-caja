@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../services/db';
 import { type CXCAccount, type CXCPayment, PaymentMethod, type Seller } from '../types';
-import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search, Download, FileText, CreditCard, Landmark, Edit, X, Percent } from 'lucide-react';
+import { User, DollarSign, History, ChevronRight, Plus, Calendar, Tag, AlertTriangle, CheckCircle, CircleDollarSign, Search, Download, FileText, CreditCard, Landmark, Edit, X, Percent, Gift } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -2038,7 +2038,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2">
                   <label className="label">Concepto</label>
                   <div className="relative">
                     <Tag className="absolute left-3 top-2.5 text-slate-400" size={18} />
@@ -2049,25 +2049,6 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
                       className="input-field pl-10" 
                       placeholder="Detalle de la venta/ingreso a crédito"
                     />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="label">Banco / Destino</label>
-                  <div className="relative">
-                    <Landmark className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                    <input 
-                      type="text" 
-                      value={cxcData.destinationBank || ''}
-                      onChange={(e) => setCxcData({...cxcData, destinationBank: e.target.value.toUpperCase()})}
-                      className="input-field pl-10 uppercase" 
-                      placeholder="Garantía, Donación, etc."
-                      list="bancos-list-cargo-cxc"
-                    />
-                    <datalist id="bancos-list-cargo-cxc">
-                      <option value="GARANTIA" />
-                      <option value="DONACION" />
-                    </datalist>
                   </div>
                 </div>
               </div>

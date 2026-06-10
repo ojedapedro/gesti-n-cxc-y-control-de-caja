@@ -442,15 +442,12 @@ export default function IncomesCierre({
   // Total sales includes regular cash/bank sales in USD + the CXC charges (from the report!)
   const totalSalesUsd = totalResumenOperaciones;
 
-  // Expected balances based on the startDate
-  const previousClosure = closures
-    .filter((c) => c.date < startDate && c.isClosed)
-    .sort((a, b) => b.date.localeCompare(a.date))[0];
-  const initialUsd = previousClosure?.actualBalanceUsd || 0;
-  const initialBs = previousClosure?.actualBalanceBs || 0;
+  // Expected balances based on the startDate (Initial balance is eliminated/set to 0 by request)
+  const initialUsd = 0;
+  const initialBs = 0;
 
-  const expectedUsd = initialUsd + incomesUsd - expensesUsd - withdrawalsUsd;
-  const expectedBs = initialBs + incomesBs - expensesBs - withdrawalsBs;
+  const expectedUsd = incomesUsd - expensesUsd - withdrawalsUsd;
+  const expectedBs = incomesBs - expensesBs - withdrawalsBs;
 
   // Filter closures recorded in the selected period for history display
   const periodClosures = closures
@@ -838,15 +835,12 @@ export default function IncomesCierre({
   // Total Resumen de operaciones = Ventas Directas + Cuentas por Cobrar (Nuevos Cargos CXC hoy)
   const rTotalSalesUsd = rTotalVentasDirectasUsd + rTotalCxc;
 
-  // Expected balances
-  const reportPreviousClosure = closures
-    .filter((c) => c.date < reportDate && c.isClosed)
-    .sort((a, b) => b.date.localeCompare(a.date))[0];
-  const rInitialUsd = reportPreviousClosure?.actualBalanceUsd || 0;
-  const rInitialBs = reportPreviousClosure?.actualBalanceBs || 0;
+  // Expected balances (Initial balance is eliminated/set to 0 by request)
+  const rInitialUsd = 0;
+  const rInitialBs = 0;
 
-  const rExpectedUsd = rInitialUsd + rIncomesUsd;
-  const rExpectedBs = rInitialBs + rIncomesBs;
+  const rExpectedUsd = rIncomesUsd;
+  const rExpectedBs = rIncomesBs;
 
   const rCurrentClosure = closures.find((c) => c.date === reportDate);
   const rIsClosed = rCurrentClosure?.isClosed || false;
@@ -1334,14 +1328,6 @@ export default function IncomesCierre({
                   </div>
                   <div className="p-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-500">
-                        Saldo Inicial
-                      </span>
-                      <span className="font-bold text-slate-900">
-                        {formatCurrency(initialUsd)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-emerald-600">
                         Ingresos (+)
                       </span>
@@ -1372,14 +1358,6 @@ export default function IncomesCierre({
                   </div>
                   <div className="p-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-500">
-                        Saldo Inicial
-                      </span>
-                      <span className="font-bold text-slate-900">
-                        {formatBs(initialBs)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-emerald-600">
                         Ingresos (+)
                       </span>
@@ -1402,89 +1380,27 @@ export default function IncomesCierre({
                 <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-4">
                   <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
                     <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2">
-                      <Activity size={14} className="text-blue-600" /> Resumen
-                      de Operaciones
+                       <Activity size={14} className="text-blue-600" /> Resumen de Operaciones
                     </h5>
                   </div>
                   <div className="p-3 space-y-3.5 border-b border-slate-200">
-                    {/* Caja Efectivo USD */}
+                    {/* 1. Caja efectivo $ */}
                     <div className="space-y-1 py-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-slate-700 ml-2">
-                          &bull; Caja Efectivo USD
+                          &bull; Caja efectivo $
                         </span>
                         <span className="font-bold text-slate-800">
                           {formatCurrency(incomesUsd)}
                         </span>
                       </div>
-                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
-                        <span>Ventas Directas (Efectivo):</span>
-                        <span className="font-medium text-slate-500">{formatCurrency(salesIncomesUsd)}</span>
-                      </div>
                     </div>
 
-                    {/* Caja Efectivo BS */}
+                    {/* 2. Banco en $ (detallado por banco) */}
                     <div className="space-y-1 py-1 border-t border-slate-100/50">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-slate-700 ml-2">
-                          &bull; Caja Efectivo BS{" "}
-                          <span className="text-[10px] font-bold text-slate-400">
-                            ({formatCurrency(incomesBsUsd)})
-                          </span>
-                        </span>
-                        <span className="font-bold text-slate-800">
-                          {formatBs(incomesBs)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
-                        <span>Ventas Directas (Efectivo BS):</span>
-                        <span className="font-medium text-slate-500">
-                          {formatBs(salesIncomesBs)}{" "}
-                          <span className="text-[10px] text-slate-400">({formatCurrency(salesIncomesBsUsd)})</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Ingresos en Bancos BS desglosado */}
-                    <div className="space-y-1 py-1 border-t border-slate-100/50">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-700 ml-2">
-                          &bull; Ingresos en Bancos BS
-                        </span>
-                        <span className="font-bold text-slate-400 text-[10px] uppercase">
-                          Desglose por Banco
-                        </span>
-                      </div>
-                      
-                      {Object.keys(bsBanksMap).length === 0 ? (
-                        <div className="text-[11px] text-slate-400 pl-6 italic">No se registraron transferencias en Bs</div>
-                      ) : (
-                        Object.entries(bsBanksMap).map(([bank, data]) => (
-                          <div key={bank} className="flex justify-between text-[11px] text-slate-500 pl-6 border-b border-dashed border-slate-100 py-0.5">
-                            <span className="font-medium text-slate-600">{bank}:</span>
-                            <span className="font-mono text-slate-700">
-                              {formatBs(data.amountBs)}{" "}
-                              <span className="text-[10px] text-slate-400">({formatCurrency(data.amountUsd)})</span>
-                            </span>
-                          </div>
-                        ))
-                      )}
-
-                      {/* Totalización de Bancos BS */}
-                      <div className="flex justify-between text-xs font-bold text-slate-700 pl-6 pt-1">
-                        <span>Total Bancos BS:</span>
-                        <span>
-                          {formatBs(totalBsInBanks)}{" "}
-                          <span className="text-[10px] text-slate-400">({formatCurrency(totalBsInBanksUsd)})</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Ingresos en Bancos USD desglosado */}
-                    <div className="space-y-1 py-1 border-t border-slate-100/50">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-700 ml-2">
-                          &bull; Ingresos en Bancos USD
+                          &bull; Banco en $
                         </span>
                         <span className="font-bold text-slate-400 text-[10px] uppercase">
                           Desglose por Banco
@@ -1501,38 +1417,100 @@ export default function IncomesCierre({
                           </div>
                         ))
                       )}
+                    </div>
 
-                      {/* Totalización de Bancos USD */}
-                      <div className="flex justify-between text-xs font-bold text-slate-700 pl-6 pt-1 border-t border-dashed border-slate-100">
-                        <span>Total Bancos USD:</span>
-                        <span>{formatCurrency(totalUsdInBanks)}</span>
+                    {/* 3. Total $ */}
+                    <div className="flex items-center justify-between border-t border-slate-100/50 pt-2 pb-1 bg-slate-100/35 px-2 rounded-lg">
+                      <span className="text-sm font-bold text-slate-800 ml-1">
+                        &bull; Total $
+                      </span>
+                      <span className="font-extrabold text-slate-900">
+                        {formatCurrency(incomesUsd + totalUsdInBanks)}
+                      </span>
+                    </div>
+
+                    {/* 4. Caja efectivo bs */}
+                    <div className="space-y-1 py-1 border-t border-slate-100/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700 ml-2">
+                          &bull; Caja efectivo bs
+                        </span>
+                        <span className="font-bold text-slate-800">
+                          {formatBs(incomesBs)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-400 pl-6">
+                        <span>Equivalente USD:</span>
+                        <span className="font-medium text-slate-500">
+                          {formatCurrency(incomesBsUsd)}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Total Ventas Directas */}
-                    <div className="flex items-center justify-between border-t border-slate-100/50 pt-2">
-                      <span className="text-sm font-semibold text-slate-700 ml-2">
-                        &bull; Total Ventas Directas
+                    {/* 5. Caja Banco bs */}
+                    <div className="space-y-1 py-1 border-t border-slate-100/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700 ml-2">
+                          &bull; Caja Banco bs
+                        </span>
+                        <span className="font-bold text-slate-400 text-[10px] uppercase">
+                          Desglose por Banco
+                        </span>
+                      </div>
+                      
+                      {Object.keys(bsBanksMap).length === 0 ? (
+                        <div className="text-[11px] text-slate-400 pl-6 italic">No se registraron transferencias en Bs</div>
+                      ) : (
+                        Object.entries(bsBanksMap).map(([bank, data]) => (
+                          <div key={bank} className="flex justify-between text-[11px] text-slate-500 pl-6 border-b border-dashed border-slate-100 py-0.5">
+                            <span className="font-medium text-slate-600">{bank}:</span>
+                            <span className="font-mono text-slate-700 font-bold">
+                              {formatBs(data.amountBs)}{" "}
+                              <span className="text-[10px] text-slate-400 font-normal">({formatCurrency(data.amountUsd)})</span>
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* 6. Total Bs */}
+                    <div className="flex items-center justify-between border-t border-slate-100/50 pt-2 pb-1 bg-slate-100/35 px-2 rounded-lg">
+                      <span className="text-sm font-bold text-slate-800 ml-1">
+                        &bull; Total Bs
                       </span>
-                      <span className="font-bold text-slate-800">
+                      <span className="font-extrabold text-slate-900 border-b border-dashed border-slate-200">
+                        {formatBs(incomesBs + totalBsInBanks)}{" "}
+                        <span className="text-xs font-semibold text-slate-500 font-sans">
+                          ({formatCurrency(incomesBsUsd + totalBsInBanksUsd)})
+                        </span>
+                      </span>
+                    </div>
+
+                    {/* 7. Total ventas cobradas */}
+                    <div className="flex items-center justify-between border-t border-indigo-100 pt-2 pb-1 bg-indigo-50/25 px-2 rounded-lg">
+                      <span className="text-sm font-black text-indigo-900 ml-1 uppercase tracking-wide">
+                        &bull; Total ventas cobradas
+                      </span>
+                      <span className="font-black text-indigo-700 text-sm">
                         {formatCurrency(totalVentasDirectasUsd)}
                       </span>
                     </div>
 
-                    {/* Cuentas por Cobrar CXC */}
+                    {/* 8. Cxc */}
                     <div className="flex items-center justify-between border-t border-slate-100/50 pt-2">
-                      <span className="text-sm font-semibold text-slate-700 ml-2">
-                        &bull; Cuentas por Cobrar (CXC)
+                      <span className="text-sm font-semibold text-slate-600 ml-2">
+                        &bull; Cxc (Nuevos Cargos)
                       </span>
-                      <span className="font-bold text-slate-800">
+                      <span className="font-bold text-slate-700">
                         {formatCurrency(totalCxc)}
                       </span>
                     </div>
                   </div>
+                  {/* 9. Total resumen operaciones */}
                   <div className="p-3 bg-white border-t border-slate-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-black text-slate-900 uppercase tracking-wide">
-                        Total Resumen de operaciones
+                    <div className="flex items-center justify-between bg-emerald-50/20 p-2 rounded-lg border border-emerald-100/50">
+                      <span className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                        Total resumen operaciones
                       </span>
                       <span className="font-black text-xl text-emerald-600">
                         {formatCurrency(totalResumenOperaciones)}
