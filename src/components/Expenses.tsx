@@ -26,7 +26,7 @@ const COLORS = ['#ef4444'];
 import Receipts from './Receipts';
 import CashFlow from './CashFlow';
 
-export default function ExpensesModule({ exchangeRate }: { exchangeRate?: number }) {
+export default function ExpensesModule({ exchangeRate, globalSearch = '' }: { exchangeRate?: number; globalSearch?: string }) {
   const [activeTab, setActiveTab] = useState<'resumen' | 'gastos' | 'retiros'>('resumen');
 
   return (
@@ -59,16 +59,16 @@ export default function ExpensesModule({ exchangeRate }: { exchangeRate?: number
         <CashFlow exchangeRate={exchangeRate} />
       </div>
       <div className={activeTab === 'gastos' ? 'block' : 'hidden'}>
-        <Expenses exchangeRate={exchangeRate} />
+        <Expenses exchangeRate={exchangeRate} globalSearch={globalSearch} />
       </div>
       <div className={activeTab === 'retiros' ? 'block' : 'hidden'}>
-        <Receipts exchangeRate={exchangeRate} />
+        <Receipts exchangeRate={exchangeRate} globalSearch={globalSearch} />
       </div>
     </div>
   );
 }
 
-function Expenses({ exchangeRate }: { exchangeRate?: number }) {
+function Expenses({ exchangeRate, globalSearch = '' }: { exchangeRate?: number; globalSearch?: string }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [view, setView] = useState<'list' | 'report'>('list');
   const [showForm, setShowForm] = useState(false);
@@ -142,6 +142,13 @@ function Expenses({ exchangeRate }: { exchangeRate?: number }) {
   const filteredExpenses = expenses.filter(e => {
     if (startDate && e.date < startDate) return false;
     if (endDate && e.date > endDate) return false;
+    if (globalSearch) {
+      const gs = globalSearch.toLowerCase();
+      const noteMatch = (e.note || '').toLowerCase().includes(gs);
+      const categoryMatch = (e.category || '').toLowerCase().includes(gs);
+      const methodMatch = (e.paymentMethod || '').toLowerCase().includes(gs);
+      if (!noteMatch && !categoryMatch && !methodMatch) return false;
+    }
     return true;
   });
 

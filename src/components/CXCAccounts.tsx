@@ -8,7 +8,7 @@ import { es } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: number }) {
+export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { exchangeRate?: number; globalSearch?: string }) {
   const [accounts, setAccounts] = useState<CXCAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<CXCAccount | null>(null);
   const [payments, setPayments] = useState<CXCPayment[]>([]);
@@ -389,15 +389,23 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             totalPaymentsBs += amountBsVal;
             totalPaymentsBsUsd += amt;
 
-            const pmText = (p.paymentMethod || '').toUpperCase();
-            const destText = (p.destinationBank || '').toUpperCase();
-            const isCashBs = pm === 'Bs' || 
-                             pm === PaymentMethod.BS_CASH ||
-                             pmText === 'BS' || 
-                             pmText.includes('EFECTIVO') || 
-                             pmText.includes('CASH') ||
-                             destText.includes('EFECTIVO') ||
-                             destText.includes('CAJA');
+            const pmText = (p.paymentMethod || '').toUpperCase().trim();
+            const destText = (p.destinationBank || '').toUpperCase().trim();
+            const isBankBs = 
+              destText.includes('BANESCO') || 
+              destText.includes('VENEZUELA') || 
+              destText.includes('TESORO') || 
+              destText.includes('PROVINCIAL') || 
+              destText.includes('MERCANTIL') || 
+              destText.includes('BNC') || 
+              destText.includes('BANCO') || 
+              destText.includes('TRANSFER') || 
+              destText.includes('PAGO') || 
+              destText.includes('MOVIL') || 
+              pmText.includes('TRANSFERENCIA') ||
+              pmText.includes('PAGO MOVIL');
+
+            const isCashBs = !isBankBs;
 
             if (isCashBs) {
               totalPaymentsBsCash += amountBsVal;
@@ -408,15 +416,25 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             }
           } else {
             totalPaymentsUsd += amt;
-            const pmText = (p.paymentMethod || '').toUpperCase();
-            const destText = (p.destinationBank || '').toUpperCase();
-            const isCashUsd = 
-              pmText === '$' || 
-              pmText.includes('EFECTIVO') || 
-              pmText.includes('CASH') || 
-              destText.includes('EFECTIVO') || 
-              destText.includes('CAJA CHICA') ||
-              (!pmText.includes('ZELLE') && !pmText.includes('BINANCE') && !pmText.includes('TRANSFERENCIA') && !pmText.includes('BANC') && !pmText.includes('PAGO'));
+            const pmText = (p.paymentMethod || '').toUpperCase().trim();
+            const destText = (p.destinationBank || '').toUpperCase().trim();
+            const isBankUsd = 
+              destText.includes('ZELLE') || 
+              destText.includes('BINANCE') || 
+              destText.includes('BANCO') || 
+              destText.includes('BANC') || 
+              destText.includes('TRANSFER') || 
+              destText.includes('PAGO') || 
+              destText.includes('BANESCO') || 
+              destText.includes('VENEZUELA') || 
+              destText.includes('PROVINCIAL') || 
+              destText.includes('MERCANTIL') || 
+              destText.includes('BNC') ||
+              pmText.includes('ZELLE') || 
+              pmText.includes('BINANCE') || 
+              pmText.includes('TRANSFERENCIA');
+
+            const isCashUsd = !isBankUsd;
             
             if (isCashUsd) {
               totalPaymentsUsdCash += amt;
@@ -505,16 +523,20 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     };
   };
 
-  const filteredAccounts = accounts.filter(acc =>
-    acc.clientName.toLowerCase().includes(searchQuery.toLowerCase())
-  ).sort((a, b) => b.totalBalance - a.totalBalance);
+  const filteredAccounts = accounts.filter(acc => {
+    const localMatch = acc.clientName.toLowerCase().includes(searchQuery.toLowerCase());
+    const globalMatch = globalSearch ? acc.clientName.toLowerCase().includes(globalSearch.toLowerCase()) : true;
+    return localMatch && globalMatch;
+  }).sort((a, b) => b.totalBalance - a.totalBalance);
 
   const matchedCharges = allPayments.filter(p => {
-    if (!searchQuery.trim() || searchMode !== 'item') return false;
+    const queryStr = (searchQuery.trim() || globalSearch.trim()).toLowerCase();
+    if (!queryStr) return false;
     const inv = (p.invoiceNumber || '').toLowerCase();
     const itemCode = (p.item || '').toLowerCase();
-    const queryStr = searchQuery.trim().toLowerCase();
-    return inv.includes(queryStr) || itemCode.includes(queryStr);
+    const concept = (p.concept || '').toLowerCase();
+    const client = (p.clientName || '').toLowerCase();
+    return inv.includes(queryStr) || itemCode.includes(queryStr) || concept.includes(queryStr) || client.includes(queryStr);
   });
 
   useEffect(() => {
@@ -776,6 +798,17 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
     if (filterStartDate && p.date < filterStartDate) return false;
     if (filterEndDate && p.date > filterEndDate) return false;
     if (filterSeller && (p.sellerName || '').trim().toUpperCase() !== filterSeller.toUpperCase()) return false;
+    if (globalSearch) {
+      const gs = globalSearch.toLowerCase();
+      const conceptMatch = (p.concept || '').toLowerCase().includes(gs);
+      const invoiceMatch = (p.invoiceNumber || '').toLowerCase().includes(gs);
+      const itemMatch = (p.item || '').toLowerCase().includes(gs);
+      const sellerMatch = (p.sellerName || '').toLowerCase().includes(gs);
+      const clientMatch = (p.clientName || '').toLowerCase().includes(gs);
+      if (!conceptMatch && !invoiceMatch && !itemMatch && !sellerMatch && !clientMatch) {
+         return false;
+      }
+    }
     return true;
   });
 
@@ -913,7 +946,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <CheckCircle size={60} className="text-emerald-600" />
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en $ (Efectivo)</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abono en $ efectivo</p>
             <p className="text-2xl font-black text-emerald-600 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalPaymentsUsdCash || 0)}</p>
             <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format((activeGlobalStats.totalPaymentsUsdCash || 0) * exchangeRate)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
@@ -925,7 +958,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <Landmark size={60} className="text-blue-600" />
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en $ (Bancos/Zelle)</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abono en $ banco</p>
             <p className="text-2xl font-black text-blue-600 tracking-tighter relative z-10">{formatCurrency(activeGlobalStats.totalPaymentsUsdBank || 0)}</p>
             <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Bs. {new Intl.NumberFormat('es-VE').format((activeGlobalStats.totalPaymentsUsdBank || 0) * exchangeRate)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
@@ -937,7 +970,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <CheckCircle size={60} className="text-teal-600" />
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en Bs (Efectivo)</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abono bs efectivo</p>
             <p className="text-2xl font-black text-teal-650 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalPaymentsBsCash)}</p>
             <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(activeGlobalStats.totalPaymentsBsCashUsd)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
@@ -949,7 +982,7 @@ export default function CXCAccounts({ exchangeRate = 1 }: { exchangeRate?: numbe
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <Landmark size={60} className="text-cyan-600" />
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abonos en Bs (Bancos)</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 relative z-10">Abono en Bs Banco</p>
             <p className="text-2xl font-black text-cyan-650 tracking-tighter relative z-10">Bs. {new Intl.NumberFormat('es-VE').format(activeGlobalStats.totalPaymentsBsBank)}</p>
             <p className="text-[10px] font-bold text-slate-400 mt-1 relative z-10">Equiv. {formatCurrency(activeGlobalStats.totalPaymentsBsBankUsd)}</p>
             <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">

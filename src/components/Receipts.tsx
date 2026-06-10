@@ -8,7 +8,7 @@ import { es } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }) {
+export default function Receipts({ exchangeRate = 1, globalSearch = '' }: { exchangeRate?: number; globalSearch?: string }) {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
@@ -308,6 +308,13 @@ export default function Receipts({ exchangeRate = 1 }: { exchangeRate?: number }
   const filteredReceipts = receipts.filter(r => {
     if (startDate && r.date < startDate) return false;
     if (endDate && r.date > endDate) return false;
+    if (globalSearch) {
+      const gs = globalSearch.toLowerCase();
+      const recipientMatch = (r.recipient || '').toLowerCase().includes(gs);
+      const conceptMatch = (r.concept || '').toLowerCase().includes(gs);
+      const fileMatch = (r.receiptNumber || '').toLowerCase().includes(gs);
+      if (!recipientMatch && !conceptMatch && !fileMatch) return false;
+    }
     return true;
   });
 

@@ -10,7 +10,8 @@ import {
   Menu,
   Activity,
   BarChart2,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import { dbService } from './services/db';
 import Dashboard from './components/Dashboard';
@@ -36,6 +37,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [globalSettings, setGlobalSettings] = useState<SettingsType | null>(null);
+  const [globalSearch, setGlobalSearch] = useState('');
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
@@ -172,12 +174,42 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 bg-slate-50 min-h-screen">
-        {activeView === 'dashboard' && <div key="dashboard"><Dashboard exchangeRate={globalSettings?.exchangeRate} /></div>}
-        {activeView === 'incomes' && <div key="incomes"><Incomes exchangeRate={globalSettings?.exchangeRate} /></div>}
-        {activeView === 'cxc' && <div key="cxc"><CXCAccounts exchangeRate={globalSettings?.exchangeRate} /></div>}
-        {activeView === 'expenses' && <div key="expenses"><Expenses exchangeRate={globalSettings?.exchangeRate} /></div>}
+        {/* Búsqueda Global */}
+        {['dashboard', 'incomes', 'cxc', 'expenses', 'reports'].includes(activeView) && (
+          <div className="mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Búsqueda Global</h2>
+              <p className="text-xs font-medium text-slate-500 font-sans">Busca clientes, conceptos u observaciones en tiempo real across views</p>
+            </div>
+            <div className="relative w-full sm:max-w-md">
+              <span className="absolute left-3.5 top-3 text-slate-400">
+                <Search size={18} />
+              </span>
+              <input 
+                type="text" 
+                placeholder="Buscar cliente, concepto, detalle..." 
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 bg-slate-50 text-slate-800 placeholder-slate-400 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium transition-all"
+              />
+              {globalSearch && (
+                <button 
+                  onClick={() => setGlobalSearch('')}
+                  className="absolute right-3 top-1.5 text-slate-400 hover:text-slate-600 font-bold transition-colors text-lg"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeView === 'dashboard' && <div key="dashboard"><Dashboard exchangeRate={globalSettings?.exchangeRate} globalSearch={globalSearch} /></div>}
+        {activeView === 'incomes' && <div key="incomes"><Incomes exchangeRate={globalSettings?.exchangeRate} globalSearch={globalSearch} /></div>}
+        {activeView === 'cxc' && <div key="cxc"><CXCAccounts exchangeRate={globalSettings?.exchangeRate} globalSearch={globalSearch} /></div>}
+        {activeView === 'expenses' && <div key="expenses"><Expenses exchangeRate={globalSettings?.exchangeRate} globalSearch={globalSearch} /></div>}
         {activeView === 'sellers' && <div key="sellers"><Sellers /></div>}
-        {activeView === 'reports' && <div key="reports"><Reports exchangeRate={globalSettings?.exchangeRate} /></div>}
+        {activeView === 'reports' && <div key="reports"><Reports exchangeRate={globalSettings?.exchangeRate} globalSearch={globalSearch} /></div>}
         {activeView === 'settings' && <div key="settings"><Settings /></div>}
       </main>
     </div>

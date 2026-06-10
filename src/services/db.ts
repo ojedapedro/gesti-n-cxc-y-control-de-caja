@@ -453,15 +453,23 @@ export const dbService = {
               totalPaymentsBs += amountBsVal;
               totalPaymentsBsUsd += amt;
 
-              const pmUpper = pmText.toUpperCase();
-              const destUpper = (data.destinationBank || '').toUpperCase();
-              const isCashBs = pmText === 'Bs' || 
-                               pmText === PaymentMethod.BS_CASH ||
-                               pmUpper === 'BS' || 
-                               pmUpper.includes('EFECTIVO') || 
-                               pmUpper.includes('CASH') ||
-                               destUpper.includes('EFECTIVO') ||
-                               destUpper.includes('CAJA');
+              const pmUpper = pmText.toUpperCase().trim();
+              const destUpper = (data.destinationBank || '').toUpperCase().trim();
+              const isBankBs = 
+                destUpper.includes('BANESCO') || 
+                destUpper.includes('VENEZUELA') || 
+                destUpper.includes('TESORO') || 
+                destUpper.includes('PROVINCIAL') || 
+                destUpper.includes('MERCANTIL') || 
+                destUpper.includes('BNC') || 
+                destUpper.includes('BANCO') || 
+                destUpper.includes('TRANSFER') || 
+                destUpper.includes('PAGO') || 
+                destUpper.includes('MOVIL') || 
+                pmUpper.includes('TRANSFERENCIA') ||
+                pmUpper.includes('PAGO MOVIL');
+
+              const isCashBs = !isBankBs;
 
               if (isCashBs) {
                 totalPaymentsBsCash += amountBsVal;

@@ -3,7 +3,7 @@ import IncomesRegistro from './IncomesRegistro';
 import IncomesCierre from './IncomesCierre';
 import { FileText, Lock } from 'lucide-react';
 
-export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
+export default function Incomes({ exchangeRate, globalSearch = '' }: { exchangeRate?: number; globalSearch?: string }) {
   const [activeTab, setActiveTab] = useState<'registro' | 'cierre'>('registro');
 
   return (
@@ -27,7 +27,7 @@ export default function Incomes({ exchangeRate }: { exchangeRate?: number }) {
 
       <div className="mt-4">
         {activeTab === 'registro' ? (
-          <IncomesRegistro exchangeRate={exchangeRate} />
+          <IncomesRegistro exchangeRate={exchangeRate} globalSearch={globalSearch} />
         ) : (
           <IncomesCierre exchangeRate={exchangeRate} />
         )}

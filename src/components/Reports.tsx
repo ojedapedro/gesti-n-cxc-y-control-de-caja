@@ -40,6 +40,7 @@ import {
 
 interface ReportsProps {
   exchangeRate?: number;
+  globalSearch?: string;
 }
 
 type ReportType = 'cxc_detail' | 'abonos' | 'bank_reconciliation' | 'egresos_vales' | 'predictive_analysis';
@@ -103,7 +104,7 @@ const getPaymentClassification = (p: CXCPayment, exchangeRate: number): 'cash_us
   return 'bank';
 };
 
-export default function Reports({ exchangeRate = 1 }: ReportsProps) {
+export default function Reports({ exchangeRate = 1, globalSearch = '' }: ReportsProps) {
   const [activeReport, setActiveReport] = useState<ReportType>('cxc_detail');
   
   // Data State
@@ -230,9 +231,17 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       if (endDate && p.date > endDate) return false;
       if (selectedClient && p.clientId !== selectedClient) return false;
       if (selectedSeller && (!p.sellerName || p.sellerName.trim().toUpperCase() !== selectedSeller.toUpperCase())) return false;
+      if (globalSearch) {
+        const gs = globalSearch.toLowerCase();
+        const clientMatch = (p.clientName || '').toLowerCase().includes(gs);
+        const conceptMatch = (p.concept || '').toLowerCase().includes(gs);
+        const invoiceMatch = (p.invoiceNumber || '').toLowerCase().includes(gs);
+        const itemMatch = (p.item || '').toLowerCase().includes(gs);
+        if (!clientMatch && !conceptMatch && !invoiceMatch && !itemMatch) return false;
+      }
       return true;
     });
-  }, [allPayments, startDate, endDate, selectedClient, selectedSeller]);
+  }, [allPayments, startDate, endDate, selectedClient, selectedSeller, globalSearch]);
 
   const cxcDetailSummary = useMemo(() => {
     let totalBruto = 0;
@@ -265,9 +274,18 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
         if (classification !== selectedPaymentMethodFilter) return false;
       }
       
+      if (globalSearch) {
+        const gs = globalSearch.toLowerCase();
+        const clientMatch = (p.clientName || '').toLowerCase().includes(gs);
+        const conceptMatch = (p.concept || '').toLowerCase().includes(gs);
+        const methodMatch = (p.paymentMethod || '').toLowerCase().includes(gs);
+        const bankMatch = (p.destinationBank || '').toLowerCase().includes(gs);
+        if (!clientMatch && !conceptMatch && !methodMatch && !bankMatch) return false;
+      }
+      
       return true;
     });
-  }, [allPayments, startDate, endDate, selectedClient, selectedSeller, selectedPaymentMethodFilter, exchangeRate]);
+  }, [allPayments, startDate, endDate, selectedClient, selectedSeller, selectedPaymentMethodFilter, exchangeRate, globalSearch]);
 
   const abonosSummary = useMemo(() => {
     let totalUsd = 0;
@@ -401,9 +419,16 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
         if (selectedCurrency === 'USD' && !item.currency.includes('$')) return false;
         if (selectedCurrency === 'BS' && !item.currency.includes('BS')) return false;
       }
+      if (globalSearch) {
+        const gs = globalSearch.toLowerCase();
+        const sourceMatch = (item.source || '').toLowerCase().includes(gs);
+        const bankMatch = (item.bank || '').toLowerCase().includes(gs);
+        const currencyMatch = (item.currency || '').toLowerCase().includes(gs);
+        if (!sourceMatch && !bankMatch && !currencyMatch) return false;
+      }
       return true;
     }).sort((a, b) => b.date.localeCompare(a.date));
-  }, [transactions, allPayments, startDate, endDate, selectedBank, selectedCurrency, clientMap, exchangeRate]);
+  }, [transactions, allPayments, startDate, endDate, selectedBank, selectedCurrency, clientMap, exchangeRate, globalSearch]);
 
   const bankReconciliationSummary = useMemo(() => {
     let totalUsd = 0;
@@ -477,9 +502,15 @@ export default function Reports({ exchangeRate = 1 }: ReportsProps) {
       if (startDate && item.date < startDate) return false;
       if (endDate && item.date > endDate) return false;
       if (selectedCategoryOrRecipient && item.categoryOrRecipient.trim().toUpperCase() !== selectedCategoryOrRecipient.toUpperCase()) return false;
+      if (globalSearch) {
+        const gs = globalSearch.toLowerCase();
+        const catRecMatch = (item.categoryOrRecipient || '').toLowerCase().includes(gs);
+        const conceptMatch = (item.concept || '').toLowerCase().includes(gs);
+        if (!catRecMatch && !conceptMatch) return false;
+      }
       return true;
     }).sort((a, b) => b.date.localeCompare(a.date));
-  }, [expenses, receipts, startDate, endDate, selectedEgresoType, selectedCategoryOrRecipient, exchangeRate]);
+  }, [expenses, receipts, startDate, endDate, selectedEgresoType, selectedCategoryOrRecipient, exchangeRate, globalSearch]);
 
   const egresosValesSummary = useMemo(() => {
     let totalUsd = 0;

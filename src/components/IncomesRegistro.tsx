@@ -6,7 +6,7 @@ import { formatCurrency } from '../lib/utils';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: number }) {
+export default function IncomesRegistro({ exchangeRate, globalSearch = '' }: { exchangeRate?: number; globalSearch?: string }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showForm, setShowForm] = useState(true);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -354,6 +354,13 @@ export default function IncomesRegistro({ exchangeRate }: { exchangeRate?: numbe
     if (endDate && t.date > endDate) return false;
     if (selectedCurrency && t.currency !== selectedCurrency) return false;
     if (selectedDestination && (t.destinationBank || '').trim().toUpperCase() !== selectedDestination.toUpperCase()) return false;
+    if (globalSearch) {
+      const gs = globalSearch.toLowerCase();
+      const clientMatch = (t.clientName || '').toLowerCase().includes(gs);
+      const conceptMatch = (t.concept || '').toLowerCase().includes(gs);
+      const sellerMatch = (t.sellerName || '').toLowerCase().includes(gs);
+      if (!clientMatch && !conceptMatch && !sellerMatch) return false;
+    }
     return true;
   });
 

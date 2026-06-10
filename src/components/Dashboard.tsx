@@ -74,7 +74,7 @@ const isBsTransaction = (t: Transaction): boolean => {
   return isBsMethod || (!isUsdMethod && !!t.amountBs && t.amountBs > 0);
 };
 
-export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number }) {
+export default function Dashboard({ exchangeRate = 1, globalSearch = '' }: { exchangeRate?: number; globalSearch?: string }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [cxcAccounts, setCXCAccounts] = useState<CXCAccount[]>([]);
@@ -896,9 +896,14 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
           </h3>
           <div className="space-y-3 mt-4">
             {cxcAccounts
-              .filter(acc => acc.totalBalance > 0)
+              .filter(acc => {
+                if (globalSearch) {
+                  return acc.clientName.toLowerCase().includes(globalSearch.toLowerCase());
+                }
+                return acc.totalBalance > 0;
+              })
               .sort((a, b) => b.totalBalance - a.totalBalance)
-              .slice(0, 5)
+              .slice(0, globalSearch ? undefined : 5)
               .map((acc, i) => (
                 <div key={i} className="flex items-center justify-between p-3.5 rounded-[16px] bg-slate-50 border border-slate-100/50 hover:bg-slate-100 transition-colors">
                   <div className="flex items-center gap-3.5">
@@ -916,10 +921,15 @@ export default function Dashboard({ exchangeRate = 1 }: { exchangeRate?: number 
                   </div>
                 </div>
               ))}
-            {cxcAccounts.length === 0 && (
+            {cxcAccounts.filter(acc => {
+              if (globalSearch) {
+                return acc.clientName.toLowerCase().includes(globalSearch.toLowerCase());
+              }
+              return acc.totalBalance > 0;
+            }).length === 0 && (
               <p className="text-sm text-slate-500 text-center py-10 flex flex-col items-center justify-center gap-2">
                 <Users className="text-slate-300" size={32} />
-                <span>No hay saldos pendientes.</span>
+                <span>No hay resultados para la búsqueda.</span>
               </p>
             )}
           </div>
