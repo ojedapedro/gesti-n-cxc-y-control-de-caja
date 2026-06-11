@@ -896,38 +896,38 @@ export default function IncomesCierre({
     // Header section decoration - White background with thin minimal separator line (ink-saver)
     doc.setDrawColor(226, 232, 240); // slate 200
     doc.setLineWidth(0.4);
-    doc.line(14, 28, 196, 28);
+    doc.line(14, 21, 196, 21);
     
     // Header text
     doc.setTextColor(15, 23, 42); // slate 900
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("INVEPINCA C.A.", 14, 14);
+    doc.setFontSize(14);
+    doc.text("INVEPINCA C.A.", 14, 11);
     
-    doc.setFontSize(8.5);
+    doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(100, 116, 139); // slate 500
-    doc.text("COMPROBANTE DE CIERRE Y REPORTE DETALLADO DE CAJA DIARIA", 14, 20);
+    doc.text("COMPROBANTE DE CIERRE Y REPORTE DETALLADO DE CAJA DIARIA", 14, 16);
     
     // Header metadata on the right side
-    doc.setFontSize(8.5);
+    doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105); // slate 600
-    doc.text(`Fecha de Caja: ${reportDate}`, 196, 14, { align: "right" });
-    doc.text(`Impresión: ${format(new Date(), "dd/MM/yyyy h:mm a")}`, 196, 19, { align: "right" });
+    doc.text(`Fecha de Caja: ${reportDate}`, 196, 11, { align: "right" });
+    doc.text(`Impresión: ${format(new Date(), "dd/MM/yyyy h:mm a")}`, 196, 15, { align: "right" });
     
     const statusText = rIsClosed ? "Caja Cerrada y Asegurada" : "Cierre Físico Pendiente";
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
-    doc.text(`Estado: ${statusText.toUpperCase()}`, 196, 25, { align: "right" });
+    doc.text(`Estado: ${statusText.toUpperCase()}`, 196, 19, { align: "right" });
     
-    let currentY = 38;
+    let currentY = 27;
     
     // Section 1: Auditoria sementes (Conteo fisico vs esperado)
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.text("1. AUDITORÍA DE SALDOS FÍSICOS (CUADRE DE EFECTIVO)", 14, currentY);
-    currentY += 4;
+    currentY += 3;
     
     const expectedUsdFormatted = formatCurrency(rExpectedUsd);
     const expectedBsFormatted = formatBs(rExpectedBs);
@@ -957,8 +957,8 @@ export default function IncomesCierre({
       head: [["Caja / Moneda", "Dato Sistema (Esperado)", "Saldo Conteo Físico", "Diferencia", "Diagnóstico"]],
       body: verificationRows,
       theme: "grid",
-      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
-      styles: { fontSize: 8.5, fontStyle: "bold", lineColor: [226, 232, 240], lineWidth: 0.1 },
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold", cellPadding: 1.2 },
+      styles: { fontSize: 7.5, fontStyle: "bold", lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1.2 },
       columnStyles: {
         0: { cellWidth: 50 },
         1: { cellWidth: 35 },
@@ -968,31 +968,31 @@ export default function IncomesCierre({
       }
     });
     
-    currentY = (doc as any).lastAutoTable.finalY + 6;
+    currentY = (doc as any).lastAutoTable.finalY + 4;
     
     // Notes / Observations if present
     if (rCurrentClosure?.observations) {
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(8.5);
+      doc.setFontSize(7.5);
       doc.text("Observaciones del Cierre Físico:", 14, currentY);
-      currentY += 4;
+      currentY += 3;
       
       doc.setFont("helvetica", "oblique");
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setTextColor(71, 85, 105);
       
       const splitText = doc.splitTextToSize(`"${rCurrentClosure.observations}"`, 182);
       doc.text(splitText, 14, currentY);
       
-      currentY += splitText.length * 4 + 4;
+      currentY += splitText.length * 3 + 3;
     }
     
     // Section 2: Resumen de actividad
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.text("2. RESUMEN DE ACTIVIDAD EN SISTEMA (FLUJO AUTOMÁTICO)", 14, currentY);
-    currentY += 4;
+    currentY += 3;
     
     const bimonetaryRows: any[] = [
       ["Efectivo USD (Caja)", formatCurrency(rIncomesUsd), "Ventas Directas (Efectivo)"],
@@ -1016,8 +1016,8 @@ export default function IncomesCierre({
       head: [["Vía de Recaudación", "Monto Registrado Período", "Desglose Operativo Internado"]],
       body: bimonetaryRows,
       theme: "grid",
-      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
-      styles: { fontSize: 8, fontStyle: "normal", lineColor: [226, 232, 240], lineWidth: 0.1 },
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold", cellPadding: 1.2 },
+      styles: { fontSize: 7, fontStyle: "normal", lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1.2 },
       columnStyles: {
         0: { cellWidth: 55, fontStyle: "bold" },
         1: { cellWidth: 40, fontStyle: "bold" },
@@ -1025,37 +1025,36 @@ export default function IncomesCierre({
       }
     });
     
-    currentY = (doc as any).lastAutoTable.finalY + 5;
+    currentY = (doc as any).lastAutoTable.finalY + 3;
 
     // Integrated financial metrics box (Border representation, no colored ink fill)
     doc.setDrawColor(203, 213, 225); // slate 300
-    doc.rect(14, currentY, 182, 20, "S");
+    doc.rect(14, currentY, 182, 11, "S");
     
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
+    doc.setFontSize(7.5);
     doc.setTextColor(15, 23, 42);
-    doc.text(`Monto Total de Ventas Registradas (Ventas Directas + CXC): ${formatCurrency(rTotalSalesUsd)}`, 18, currentY + 6);
+    doc.text(`Monto Total de Ventas Registradas (Ventas Directas + CXC): ${formatCurrency(rTotalSalesUsd)}`, 18, currentY + 4);
     
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setTextColor(71, 85, 105);
-    doc.text(`- Ventas Directas Totales (Efectivo + Bancos): ${formatCurrency(rTotalVentasDirectasUsd)}`, 18, currentY + 11);
-    doc.text(`- Ventas a Crédito (Nuevos Cargos CXC hoy): ${formatCurrency(rTotalCxc)}`, 18, currentY + 16);
+    doc.text(`- Ventas Directas Totales (Efectivo + Bancos): ${formatCurrency(rTotalVentasDirectasUsd)}   |   - Ventas a Crédito (Nuevos Cargos CXC hoy): ${formatCurrency(rTotalCxc)}`, 18, currentY + 8);
     
-    currentY += 27;
+    currentY += 15;
 
-    // Trigger a new page if remaining vertical space is tight (less than 85mm)
-    if (currentY > 190) {
+    // Trigger a new page if remaining vertical space is tight (less than 60mm)
+    if (currentY > 235) {
       doc.addPage();
-      currentY = 20;
+      currentY = 15;
     }
     
     // Section 3: Ventas Directas
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.text("3. MOVIMIENTOS DESGOSADOS: VENTAS DIRECTAS", 14, currentY);
-    currentY += 4;
+    currentY += 3;
 
     const salesTableBody = reportVentasDirectas.map((t) => {
       const isBs = isBsTransaction(t);
@@ -1076,8 +1075,8 @@ export default function IncomesCierre({
       head: [["Concepto", "Cliente", "Vendedor", "Vía Pago", "Destino", "Monto USD", "Monto BS"]],
       body: salesTableBody.length > 0 ? salesTableBody : [["No se registraron ventas directas el día de hoy.", "", "", "", "", "", ""]],
       theme: "grid",
-      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold" },
-      styles: { fontSize: 7.5, lineColor: [226, 232, 240], lineWidth: 0.1 },
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7, fontStyle: "bold", cellPadding: 1 },
+      styles: { fontSize: 6.5, lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1 },
       columnStyles: {
         0: { cellWidth: 42 },
         1: { cellWidth: 26 },
@@ -1089,19 +1088,19 @@ export default function IncomesCierre({
       }
     });
 
-    currentY = (doc as any).lastAutoTable.finalY + 8;
+    currentY = (doc as any).lastAutoTable.finalY + 4;
 
     // Section 4: Cargos Emitidos
-    if (currentY > 200) {
+    if (currentY > 235) {
       doc.addPage();
-      currentY = 20;
+      currentY = 15;
     }
 
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.text("4. MOVIMIENTOS DESGLOSADOS: NUEVOS CARGOS CXC (PROVEÍDOS A CRÉDITO)", 14, currentY);
-    currentY += 4;
+    currentY += 3;
 
     const cargosTableBody = reportCargosList.map((p) => {
       const associated = cxcAccounts.find((a) => a.id === p.clientId);
@@ -1120,8 +1119,8 @@ export default function IncomesCierre({
       head: [["Cliente de Cargo", "Item / Rubro de Crédito", "Factura Nº", "Cargador/Vendedor", "Importe Crédito USD"]],
       body: cargosTableBody.length > 0 ? cargosTableBody : [["No se registraron ventas a crédito el día de hoy.", "", "", "", ""]],
       theme: "grid",
-      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold" },
-      styles: { fontSize: 7.5, lineColor: [226, 232, 240], lineWidth: 0.1 },
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7, fontStyle: "bold", cellPadding: 1 },
+      styles: { fontSize: 6.5, lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1 },
       columnStyles: {
         0: { cellWidth: 45 },
         1: { cellWidth: 45 },
@@ -1131,24 +1130,24 @@ export default function IncomesCierre({
       }
     });
 
-    currentY = (doc as any).lastAutoTable.finalY + 12;
+    currentY = (doc as any).lastAutoTable.finalY + 8;
 
-    // Signatures block
-    if (currentY > 230) {
+    // Signatures block - Compact
+    if (currentY > 260) {
       doc.addPage();
-      currentY = 30;
+      currentY = 15;
     }
 
     doc.setDrawColor(203, 213, 225); // slate 300
     
     // Line and signature placeholders
-    doc.line(20, currentY + 15, 85, currentY + 15);
+    doc.line(20, currentY + 10, 85, currentY + 10);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("Firma de Gerencia de Caja", 34, currentY + 19);
+    doc.setFontSize(7.5);
+    doc.text("Firma de Gerencia de Caja", 34, currentY + 14);
     
-    doc.line(125, currentY + 15, 190, currentY + 15);
-    doc.text("Firma de Auditoría General", 137, currentY + 19);
+    doc.line(125, currentY + 10, 190, currentY + 10);
+    doc.text("Firma de Auditoría General", 137, currentY + 14);
 
     // Save and download PDF
     doc.save(`Reporte_Caja_Detallado_${reportDate}.pdf`);
