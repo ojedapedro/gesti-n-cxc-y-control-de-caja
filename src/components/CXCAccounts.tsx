@@ -398,6 +398,9 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
               destText.includes('PROVINCIAL') || 
               destText.includes('MERCANTIL') || 
               destText.includes('BNC') || 
+              destText.includes('BVC') || 
+              destText.includes('VENEZOLANO') || 
+              destText.includes('CREDITO') || 
               destText.includes('BANCO') || 
               destText.includes('TRANSFER') || 
               destText.includes('PAGO') || 
@@ -430,6 +433,9 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
               destText.includes('PROVINCIAL') || 
               destText.includes('MERCANTIL') || 
               destText.includes('BNC') ||
+              destText.includes('BVC') || 
+              destText.includes('VENEZOLANO') || 
+              destText.includes('CREDITO') || 
               pmText.includes('ZELLE') || 
               pmText.includes('BINANCE') || 
               pmText.includes('TRANSFERENCIA');
@@ -1457,6 +1463,7 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
                               <option value="PROVINCIAL" />
                               <option value="MERCANTIL" />
                               <option value="BNC" />
+                              <option value="BANCO VENEZOLANO DE CREDITO" />
                             </>
                           ) : (
                             <>
@@ -1471,6 +1478,7 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
                               <option value="PROVINCIAL" />
                               <option value="MERCANTIL" />
                               <option value="BNC" />
+                              <option value="BANCO VENEZOLANO DE CREDITO" />
                             </>
                           )}
                         </datalist>
@@ -1898,6 +1906,7 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
                             <option value="PROVINCIAL" />
                             <option value="MERCANTIL" />
                             <option value="BNC" />
+                            <option value="BANCO VENEZOLANO DE CREDITO" />
                           </>
                         ) : (
                           <>
@@ -1912,6 +1921,7 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
                             <option value="PROVINCIAL" />
                             <option value="MERCANTIL" />
                             <option value="BNC" />
+                            <option value="BANCO VENEZOLANO DE CREDITO" />
                           </>
                         )}
                       </datalist>

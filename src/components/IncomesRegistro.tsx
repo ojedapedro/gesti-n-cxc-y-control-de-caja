@@ -510,32 +510,6 @@ export default function IncomesRegistro({ exchangeRate, globalSearch = '' }: { e
             <Plus size={16} />
             <span>Registrar Cargo (CXC)</span>
           </button>
-
-          <button 
-            onClick={() => {
-              setCxcData({
-                date: format(new Date(), 'yyyy-MM-dd'),
-                clientName: '',
-                concept: 'DONACIÓN',
-                amountUsd: '',
-                grossAmountUsd: '',
-                amountBs: '',
-                invoiceNumber: '',
-                sellerName: '',
-                sellerId: '',
-                rubroName: '',
-                exchangeRate: exchangeRate?.toString() || '1',
-                item: `CXC-${format(new Date(), 'yyyyMMdd-HHmmss')}`,
-                destinationBank: 'DONACION'
-              });
-              setDwType('DONACION');
-              setShowDonationWarrantyModal(true);
-            }}
-            className="bg-violet-600 hover:bg-violet-700 text-white font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition-colors text-sm h-10"
-          >
-            <Gift size={16} />
-            <span>Reg. Donación / Garantía</span>
-          </button>
         </div>
       </div>
 
@@ -600,6 +574,7 @@ export default function IncomesRegistro({ exchangeRate, globalSearch = '' }: { e
                       <option value="PROVINCIAL" />
                       <option value="MERCANTIL" />
                       <option value="BNC" />
+                      <option value="BANCO VENEZOLANO DE CREDITO" />
                     </>
                   ) : (
                     <>
@@ -612,6 +587,7 @@ export default function IncomesRegistro({ exchangeRate, globalSearch = '' }: { e
                       <option value="PROVINCIAL" />
                       <option value="MERCANTIL" />
                       <option value="BNC" />
+                      <option value="BANCO VENEZOLANO DE CREDITO" />
                     </>
                   )}
                 </datalist>
@@ -911,6 +887,7 @@ export default function IncomesRegistro({ exchangeRate, globalSearch = '' }: { e
                         <option value="PROVINCIAL">PROVINCIAL</option>
                         <option value="MERCANTIL">MERCANTIL</option>
                         <option value="BNC">BNC</option>
+                        <option value="BANCO VENEZOLANO DE CREDITO">BANCO VENEZOLANO DE CREDITO</option>
                       </>
                     ) : (
                       <>
@@ -923,6 +900,7 @@ export default function IncomesRegistro({ exchangeRate, globalSearch = '' }: { e
                         <option value="PROVINCIAL">PROVINCIAL</option>
                         <option value="MERCANTIL">MERCANTIL</option>
                         <option value="BNC">BNC</option>
+                        <option value="BANCO VENEZOLANO DE CREDITO">BANCO VENEZOLANO DE CREDITO</option>
                       </>
                     )}
                   </select>

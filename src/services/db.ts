@@ -462,6 +462,9 @@ export const dbService = {
                 destUpper.includes('PROVINCIAL') || 
                 destUpper.includes('MERCANTIL') || 
                 destUpper.includes('BNC') || 
+                destUpper.includes('BVC') || 
+                destUpper.includes('VENEZOLANO') || 
+                destUpper.includes('CREDITO') || 
                 destUpper.includes('BANCO') || 
                 destUpper.includes('TRANSFER') || 
                 destUpper.includes('PAGO') || 

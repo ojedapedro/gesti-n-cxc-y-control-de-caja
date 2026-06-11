@@ -11,9 +11,11 @@ import {
   Activity,
   BarChart2,
   X,
-  Search
+  Search,
+  ShieldCheck
 } from 'lucide-react';
 import { dbService } from './services/db';
+import { backupService } from './services/backup';
 import Dashboard from './components/Dashboard';
 import Incomes from './components/Incomes';
 import CXCAccounts from './components/CXCAccounts';
@@ -38,6 +40,7 @@ export default function App() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [globalSettings, setGlobalSettings] = useState<SettingsType | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [backupToast, setBackupToast] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
@@ -53,7 +56,23 @@ export default function App() {
   useEffect(() => {
     if (user) {
       const unsubSettings = dbService.subscribeToSettings(setGlobalSettings);
-      return () => unsubSettings();
+      
+      // Check for scheduled background local backups
+      const backupTimeout = setTimeout(() => {
+        backupService.runScheduledBackupCheck()
+          .then((res) => {
+            if (res.executed) {
+              setBackupToast(`Copia de seguridad ejecutada automáticamente vía: ${res.method || 'almacenamiento local'}`);
+              setTimeout(() => setBackupToast(null), 8000);
+            }
+          })
+          .catch((err) => console.error("Error executing scheduled backup:", err));
+      }, 5000);
+
+      return () => {
+        unsubSettings();
+        clearTimeout(backupTimeout);
+      };
     }
   }, [user]);
 
@@ -212,6 +231,22 @@ export default function App() {
         {activeView === 'reports' && <div key="reports"><Reports exchangeRate={globalSettings?.exchangeRate} globalSearch={globalSearch} /></div>}
         {activeView === 'settings' && <div key="settings"><Settings /></div>}
       </main>
+
+      {/* Backup Floating Toast Notification */}
+      {backupToast && (
+        <div className="fixed bottom-6 right-6 bg-slate-900 border border-slate-800 text-white rounded-2xl p-4 shadow-2xl flex items-center gap-3 animate-fade-in max-w-sm z-50">
+          <div className="w-10 h-10 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
+            <ShieldCheck size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h5 className="text-[11px] font-black uppercase tracking-wider text-emerald-400">Protección de Datos</h5>
+            <p className="text-[11px] text-slate-300 mt-0.5 leading-normal">{backupToast}</p>
+          </div>
+          <button onClick={() => setBackupToast(null)} className="text-slate-400 hover:text-white ml-2 transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { dbService } from "../services/db";
-import {
-  CashClosure,
+import { backupService } from "../services/backup";
+import {  CashClosure,
   TransactionType,
   PaymentMethod,
   Transaction,
@@ -494,6 +494,16 @@ export default function IncomesCierre({
         });
       } else {
         await dbService.addCashClosure(data);
+      }
+
+      // Trigger automatic backup if configured for cash closure
+      try {
+        const backupResult = await backupService.triggerClosureBackup();
+        if (backupResult.executed) {
+          console.log("[Backup] Respaldo automático por cierre de caja ejecutado: ", backupResult.method);
+        }
+      } catch (backupErr) {
+        console.error("Error doing automatic backup on cash closure:", backupErr);
       }
 
       setObservations("");
@@ -1318,63 +1328,9 @@ export default function IncomesCierre({
               </h4>
 
               <div className="space-y-6">
-                {/* CAJA USD */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                  <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
-                    <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2">
-                      <DollarSign size={14} className="text-emerald-600" /> Caja
-                      Efectivo USD
-                    </h5>
-                  </div>
-                  <div className="p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-emerald-600">
-                        Ingresos (+)
-                      </span>
-                      <span className="font-bold text-emerald-600">
-                        +{formatCurrency(incomesUsd)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
-                      <span className="text-sm font-black text-slate-800">
-                        Saldo Esperado USD
-                      </span>
-                      <span className="text-lg font-black text-emerald-600">
-                        {formatCurrency(expectedUsd)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* CAJA BS */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                  <div className="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
-                    <h5 className="text-xs font-bold text-slate-700 tracking-widest uppercase flex items-center gap-2">
-                      <div className="font-bold font-serif text-blue-600 bg-blue-100 rounded-sm px-1 text-[10px]">
-                        Bs
-                      </div>{" "}
-                      Caja Efectivo Bolívares
-                    </h5>
-                  </div>
-                  <div className="p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-emerald-600">
-                        Ingresos (+)
-                      </span>
-                      <span className="font-bold text-emerald-600">
-                        +{formatBs(incomesBs)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-2">
-                      <span className="text-sm font-black text-slate-800">
-                        Saldo Esperado BS
-                      </span>
-                      <span className="text-sm font-black text-blue-600">
-                        {formatBs(expectedBs)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+
+
 
                 {/* OTROS TOTALES */}
                 <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-4">

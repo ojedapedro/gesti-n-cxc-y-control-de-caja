@@ -90,7 +90,7 @@ const getPaymentClassification = (p: CXCPayment, exchangeRate: number): 'cash_us
       pMethod.includes('CASH') || 
       dest.includes('EFECTIVO') || 
       dest.includes('CAJA CHICA') ||
-      (!pMethod.includes('ZELLE') && !pMethod.includes('BINANCE') && !pMethod.includes('TRANSFERENCIA') && !pMethod.includes('BANC') && !pMethod.includes('PAGO'));
+      (!pMethod.includes('ZELLE') && !pMethod.includes('BINANCE') && !pMethod.includes('TRANSFERENCIA') && !pMethod.includes('BANC') && !pMethod.includes('PAGO') && !dest.includes('BVC') && !dest.includes('CREDITO') && !dest.includes('VENEZOLANO'));
     if (isCashUsd) return 'cash_usd';
   } else {
     const isCashBs = 
@@ -98,7 +98,7 @@ const getPaymentClassification = (p: CXCPayment, exchangeRate: number): 'cash_us
       pMethod.includes('CASH') || 
       dest.includes('EFECTIVO') || 
       dest.includes('CAJA CHICA') ||
-      (!pMethod.includes('TRANSFERENCIA') && !pMethod.includes('PAGO MOVIL') && !pMethod.includes('BANCO') && !pMethod.includes('BANC') && !dest.includes('BANC') && !dest.includes('TRANSFERENCIA') && !dest.includes('BOD') && !dest.includes('PROVINCIAL') && !dest.includes('MERCANTIL') && !dest.includes('BANESCO') && !dest.includes('BDV') && !dest.includes('VENEZUELA'));
+      (!pMethod.includes('TRANSFERENCIA') && !pMethod.includes('PAGO MOVIL') && !pMethod.includes('BANCO') && !pMethod.includes('BANC') && !dest.includes('BANC') && !dest.includes('TRANSFERENCIA') && !dest.includes('BOD') && !dest.includes('PROVINCIAL') && !dest.includes('MERCANTIL') && !dest.includes('BANESCO') && !dest.includes('BDV') && !dest.includes('VENEZUELA') && !dest.includes('BVC') && !dest.includes('CREDITO') && !dest.includes('VENEZOLANO'));
     if (isCashBs) return 'cash_bs';
   }
   return 'bank';
