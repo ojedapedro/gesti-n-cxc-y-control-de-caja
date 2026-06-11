@@ -24,6 +24,7 @@ import Receipts from './components/Receipts';
 import Settings from './components/Settings';
 import Sellers from './components/Sellers';
 import Reports from './components/Reports';
+import QuickActionFAB from './components/QuickActionFAB';
 
 type View = 'dashboard' | 'incomes' | 'cxc' | 'expenses' | 'settings' | 'sellers' | 'reports';
 
@@ -247,6 +248,9 @@ export default function App() {
           </button>
         </div>
       )}
+
+      {/* Global Quick Action Floating Button (FAB) */}
+      <QuickActionFAB exchangeRate={globalSettings?.exchangeRate} />
     </div>
   );
 }
