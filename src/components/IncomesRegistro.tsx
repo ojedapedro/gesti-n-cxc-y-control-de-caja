@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 import { TransactionType, PaymentMethod, type Transaction, type Seller } from '../types';
-import { Plus, Search, Calendar, User, DollarSign, Tag, Clock, FileText, Edit, X, Percent, Landmark, Gift } from 'lucide-react';
+import { Plus, Search, Calendar, User, DollarSign, Tag, Clock, FileText, Edit, X, Percent, Landmark, Gift, Printer } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -718,7 +718,7 @@ export default function IncomesRegistro({ exchangeRate, globalSearch = '' }: { e
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-emerald-950/20">Zelle/Binance</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700 bg-orange-950/20">Efectivo Bs</th>
                 <th className="p-3 text-right text-[10px] uppercase font-black border-r border-slate-700">Venta Diaria</th>
-                <th className="p-3 text-center text-[10px] uppercase font-black">Edit</th>
+                <th className="p-3 text-center text-[10px] uppercase font-black no-print">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -798,13 +798,38 @@ export default function IncomesRegistro({ exchangeRate, globalSearch = '' }: { e
                           );
                         })()}
                       </td>
-                      <td className="p-3 text-center">
-                        <button 
-                           onClick={() => setEditingTransaction(t)}
-                           className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
-                        >
-                          <Edit size={14} />
-                        </button>
+                      <td className="p-3 text-center no-print border-l border-slate-100">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button 
+                             type="button"
+                             onClick={() => setEditingTransaction(t)}
+                             className="p-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer flex items-center justify-center"
+                             title="Editar Transacción"
+                          >
+                            <Edit size={13} />
+                          </button>
+                          <button 
+                             type="button"
+                             onClick={() => {
+                               if ((window as any).triggerPrintReceipt) {
+                                 const isBs = !!(t.amountBs && t.amountBs > 0);
+                                 const valUsd = isBs ? ((t.amountUsdCash || 0) + (t.amountZelle || 0)) : (t.totalDailySale || t.amountUsd || 0);
+                                 const valBs = isBs ? t.amountBs : (valUsd * (t.exchangeRate || exchangeRate || 1));
+                                 (window as any).triggerPrintReceipt('transaction', {
+                                   ...t,
+                                   recipient: t.clientName || 'CLIENTE GENERAL',
+                                   amountUsd: valUsd,
+                                   amountBs: valBs,
+                                   concept: `CUADRE DIARIO DE CAJA - RECIBO DE INGRESO. DESTINO SUCURSAL: ${(t.destinationBank || 'CAJA GENERAL').toUpperCase()}`
+                                 });
+                               }
+                             }}
+                             className="p-1.5 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer flex items-center justify-center"
+                             title="Imprimir Comprobante"
+                          >
+                            <Printer size={13} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

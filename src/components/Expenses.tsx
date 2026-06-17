@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 import { PaymentMethod, type Expense } from '../types';
-import { Plus, TrendingDown, Calendar, Tag, FileText, Search, Filter, PieChart, List, ChevronRight, Download, Activity } from 'lucide-react';
+import { Plus, TrendingDown, Calendar, Tag, FileText, Search, Filter, PieChart, List, ChevronRight, Download, Activity, Printer } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { jsPDF } from 'jspdf';
@@ -157,36 +157,52 @@ function Expenses({ exchangeRate, globalSearch = '' }: { exchangeRate?: number; 
   }).filter(d => d.value > 0);
 
   const handleDownloadReport = () => {
-    const doc = new jsPDF();
-    const currentDate = format(new Date(), "dd/MM/yyyy HH:mm");
+    const doc = new jsPDF("p", "mm", "a4");
+    const currentDate = format(new Date(), "dd/MM/yyyy h:mm a");
 
-    doc.setFontSize(18);
-    doc.text('Reporte de Egresos', 14, 22);
+    // Header section decoration - White background with thin minimal separator line (ink-saver)
+    doc.setDrawColor(226, 232, 240); // slate 200
+    doc.setLineWidth(0.4);
+    doc.line(14, 21, 196, 21);
     
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generado: ${currentDate}`, 14, 28);
+    // Header text
+    doc.setTextColor(15, 23, 42); // slate 900
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("INVEPINCA C.A.", 14, 11);
+    
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(100, 116, 139); // slate 500
+    doc.text("REPORTE DETALLADO DE EGRESOS DE CAJA", 14, 16);
+    
+    // Header metadata on the right side
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105); // slate 600
+    doc.text(`Impresión: ${currentDate}`, 196, 11, { align: "right" });
     
     let periodText = 'Periodo: Todos los registros';
     if (startDate && endDate) {
-      periodText = `Periodo: ${format(new Date(startDate), "dd/MM/yyyy")} al ${format(new Date(endDate), "dd/MM/yyyy")}`;
+      periodText = `Periodo: ${format(new Date(startDate + 'T12:00:00'), "dd/MM/yyyy")} al ${format(new Date(endDate + 'T12:00:00'), "dd/MM/yyyy")}`;
     } else if (startDate) {
-      periodText = `Periodo: Desde ${format(new Date(startDate), "dd/MM/yyyy")}`;
+      periodText = `Periodo: Desde ${format(new Date(startDate + 'T12:00:00'), "dd/MM/yyyy")}`;
     } else if (endDate) {
-      periodText = `Periodo: Hasta ${format(new Date(endDate), "dd/MM/yyyy")}`;
+      periodText = `Periodo: Hasta ${format(new Date(endDate + 'T12:05:00'), "dd/MM/yyyy")}`;
     }
-    doc.text(periodText, 14, 33);
-    
-    doc.setFontSize(12);
-    doc.setTextColor(50);
-    doc.text(`Total Egresos USD: ${formatCurrency(totalMonthlyExpense)}`, 14, 43);
+    doc.text(periodText, 196, 15, { align: "right" });
+
+    // Display summary banner on left side or as a clean box
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Total Egresos Conciliados: ${formatCurrency(totalMonthlyExpense)}`, 14, 26);
     if (exchangeRate) {
-      doc.text(`Total Equivalente Bs: Bs. ${new Intl.NumberFormat('es-VE').format(totalMonthlyExpense * exchangeRate)}`, 14, 49);
+      doc.text(`Equiv. Bolívares (Tasa: ${exchangeRate.toFixed(2)}): Bs. ${new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalMonthlyExpense * exchangeRate)}`, 14, 30);
     }
 
-    const tableColumn = ["Fecha", "Detalle", "Moneda", "Monto USD"];
+    const tableColumn = ["Fecha", "Detalle / Concepto", "Moneda", "Monto USD"];
     if (exchangeRate) {
-      tableColumn.push("Monto Bs.");
+      tableColumn.push("Monto Recaudado Bs.");
     }
     const tableRows: any[] = [];
 
@@ -194,29 +210,60 @@ function Expenses({ exchangeRate, globalSearch = '' }: { exchangeRate?: number; 
     const sortedExpenses = [...filteredExpenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     sortedExpenses.forEach(e => {
+      let displayDate = e.date;
+      try {
+        const parts = e.date.split('-');
+        if (parts.length === 3) {
+          displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+      } catch (err) {
+        // fallback
+      }
+
       const rowData = [
-        format(new Date(e.date), "dd/MM/yyyy"),
-        e.note || e.category || '-',
-        e.paymentMethod === PaymentMethod.BS_CASH || e.paymentMethod === PaymentMethod.BS ? 'Bs' : '$',
+        displayDate,
+        (e.note || e.category || '-').toUpperCase(),
+        e.paymentMethod === PaymentMethod.BS_CASH || e.paymentMethod === PaymentMethod.BS ? 'BOLÍVARES (Bs)' : 'DÓLARES ($)',
         formatCurrency(e.amountUsd)
       ];
       if (exchangeRate) {
-         rowData.push(`Bs. ${new Intl.NumberFormat('es-VE').format(e.amountUsd * exchangeRate)}`);
+         rowData.push(`Bs. ${new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(e.amountUsd * (e.exchangeRate || exchangeRate))}`);
       }
       tableRows.push(rowData);
     });
 
+    // Totals row at bottom
+    const totalRow = [
+      { content: "EGRESOS CONCILIADOS PERIODOS", colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: "", styles: { halign: 'center' } },
+      { content: formatCurrency(totalMonthlyExpense), styles: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] } }
+    ];
+    if (exchangeRate) {
+      totalRow.push({ content: `Bs. ${new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(totalMonthlyExpense * exchangeRate)}`, styles: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] } });
+    }
+    tableRows.push(totalRow);
+
     autoTable(doc, {
-      startY: 55,
+      startY: exchangeRate ? 35 : 31,
       head: [tableColumn],
       body: tableRows,
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 4 },
-      headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold", cellPadding: 1.2 },
+      styles: { fontSize: 7, lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1.2 },
       columnStyles: exchangeRate 
-          ? { 3: { halign: 'right', fontStyle: 'bold' }, 4: { halign: 'right' } }
-          : { 3: { halign: 'right', fontStyle: 'bold' } }
+          ? { 
+              0: { cellWidth: 20, halign: 'center' }, 
+              1: { cellWidth: 80 }, 
+              2: { cellWidth: 28, halign: 'center' }, 
+              3: { cellWidth: 27, halign: 'right' }, 
+              4: { cellWidth: 27, halign: 'right' } 
+            }
+          : { 
+              0: { cellWidth: 25, halign: 'center' }, 
+              1: { cellWidth: 107 }, 
+              2: { cellWidth: 25, halign: 'center' }, 
+              3: { cellWidth: 25, halign: 'right' } 
+            }
     });
 
     doc.save(`gastos_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
@@ -409,6 +456,7 @@ function Expenses({ exchangeRate, globalSearch = '' }: { exchangeRate?: number; 
                 <th className="p-4 px-5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Detalle</th>
                 <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest whitespace-nowrap">Moneda O.</th>
                 <th className="p-4 px-5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-widest bg-rose-50/50">Monto Eq. USD</th>
+                <th className="p-4 px-5 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-widest no-print">Imprimir</th>
               </tr>
             </thead>
             <tbody>
@@ -435,12 +483,27 @@ function Expenses({ exchangeRate, globalSearch = '' }: { exchangeRate?: number; 
                      -{formatCurrency(e.amountUsd)}
                      <span className="block text-[10px] text-slate-400 font-normal mt-0.5">Bs. {new Intl.NumberFormat('es-VE').format(e.amountUsd * (e.exchangeRate || exchangeRate || 1))}</span>
                    </td>
+                   <td className="p-4 px-5 text-center no-print">
+                     <button
+                       type="button"
+                       onClick={() => {
+                         if ((window as any).triggerPrintReceipt) {
+                           (window as any).triggerPrintReceipt('expense', e);
+                         }
+                       }}
+                       className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold hover:border-slate-300 transition-all flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                       title="Imprimir Comprobante de Gasto"
+                     >
+                       <Printer size={13} className="text-slate-500" />
+                       <span>Ticket</span>
+                     </button>
+                   </td>
                  </tr>
                 )
               })}
               {filteredExpenses.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="p-10 text-center text-slate-500 italic">No hay egresos en este periodo.</td>
+                  <td colSpan={5} className="p-10 text-center text-slate-500 italic">No hay egresos en este periodo.</td>
                 </tr>
               )}
             </tbody>

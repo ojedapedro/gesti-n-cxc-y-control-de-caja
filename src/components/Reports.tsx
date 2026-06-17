@@ -1048,13 +1048,27 @@ export default function Reports({ exchangeRate = 1, globalSearch = '' }: Reports
       ]);
     }
 
-    // PDF Headers rendering
-    doc.text('INVEPINCA CA', 14, 18);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 116, 139); // slate-500
-    doc.text(titleText, 14, 24);
-    doc.text(`Fecha Emisión: ${todayStr} | Tasa de Cambio Base: ${formatBs(exchangeRate)}`, 14, 29);
+    // PDF Headers rendering - White background with thin minimal separator line (ink-saver)
+    doc.setDrawColor(226, 232, 240); // slate 200
+    doc.setLineWidth(0.4);
+    doc.line(14, 21, 196, 21);
+    
+    // Header company text
+    doc.setTextColor(15, 23, 42); // slate 900
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("INVEPINCA C.A.", 14, 11);
+    
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(100, 116, 139); // slate 500
+    doc.text(titleText.toUpperCase(), 14, 16);
+    
+    // Header metadata on the right side
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105); // slate 600
+    doc.text(`Impresión: ${todayStr}`, 196, 11, { align: "right" });
+    doc.text(`Tasa Base: ${formatBs(exchangeRate)}`, 196, 15, { align: "right" });
 
     let filterText = 'Filtros aplicados: ';
     if (startDate) filterText += `Desde: ${startDate} `;
@@ -1081,20 +1095,62 @@ export default function Reports({ exchangeRate = 1, globalSearch = '' }: Reports
       filterText += 'Ninguno (Datos completos)';
     }
 
-    doc.setFontSize(9);
-    doc.text(filterText, 14, 34);
+    doc.setFont("helvetica", "oblique");
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(filterText, 14, 26);
+
+    // Apply specific column spacing and alignments according to active report
+    let selectedColStyles: { [key: number]: any } = {};
+    if (activeReport === 'cxc_detail') {
+      selectedColStyles = {
+        0: { cellWidth: 'auto' }, // Cliente
+        1: { cellWidth: 18, halign: 'center' }, // Fecha
+        2: { cellWidth: 16, halign: 'center' }, // Factura
+        3: { cellWidth: 32 }, // Vendedor
+        4: { cellWidth: 23, halign: 'right' }, // Monto Bruto
+        5: { cellWidth: 19, halign: 'right' }, // Comisión
+        6: { cellWidth: 23, halign: 'right' }  // Monto Neto
+      };
+    } else if (activeReport === 'abonos') {
+      selectedColStyles = {
+        0: { cellWidth: 18, halign: 'center' }, // Fecha
+        1: { cellWidth: 'auto' }, // Cliente
+        2: { cellWidth: 32 }, // Vendedor
+        3: { cellWidth: 22, halign: 'right' }, // Abono USD
+        4: { cellWidth: 26, halign: 'right' }, // Abono BS
+        5: { cellWidth: 22, halign: 'right' }, // Equivalente USD
+        6: { cellWidth: 22, halign: 'right' }  // Saldo Cliente
+      };
+    } else if (activeReport === 'bank_reconciliation') {
+      selectedColStyles = {
+        0: { cellWidth: 18, halign: 'center' }, // Fecha
+        1: { cellWidth: 28 }, // Banco
+        2: { cellWidth: 16, halign: 'center' }, // Moneda
+        3: { cellWidth: 'auto' }, // Concepto
+        4: { cellWidth: 25, halign: 'right' }, // Monto USD
+        5: { cellWidth: 27, halign: 'right' }  // Monto BS
+      };
+    } else if (activeReport === 'egresos_vales') {
+      selectedColStyles = {
+        0: { cellWidth: 18, halign: 'center' }, // Fecha
+        1: { cellWidth: 17, halign: 'center' }, // Tipo
+        2: { cellWidth: 42 }, // Beneficiario / Categoria
+        3: { cellWidth: 'auto' }, // Concepto/Nota
+        4: { cellWidth: 23, halign: 'right' }, // Monto USD
+        5: { cellWidth: 25, halign: 'right' }  // Monto BS
+      };
+    }
 
     // Apply autotable PDF library
     autoTable(doc, {
-      startY: 38,
+      startY: 30,
       head: [tableHeaders],
       body: tableRows,
       theme: 'grid',
-      headStyles: { fillColor: [15, 23, 42] },
-      styles: { fontSize: 8.5, cellPadding: 2.5 },
-      columnStyles: {
-        0: { cellWidth: 'auto' }
-      }
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.2, fontStyle: "bold", cellPadding: 1.2 },
+      styles: { fontSize: 6.8, lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1.2 },
+      columnStyles: selectedColStyles
     });
 
     const pdfName = `Reporte_${activeReport}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;

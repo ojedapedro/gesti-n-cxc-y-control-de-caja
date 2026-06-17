@@ -176,7 +176,11 @@ export default function Receipts({ exchangeRate = 1, globalSearch = '' }: { exch
 
   const handlePrint = () => {
     if (!selectedReceipt) return;
-    window.print();
+    if ((window as any).triggerPrintReceipt) {
+      (window as any).triggerPrintReceipt('receipt', selectedReceipt);
+    } else {
+      window.print();
+    }
   };
 
   const handleDownloadPDF = async () => {

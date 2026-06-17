@@ -25,6 +25,7 @@ import Settings from './components/Settings';
 import Sellers from './components/Sellers';
 import Reports from './components/Reports';
 import QuickActionFAB from './components/QuickActionFAB';
+import PrintReceiptComponent from './components/PrintReceiptComponent';
 
 type View = 'dashboard' | 'incomes' | 'cxc' | 'expenses' | 'settings' | 'sellers' | 'reports';
 
@@ -42,6 +43,7 @@ export default function App() {
   const [globalSettings, setGlobalSettings] = useState<SettingsType | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
   const [backupToast, setBackupToast] = useState<string | null>(null);
+  const [printTarget, setPrintTarget] = useState<{ type: 'receipt' | 'transaction' | 'expense'; data: any } | null>(null);
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
@@ -76,6 +78,19 @@ export default function App() {
       };
     }
   }, [user]);
+
+  useEffect(() => {
+    (window as any).triggerPrintReceipt = (type: 'receipt' | 'transaction' | 'expense', data: any) => {
+      setPrintTarget({ type, data });
+      setTimeout(() => {
+        window.print();
+        setPrintTarget(null);
+      }, 150);
+    };
+    return () => {
+      delete (window as any).triggerPrintReceipt;
+    };
+  }, []);
 
   if (loadingAuth) {
     return (
@@ -251,6 +266,15 @@ export default function App() {
 
       {/* Global Quick Action Floating Button (FAB) */}
       <QuickActionFAB exchangeRate={globalSettings?.exchangeRate} />
+
+      {/* Global Print View (Invisible on screen, styled beautifully on printed paper) */}
+      {printTarget && (
+        <PrintReceiptComponent 
+          type={printTarget.type} 
+          data={printTarget.data} 
+          exchangeRate={globalSettings?.exchangeRate} 
+        />
+      )}
     </div>
   );
 }

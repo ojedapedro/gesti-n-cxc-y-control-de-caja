@@ -656,16 +656,31 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
   };
 
   const handleDownloadBook = () => {
-    const doc = new jsPDF();
-    const currentDate = format(new Date(), "dd/MM/yyyy HH:mm");
+    const doc = new jsPDF("p", "mm", "a4");
+    const currentDate = format(new Date(), "dd/MM/yyyy h:mm a");
 
-    doc.setFontSize(18);
-    doc.text('Libro de CXC - Cuentas por Cobrar', 14, 22);
+    // Header section decoration - White background with thin minimal separator line (ink-saver)
+    doc.setDrawColor(226, 232, 240); // slate 200
+    doc.setLineWidth(0.4);
+    doc.line(14, 21, 196, 21);
+    
+    // Header text
+    doc.setTextColor(15, 23, 42); // slate 900
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("INVEPINCA C.A.", 14, 11);
+    
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(100, 116, 139); // slate 500
+    doc.text("LIBRO AUXILIAR DE CUENTAS POR COBRAR (CXC)", 14, 16);
+    
+    // Header metadata on the right side
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105); // slate 600
+    doc.text(`Impresión: ${currentDate}`, 196, 15, { align: "right" });
 
-    doc.setFontSize(11);
-    doc.text(`Invepinca CA - Generado el: ${currentDate}`, 14, 30);
-
-    const tableColumn = ["Cliente", "Última Actualización", "Deuda Acumulada"];
+    const tableColumn = ["Cliente o Razón Social", "Última Operación", "Saldo Deudor Pendiente"];
     const tableRows: any[] = [];
 
     let totalCXC = 0;
@@ -682,7 +697,7 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
       }
 
       const rowData = [
-        account.clientName,
+        account.clientName.toUpperCase(),
         format(dateObj, "dd/MM/yyyy"),
         formatCurrency(account.totalBalance)
       ];
@@ -692,17 +707,22 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
 
     // Subtotal/Total row
     tableRows.push([
-      { content: "TOTAL GENERAL", colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
-      { content: formatCurrency(totalCXC), styles: { fontStyle: 'bold', textColor: [200, 50, 50] } }
+      { content: "TOTAL CARTERA DEUDORA", colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: formatCurrency(totalCXC), styles: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38], fillColor: [254, 242, 242] } }
     ]);
 
     autoTable(doc, {
-      startY: 40,
+      startY: 27,
       head: [tableColumn],
       body: tableRows,
       theme: 'grid',
-      headStyles: { fillColor: [15, 23, 42] }, // Slate-900 like
-      styles: { fontSize: 10 }
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7.5, fontStyle: "bold", cellPadding: 1.2 },
+      styles: { fontSize: 7, lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1.2 },
+      columnStyles: {
+        0: { cellWidth: 110 },
+        1: { cellWidth: 32, halign: 'center' },
+        2: { cellWidth: 40, halign: 'right' }
+      }
     });
 
     doc.save(`Libro_CXC_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
@@ -711,28 +731,43 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
   const handleDownloadClientPDF = () => {
     if (!selectedAccount) return;
 
-    const doc = new jsPDF();
-    const currentDate = format(new Date(), "dd/MM/yyyy HH:mm");
+    const doc = new jsPDF("p", "mm", "a4");
+    const currentDate = format(new Date(), "dd/MM/yyyy h:mm a");
 
-    doc.setFontSize(18);
-    doc.text(`Estado de Cuenta - ${selectedAccount.clientName}`, 14, 22);
+    // Header section decoration - White background with thin minimal separator line (ink-saver)
+    doc.setDrawColor(226, 232, 240); // slate 200
+    doc.setLineWidth(0.4);
+    doc.line(14, 21, 196, 21);
+    
+    // Header text
+    doc.setTextColor(15, 23, 42); // slate 900
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("INVEPINCA C.A.", 14, 11);
+    
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(100, 116, 139); // slate 500
+    doc.text(`ESTADO DE CUENTA DETALLADO - ${selectedAccount.clientName.toUpperCase()}`, 14, 16);
+    
+    // Header metadata on the right side
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105); // slate 600
+    doc.text(`ID Cliente: ${selectedAccount.id}`, 196, 11, { align: "right" });
+    doc.text(`Generado: ${currentDate}`, 196, 15, { align: "right" });
+    doc.text(`Saldo Pendiente: ${formatCurrency(selectedAccount.totalBalance)}`, 196, 19, { align: "right" });
 
-    doc.setFontSize(11);
-    doc.text(`Invepinca CA - Generado el: ${currentDate}`, 14, 30);
-    doc.text(`ID Cliente: ${selectedAccount.id}`, 14, 36);
-    doc.text(`Saldo Total Pendiente: ${formatCurrency(selectedAccount.totalBalance)}`, 14, 42);
-
-    let startYTable = 50;
+    let startYTable = 27;
     if (filterStartDate || filterEndDate || filterSeller) {
       let filterDetails = 'Filtros aplicados: ';
       if (filterStartDate) filterDetails += `Desde: ${filterStartDate} `;
       if (filterEndDate) filterDetails += `Hasta: ${filterEndDate} `;
       if (filterSeller) filterDetails += `Vendedor: ${filterSeller}`;
-      doc.setFontSize(9);
-      doc.setTextColor(115, 115, 115);
-      doc.text(filterDetails, 14, 46);
-      startYTable = 52;
-      doc.setTextColor(0, 0, 0); // Reset color
+      doc.setFont("helvetica", "oblique");
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(filterDetails, 14, startYTable);
+      startYTable = 31;
     }
 
     const tableColumn = ["Fecha", "Concepto", "Vendedor", "Factura", "Monto Bruto", "Comisión", "Monto Neto", "Abono"];
@@ -744,8 +779,19 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
     filteredPayments.forEach(payment => {
       const isCharge = payment.type === 'charge';
       
+      // Format Date nicely
+      let displayDate = payment.date;
+      try {
+        const parts = payment.date.split('-');
+        if (parts.length === 3) {
+          displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+      } catch (e) {
+        // fallback
+      }
+
       const rowData = [
-        payment.date,
+        displayDate,
         payment.concept || (isCharge ? 'Venta a Crédito' : 'Abono/Pago'),
         payment.sellerName ? (payment.rubroName ? `${payment.sellerName} (${payment.rubroName})` : payment.sellerName) : (isCharge ? '-' : (payment.paymentMethod || '-')),
         payment.invoiceNumber || '-',
@@ -761,13 +807,13 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
 
     tableRows.push([
       { content: "TOTALES", colSpan: 6, styles: { halign: 'right', fontStyle: 'bold' } },
-      { content: formatCurrency(totalCargos), styles: { fontStyle: 'bold', textColor: [200, 50, 50] } },
-      { content: formatCurrency(totalPagos), styles: { fontStyle: 'bold', textColor: [50, 150, 50] } }
+      { content: formatCurrency(totalCargos), styles: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] } },
+      { content: formatCurrency(totalPagos), styles: { halign: 'right', fontStyle: 'bold', textColor: [22, 163, 74] } }
     ]);
 
     tableRows.push([
-      { content: "SALDO DEUDOR", colSpan: 7, styles: { halign: 'right', fontStyle: 'bold' } },
-      { content: formatCurrency(totalCargos - totalPagos), styles: { fontStyle: 'bold' } }
+      { content: "SALDO DEUDOR FINAL", colSpan: 6, styles: { halign: 'right', fontStyle: 'bold' } },
+      { content: formatCurrency(totalCargos - totalPagos), colSpan: 2, styles: { halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42], fillColor: [241, 245, 249] } }
     ]);
 
     autoTable(doc, {
@@ -775,8 +821,18 @@ export default function CXCAccounts({ exchangeRate = 1, globalSearch = '' }: { e
       head: [tableColumn],
       body: tableRows,
       theme: 'grid',
-      headStyles: { fillColor: [15, 23, 42] },
-      styles: { fontSize: 10 }
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 7, fontStyle: "bold", cellPadding: 1.2 },
+      styles: { fontSize: 6.5, lineColor: [226, 232, 240], lineWidth: 0.1, cellPadding: 1.2 },
+      columnStyles: {
+        0: { cellWidth: 16 }, // Fecha
+        1: { cellWidth: 34 }, // Concepto
+        2: { cellWidth: 32 }, // Vendedor
+        3: { cellWidth: 14 }, // Factura
+        4: { cellWidth: 22, halign: 'right' }, // Monto Bruto
+        5: { cellWidth: 20, halign: 'right' }, // Comisión
+        6: { cellWidth: 22, halign: 'right' }, // Monto Neto
+        7: { cellWidth: 22, halign: 'right' }  // Abono
+      }
     });
 
     doc.save(`Estado_Cuenta_${selectedAccount.clientName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
